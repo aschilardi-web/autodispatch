@@ -1,0 +1,2375 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#102d4c">
+<title>AutoDispatch</title>
+<style>
+:root{--navy:#102d4c;--blue:#2675a9;--pale:#edf5fb;--ink:#20384e;--muted:#74879a;--line:#e2e9ef;--bg:#f4f7fa;--green:#24784d;--amber:#9a6b18;--red:#a54b48}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px Arial,Helvetica,sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid #4a9cdc;outline-offset:2px}
+@keyframes shimmer{0%{left:-80%}100%{left:120%}}
+.loading-bar{position:fixed;top:0;left:0;right:0;height:3px;background:#1a3f6a;z-index:200;display:none;overflow:hidden}.loading-bar.on{display:block}.loading-bar::before{content:'';position:absolute;top:0;left:-80%;width:60%;height:100%;background:linear-gradient(90deg,transparent,#5ab0e8,transparent);animation:shimmer 1.2s ease-in-out infinite}
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg)}.auth-card{background:white;border:1px solid var(--line);border-radius:12px;padding:32px;width:360px;box-shadow:0 8px 32px #102d4c14}.auth-brand{font-size:22px;font-weight:800;color:var(--navy);margin-bottom:6px}.auth-brand span{color:#98c9e9;font-weight:400}.auth-brand small{display:block;font-size:9px;letter-spacing:2px;color:var(--muted);margin-top:4px}.auth-title{font-size:17px;font-weight:700;margin:22px 0 18px}.auth-err{color:var(--red);font-size:12px;min-height:18px;margin:8px 0 4px}
+.shell{min-height:100vh;display:flex}.sidebar{width:230px;background:var(--navy);color:#d4e2ee;position:fixed;inset:0 auto 0 0;padding:24px 13px;display:flex;flex-direction:column;z-index:5}.brand{font-size:20px;font-weight:800;color:white;padding:0 12px 28px;letter-spacing:-.5px}.brand span{color:#98c9e9;font-weight:400}.brand small{display:block;color:#7799b4;font-size:8px;letter-spacing:2px;margin-top:5px}.nav-label{font-size:10px;letter-spacing:1.5px;color:#7f9bb3;padding:12px 12px}.nav{display:grid;gap:4px}.nav button{border:0;background:transparent;color:#b7cadb;border-radius:7px;text-align:left;padding:11px 12px;display:flex;gap:11px;align-items:center;font-weight:600}.nav button:hover,.nav button.active{background:#244a70;color:white}.nav .icon{width:21px;text-align:center;font-size:16px}.sidebar-foot{margin-top:auto;border-top:1px solid #294d6c;padding:16px 10px;font-size:11px;color:#acc2d4;line-height:1.6}.main{margin-left:230px;width:calc(100% - 230px);min-height:100vh}.topbar{height:68px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:3}.crumb{font-size:12px;color:var(--muted)}.crumb strong{color:var(--ink);font-size:14px}.top-actions{display:flex;gap:9px}.btn{border:1px solid #d8e2ea;background:#fff;color:#33536e;padding:9px 12px;border-radius:7px;font-weight:700;font-size:12px}.btn:hover{background:#f3f8fc}.btn.primary{border-color:var(--blue);background:var(--blue);color:white}.btn.soft{border-color:#d2e4f1;background:var(--pale);color:#1e6592}.btn.danger{color:var(--red)}.content{padding:25px 28px;max-width:1450px;margin:auto}.heading{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:20px}.eyebrow{font-size:10px;font-weight:800;letter-spacing:1.5px;color:#6e879e}.heading h1{font-size:25px;margin:5px 0 0;letter-spacing:-.5px}.heading p{margin:6px 0 0;color:var(--muted);font-size:12px}.grid{display:grid;gap:14px}.stats{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:20px}.stat,.panel,.card{background:white;border:1px solid var(--line);border-radius:9px}.stat{padding:17px}.stat small{color:var(--muted);font-size:11px}.stat strong{display:block;font-size:23px;margin-top:9px}.stat em{font-style:normal;color:#8094a6;font-size:11px}.panel{padding:17px;margin-bottom:16px}.panel-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.panel-title h2{font-size:15px;margin:0}.panel-title small{font-weight:400;color:var(--muted)}.recent-list{display:grid}.recent-row{display:grid;grid-template-columns:130px 1.15fr 1fr 1fr 110px 80px;gap:10px;align-items:center;padding:12px 4px;border-top:1px solid #eef1f4;font-size:12px}.recent-row:first-child{border-top:0}.recent-row strong{font-size:12px}.recent-row small{display:block;color:var(--muted);font-size:11px;margin-top:4px}.badge{display:inline-flex;align-items:center;border-radius:20px;background:#eff3f6;color:#536a7d;padding:5px 8px;font-size:10px;font-weight:700;white-space:nowrap}.badge.green{background:#e7f4ec;color:var(--green)}.badge.amber{background:#fff4df;color:var(--amber)}.badge.blue{background:#e7f2fa;color:#286d99}.toolbar{display:flex;gap:9px;align-items:center;margin-bottom:12px;flex-wrap:wrap}.toolbar input,.toolbar select{border:1px solid #dbe4eb;border-radius:7px;padding:9px 10px;background:white;color:var(--ink);font-size:12px}.toolbar input[type=search]{min-width:220px;flex:1}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:8px;background:white}table{border-collapse:collapse;width:100%;min-width:850px}th,td{text-align:left;padding:11px 12px;border-bottom:1px solid #edf1f4;vertical-align:middle;font-size:12px}th{position:sticky;top:0;background:#f8fafc;color:#60778b;font-size:10px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}th button{border:0;background:none;color:inherit;font-size:inherit;font-weight:800;text-transform:inherit;letter-spacing:inherit;padding:0}tbody tr:hover{background:#fbfdff}td strong{font-size:12px}td small{display:block;color:var(--muted);font-size:10px;margin-top:4px}.check-cell{width:38px}.check-cell input{width:16px;height:16px;accent-color:var(--blue)}.bulkbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;background:#edf6fc;border:1px solid #d6e7f2;border-radius:8px;padding:12px;margin:0 0 12px}.bulkbar strong{font-size:12px;margin-right:auto}.bulkbar select,.bulkbar input{padding:8px;border:1px solid #d4e1ea;border-radius:6px;background:#fff;font-size:12px}.cards{grid-template-columns:repeat(3,minmax(0,1fr))}.entity-card{padding:16px}.entity-card h3{margin:0 0 5px;font-size:14px}.entity-card p{font-size:11px;color:var(--muted);line-height:1.55;margin:6px 0}.entity-card .card-actions{display:flex;gap:7px;margin-top:12px}.route{display:grid;grid-template-columns:1fr 1fr;gap:12px}.routebox{border:1px solid var(--line);border-radius:8px;padding:13px}.routebox small{display:block;font-size:9px;letter-spacing:1px;color:#71879a;font-weight:800}.routebox strong{display:block;margin-top:7px;font-size:13px}.routebox p{margin:5px 0 0;color:var(--muted);font-size:11px;line-height:1.5}.mission-list{display:grid;gap:9px}.empty{padding:32px;text-align:center;color:var(--muted);font-size:13px}.notice{margin:10px 0;padding:10px;border-radius:7px;background:#eaf5ee;color:#287247;font-size:12px}.notice.error{background:#faeeee;color:#984745}.modal-backdrop{position:fixed;inset:0;background:#132d456b;z-index:20;display:none;align-items:center;justify-content:center;padding:15px}.modal-backdrop.open{display:flex}.modal{background:white;border-radius:12px;width:min(760px,100%);max-height:92vh;overflow:auto;padding:21px;box-shadow:0 20px 60px #0d233533}.modal-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}.modal-header h2{margin:0;font-size:19px}.modal-header p{margin:5px 0 0;color:var(--muted);font-size:12px}.x{border:0;background:none;font-size:23px;color:#8091a1}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}.field{display:grid;gap:5px}.field.wide{grid-column:1/-1}.field label{font-size:10px;font-weight:800;color:#5f7589}.field input,.field select,.field textarea{width:100%;border:1px solid #d9e2e9;border-radius:6px;padding:9px;font-size:12px;background:white;color:var(--ink)}.field textarea{min-height:62px;resize:vertical}.form-section{grid-column:1/-1;border-top:1px solid var(--line);padding-top:13px;margin-top:3px;font-size:12px;font-weight:800}.modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:17px}.car-form{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;align-items:end}.car-form .field input{min-width:0}.mission-detail{position:fixed;inset:0 0 0 auto;width:min(640px,100%);background:white;z-index:12;box-shadow:-15px 0 50px #102d4c26;transform:translateX(105%);transition:transform .2s;overflow:auto;padding:24px}.mission-detail.open{transform:none}.detail-head{display:flex;justify-content:space-between}.detail-head h2{margin:3px 0 5px}.detail-head p{margin:0;color:var(--muted);font-size:12px}.detail-block{padding:15px 0;border-bottom:1px solid var(--line)}.detail-block h3{font-size:12px;margin:0 0 10px}.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}.info-grid span{font-size:10px;color:var(--muted)}.info-grid strong{display:block;color:var(--ink);font-size:12px;margin-top:4px}.notification{background:#f4f9fc;border:1px solid #dfeaf1;border-radius:8px;padding:12px;margin:8px 0}.notification h4{font-size:12px;margin:0 0 6px}.notification p{font-size:11px;color:#60778b;line-height:1.5}.notification-actions{display:flex;gap:6px;flex-wrap:wrap}.doc-row{display:flex;justify-content:space-between;border-top:1px solid var(--line);padding:9px 0;font-size:11px}.doc-row:first-of-type{border-top:0}.summary{line-height:1.65;font-size:13px;color:#526a7d}.summary h3{font-size:14px;color:var(--ink);margin:18px 0 5px}.summary ul{margin:5px 0;padding-left:20px}.hide{display:none!important}
+/* ── TOAST NOTIFICATIONS ── */
+#toast-container{position:fixed;bottom:22px;right:22px;z-index:900;display:flex;flex-direction:column-reverse;gap:10px;pointer-events:none}
+.toast{background:white;border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:10px;padding:14px 38px 14px 14px;box-shadow:0 8px 28px #102d4c1f;min-width:270px;max-width:360px;pointer-events:all;display:flex;gap:11px;align-items:flex-start;animation:toast-in .22s ease;position:relative}
+@keyframes toast-in{from{transform:translateX(115%);opacity:0}to{transform:none;opacity:1}}
+.toast.out{animation:toast-out .28s ease forwards}
+@keyframes toast-out{to{transform:translateX(115%);opacity:0}}
+.toast.success{border-left-color:var(--green)}
+.toast.warning{border-left-color:var(--amber)}
+.toast-icon{font-size:19px;line-height:1;flex-shrink:0;margin-top:1px}
+.toast-body{flex:1;min-width:0}
+.toast-title{font-weight:800;font-size:12px;color:var(--navy)}
+.toast-msg{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.4}
+.toast-action{display:inline-block;margin-top:7px;background:var(--pale);color:var(--blue);border:none;padding:4px 9px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer}
+.toast-close{position:absolute;top:7px;right:9px;border:none;background:none;color:#aab6c2;font-size:17px;cursor:pointer;line-height:1}
+.notif-bell{position:relative;display:inline-flex}
+.notif-badge{position:absolute;top:-5px;right:-6px;background:#e8534a;color:white;font-size:9px;font-weight:800;border-radius:10px;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;padding:0 3px}
+/* ── PORTAIL INSPECTION ── */
+#inspection-portal{min-height:100vh;background:#f0f4f8;font-family:Arial,Helvetica,sans-serif}
+.insp-header{background:var(--navy);color:white;padding:18px 16px 22px;position:sticky;top:0;z-index:10}
+.insp-header .brand{font-size:18px;font-weight:800;padding:0;letter-spacing:-.3px}
+.insp-header .brand span{color:#98c9e9;font-weight:400}
+.insp-body{max-width:600px;margin:0 auto;padding:14px 12px 80px}
+.insp-card{background:white;border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
+.insp-card h3{font-size:13px;font-weight:800;margin:0 0 12px;color:var(--navy)}
+.insp-zone-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.insp-zone-btn{background:#f4f7fa;border:2px solid var(--line);border-radius:8px;padding:10px 8px;font-size:11px;font-weight:700;color:var(--ink);cursor:pointer;text-align:center;transition:background .15s,border-color .15s}
+.insp-zone-btn:hover,.insp-zone-btn:active{background:#e0ecf7;border-color:var(--blue)}
+.insp-zone-btn.has-damage{background:#fff4df;border-color:var(--amber);color:var(--amber)}
+.damage-item{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.damage-item:first-child{border-top:0}
+.damage-thumb{width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid var(--line);flex-shrink:0}
+.damage-thumb-placeholder{width:60px;height:60px;background:#f4f7fa;border-radius:6px;border:1px dashed var(--line);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px}
+.insp-sig-canvas{width:100%;height:160px;border:2px dashed #c5d4e0;border-radius:8px;touch-action:none;background:#fafcfe;cursor:crosshair}
+.insp-submit-bar{position:fixed;bottom:0;left:0;right:0;background:white;border-top:1px solid var(--line);padding:12px 16px;z-index:20}
+.insp-camera-modal{position:fixed;inset:0;background:#000;z-index:50;display:flex;flex-direction:column}
+.insp-camera-preview{flex:1;object-fit:cover;width:100%}
+.insp-loading-photos{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.insp-loading-photo{width:80px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--line);flex-shrink:0}
+.car-svg-zone{cursor:pointer;transition:opacity .15s}
+.car-svg-zone:hover,.car-svg-zone.active{opacity:.7}
+.car-svg-zone.has-damage{fill:#ffe8a1 !important}
+/* ── PORTAIL TRANSPORTEUR ── */
+.portal-wrap{min-height:100vh;background:#f0f4f8;padding:0 0 60px}
+.portal-header{background:var(--navy);color:white;padding:20px 16px 24px;position:sticky;top:0;z-index:5}
+.portal-header .brand{font-size:18px;font-weight:800;padding:0 0 14px;letter-spacing:-.3px}
+.portal-header .brand span{color:#98c9e9;font-weight:400}
+.portal-body{max-width:600px;margin:0 auto;padding:16px}
+.portal-mission-bar{background:white;border:1px solid var(--line);border-radius:10px;padding:15px;margin-bottom:16px}
+.portal-car{background:white;border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
+.portal-car-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
+.portal-section{border:1px solid var(--line);border-radius:8px;padding:13px;margin-top:10px}
+.portal-section.done{border-color:#c3e6cb;background:#f0fbf4}
+.portal-section.locked{opacity:.55;pointer-events:none}
+.portal-section-label{font-size:10px;font-weight:800;letter-spacing:1px;color:var(--muted);margin-bottom:10px}
+.portal-section.done .portal-section-label{color:var(--green)}
+.portal-photos{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.portal-photos img{width:80px;height:62px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:pointer}
+.portal-upload-btn{display:block;width:100%;background:var(--blue);color:white;text-align:center;padding:13px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;border:none;margin-top:6px}
+.portal-confirm-btn{width:100%;background:var(--green);color:white;border:none;padding:13px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;margin-top:8px}
+.portal-add-photo{display:block;border:2px dashed #c3e6cb;color:var(--green);text-align:center;padding:9px;border-radius:7px;margin-top:8px;font-size:12px;cursor:pointer;background:none;width:100%}
+.portal-confirm-btn:disabled{background:#9eb8a0;cursor:not-allowed}
+@media(max-width:950px){.sidebar{width:190px}.main{margin-left:190px;width:calc(100% - 190px)}.stats{grid-template-columns:repeat(2,1fr)}.recent-row{grid-template-columns:100px 1fr 1fr 100px}.recent-row>*:nth-child(3){display:none}.cards{grid-template-columns:repeat(2,1fr)}}@media(max-width:680px){.sidebar{width:62px;padding:14px 6px}.brand{padding:5px 9px 20px;font-size:0}.brand:before{content:'AD';font-size:16px;color:white}.brand span,.brand small,.nav-label,.nav button:not(.active) .label,.nav .label,.sidebar-foot{display:none}.nav button{justify-content:center;padding:12px 4px}.nav .icon{font-size:17px}.main{margin-left:62px;width:calc(100% - 62px)}.topbar{padding:0 13px;height:60px}.content{padding:17px 12px}.heading{align-items:flex-start;flex-direction:column}.heading h1{font-size:22px}.stats{gap:8px}.stat{padding:12px}.stat strong{font-size:19px}.cards{grid-template-columns:1fr}.route{grid-template-columns:1fr}.recent-row{grid-template-columns:88px 1fr 90px}.recent-row>*:nth-child(4){display:none}.form-grid{grid-template-columns:1fr}.field.wide,.form-section{grid-column:1}.car-form{grid-template-columns:1fr 1fr}.mission-mini{grid-template-columns:24px 1fr 95px}.heading>.btn{align-self:flex-start}.toolbar input[type=search]{min-width:100%}}
+</style>
+</head>
+<body>
+
+<div class="loading-bar" id="loading-bar"></div>
+
+<!-- ═══════════ AUTH ═══════════ -->
+<div id="auth-screen" class="auth-wrap" style="display:none">
+  <div class="auth-card">
+    <div class="auth-brand">auto<span>dispatch</span><small>TRANSPORT MANAGEMENT</small></div>
+    <div class="auth-title">Connexion</div>
+    <div class="field"><label>E-MAIL</label><input id="login-email" type="email" placeholder="votre@email.com" autocomplete="email"></div>
+    <div class="field" style="margin-top:9px"><label>MOT DE PASSE</label><input id="login-pwd" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()"></div>
+    <div class="auth-err" id="login-err"></div>
+    <button class="btn primary" style="width:100%;padding:11px" onclick="login()">Se connecter</button>
+  </div>
+</div>
+
+<!-- ═══════════ PORTAIL TRANSPORTEUR ═══════════ -->
+<div id="carrier-portal" style="display:none"></div>
+
+<!-- ═══════════ PORTAIL INSPECTION LIVRAISON ═══════════ -->
+<div id="inspection-portal" style="display:none"></div>
+
+<!-- ═══════════ APP ═══════════ -->
+<div class="shell" id="app-shell" style="display:none">
+  <aside class="sidebar">
+    <div class="brand">auto<span>dispatch</span><small>TRANSPORT MANAGEMENT</small></div>
+    <div class="nav-label">ESPACE DE TRAVAIL</div>
+    <nav class="nav" id="nav"></nav>
+    <div class="sidebar-foot">
+      <div id="user-info" style="margin-bottom:10px;word-break:break-all"></div>
+      <button onclick="logout()" style="width:100%;background:transparent;border:1px solid #294d6c;color:#acc2d4;border-radius:6px;padding:8px;font-size:11px;font-weight:600;cursor:pointer">Déconnexion</button>
+    </div>
+  </aside>
+  <main class="main">
+    <header class="topbar">
+      <div class="crumb">AutoDispatch　›　<strong id="crumb">Vue d'ensemble</strong></div>
+      <div class="top-actions">
+        <button class="btn notif-bell" id="notif-btn" style="display:none" onclick="clearNotifBadge()" title="Notifications transporteur">
+          🔔<span class="notif-badge" id="notif-badge">0</span>
+        </button>
+        <button class="btn" onclick="refreshAll()">↺ Actualiser</button>
+        <button class="btn primary" onclick="openMissionForm()">＋ Nouvelle mission</button>
+      </div>
+    </header>
+    <div class="content"><section id="view"></section></div>
+  </main>
+</div>
+
+<div class="modal-backdrop" id="modal"><div class="modal" id="modal-content"></div></div>
+<aside id="detail" class="mission-detail"></aside>
+<div id="toast-container"></div>
+
+<!-- Supabase JS -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<!-- jsPDF for inspection PDF generation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  CONFIG — remplace les deux valeurs ci-dessous par celles de
+//  ton projet Supabase : Settings → API → Project URL & anon key
+// ═══════════════════════════════════════════════════════════════
+const SUPABASE_URL  = 'https://srmesytesdspwdtumnfj.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNybWVzeXRlc2RzcHdkdHVtbmZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1ODMyMDEsImV4cCI6MjEwNjE1OTIwMX0.NpngBYSzBUNf7_OI516YhmtwzvPGPewlPRTPwbPwYoI';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// Token transporteur dans l'URL (?t=UUID)
+const CARRIER_TOKEN = new URLSearchParams(window.location.search).get('t');
+// Token inspection livraison dans l'URL (?inspection=UUID)
+const INSPECTION_TOKEN = new URLSearchParams(window.location.search).get('inspection');
+
+// ─── STATE ──────────────────────────────────────────────────────
+const NAV=[["Vue d'ensemble",'⌂'],['Planning','▦'],['Missions','▤'],['Véhicules','▣'],['Clients','◫'],['Transporteurs','▰'],['Documents','▧'],['Finance','€'],['Résumé','i']];
+let db={clients:[],carriers:[],missions:[],carrierEvents:[],selectedIds:[],sort:'ref',direction:1};
+let current="Vue d'ensemble",search='',filterStatus='Tous les statuts',docSearch='',docFilter='';
+let editingMission=null,detailId=null,currentUser=null;
+let weekOffset=0,filterClient='Tous les clients',filterCarrier='Tous les transporteurs';
+let colF={ref:'',make:'',vin:'',plate:'',pickupCity:'',deliveryCity:'',pickupDate:''};
+
+// État portail transporteur
+let portalMission=null,portalCars=[],portalEvents=[],portalDocs=[];
+
+// ─── I18N ──────────────────────────────────────────────────────────
+// Mapping pays → code langue (pour emails parc et portail)
+const COUNTRY_LANG={
+  'roumanie':'ro','romania':'ro','românia':'ro','roumanie':'ro',
+  'pologne':'pl','poland':'pl','polska':'pl',
+  'lituanie':'lt','lithuania':'lt','lietuva':'lt',
+  'lettonie':'lv','latvia':'lv','latvija':'lv',
+  'estonie':'et','estonia':'et','eesti':'et',
+  'allemagne':'de','germany':'de','deutschland':'de','autriche':'de','austria':'de','österreich':'de',
+  'france':'fr','belgique':'fr','luxembourg':'fr','suisse':'fr','switzerland':'fr','belgien':'fr',
+  'espagne':'es','spain':'es','españa':'es',
+  'italie':'it','italy':'it','italia':'it',
+  'pays-bas':'nl','netherlands':'nl','nederland':'nl','hollande':'nl','belgique nl':'nl',
+  'tchéquie':'cs','tchèque':'cs','czech republic':'cs','czech republique':'cs','czechia':'cs','česká republika':'cs','république tchèque':'cs','republique tcheque':'cs','republique tchèque':'cs',
+  'slovaquie':'sk','slovakia':'sk','slovensko':'sk','slovak republic':'sk',
+  'hongrie':'hu','hungary':'hu','magyarország':'hu',
+  'bulgarie':'bg','bulgaria':'bg','българия':'bg',
+  'slovénie':'sl','slovenia':'sl','slovenija':'sl',
+  'croatie':'hr','croatia':'hr','hrvatska':'hr',
+  'serbie':'sr','serbia':'sr','srbija':'sr',
+};
+function detectLang(countryStr){
+  if(!countryStr)return'en';
+  const k=(countryStr||'').toLowerCase().trim();
+  return COUNTRY_LANG[k]||'en';
+}
+function portalLang(){
+  // Portail : langue du navigateur du transporteur
+  const nav=navigator.language||navigator.userLanguage||'en';
+  const code=nav.split('-')[0].toLowerCase();
+  return['fr','en','ro','pl','lt','lv','et','de','es','it','nl','cs','sk','hu','bg','sl','hr','sr'].includes(code)?code:'en';
+}
+
+// Toutes les chaînes du portail transporteur
+const I18N={
+  fr:{
+    portal_subtitle:'PORTAIL TRANSPORTEUR · SANS CONNEXION',
+    pickup:'ENLÈVEMENT', delivery:'LIVRAISON',
+    tip:'📋 Prenez des photos à l\'enlèvement (véhicule + CMR) et à la livraison (véhicule + CMR), puis confirmez chaque étape.',
+    vin:'VIN', plate:'Plaque',
+    docs_received:'📎 DOCUMENTS REÇUS',
+    doc_open:'↓ Ouvrir', doc_none:'Pas de fichier',
+    loading_title:'ÉTAT DU VÉHICULE · ENLÈVEMENT',
+    delivery_title:'ÉTAT DU VÉHICULE · LIVRAISON',
+    confirmed_suffix:' — CONFIRMÉ(E)',
+    delivery_locked:'(disponible après enlèvement)',
+    btn_confirm_loading:'✓ Confirmer le chargement',
+    btn_confirm_delivery:'✓ Confirmer la livraison',
+    cmr_required:'⚠️ La CMR est obligatoire avant de confirmer',
+    loading_done:'✓ Chargement confirmé',
+    delivery_done:'✓ Livraison confirmée',
+    badge_loaded:'Chargé', badge_delivered:'✓ Livré', badge_pending:'À charger',
+    photo:'📷 Photo', retake:'↺ Reprendre', no_photo:'Pas de photo',
+    cats_loading:['Avant','Arrière','Côté gauche','Côté droit','Tableau de bord / km','Dommage(s)','CMR · Enlèvement'],
+    cats_delivery:['Avant','Arrière','Côté gauche','Côté droit','Dommage(s)','CMR · Livraison'],
+  },
+  en:{
+    portal_subtitle:'CARRIER PORTAL · NO LOGIN REQUIRED',
+    pickup:'PICKUP', delivery:'DELIVERY',
+    tip:'📋 Please take photos at pickup (vehicle + CMR) and at delivery (vehicle + CMR), then confirm each step.',
+    vin:'VIN', plate:'Plate',
+    docs_received:'📎 RECEIVED DOCUMENTS',
+    doc_open:'↓ Open', doc_none:'No file',
+    loading_title:'VEHICLE CONDITION · PICKUP',
+    delivery_title:'VEHICLE CONDITION · DELIVERY',
+    confirmed_suffix:' — CONFIRMED',
+    delivery_locked:'(available after pickup)',
+    btn_confirm_loading:'✓ Confirm loading',
+    btn_confirm_delivery:'✓ Confirm delivery',
+    cmr_required:'⚠️ CMR is required before confirming',
+    loading_done:'✓ Loading confirmed',
+    delivery_done:'✓ Delivery confirmed',
+    badge_loaded:'Loaded', badge_delivered:'✓ Delivered', badge_pending:'To load',
+    photo:'📷 Photo', retake:'↺ Retake', no_photo:'No photo',
+    cats_loading:['Front','Rear','Left side','Right side','Dashboard / mileage','Damage(s)','CMR · Pickup'],
+    cats_delivery:['Front','Rear','Left side','Right side','Damage(s)','CMR · Delivery'],
+  },
+  ro:{
+    portal_subtitle:'PORTAL TRANSPORTATOR · FĂRĂ AUTENTIFICARE',
+    pickup:'PRELUARE', delivery:'LIVRARE',
+    tip:'📋 Faceți fotografii la preluare (vehicul + CMR) și la livrare (vehicul + CMR), apoi confirmați fiecare etapă.',
+    vin:'VIN', plate:'Număr înmatriculare',
+    docs_received:'📎 DOCUMENTE PRIMITE',
+    doc_open:'↓ Deschide', doc_none:'Niciun fișier',
+    loading_title:'STAREA VEHICULULUI · PRELUARE',
+    delivery_title:'STAREA VEHICULULUI · LIVRARE',
+    confirmed_suffix:' — CONFIRMAT',
+    delivery_locked:'(disponibil după preluare)',
+    btn_confirm_loading:'✓ Confirmați încărcarea',
+    btn_confirm_delivery:'✓ Confirmați livrarea',
+    cmr_required:'⚠️ CMR este obligatoriu înainte de confirmare',
+    loading_done:'✓ Încărcare confirmată',
+    delivery_done:'✓ Livrare confirmată',
+    badge_loaded:'Încărcat', badge_delivered:'✓ Livrat', badge_pending:'De încărcat',
+    photo:'📷 Fotografie', retake:'↺ Refaceți', no_photo:'Fără fotografie',
+    cats_loading:['Față','Spate','Lateral stânga','Lateral dreapta','Bord / km','Daune','CMR · Preluare'],
+    cats_delivery:['Față','Spate','Lateral stânga','Lateral dreapta','Daune','CMR · Livrare'],
+  },
+  pl:{
+    portal_subtitle:'PORTAL PRZEWOŹNIKA · BEZ LOGOWANIA',
+    pickup:'ODBIÓR', delivery:'DOSTAWA',
+    tip:'📋 Wykonaj zdjęcia przy odbiorze (pojazd + CMR) i przy dostawie (pojazd + CMR), a następnie potwierdź każdy etap.',
+    vin:'VIN', plate:'Tablica rejestracyjna',
+    docs_received:'📎 OTRZYMANE DOKUMENTY',
+    doc_open:'↓ Otwórz', doc_none:'Brak pliku',
+    loading_title:'STAN POJAZDU · ODBIÓR',
+    delivery_title:'STAN POJAZDU · DOSTAWA',
+    confirmed_suffix:' — POTWIERDZONE',
+    delivery_locked:'(dostępne po odbiorze)',
+    btn_confirm_loading:'✓ Potwierdź załadunek',
+    btn_confirm_delivery:'✓ Potwierdź dostawę',
+    cmr_required:'⚠️ CMR jest wymagany przed potwierdzeniem',
+    loading_done:'✓ Załadunek potwierdzony',
+    delivery_done:'✓ Dostawa potwierdzona',
+    badge_loaded:'Załadowany', badge_delivered:'✓ Dostarczony', badge_pending:'Do załadunku',
+    photo:'📷 Zdjęcie', retake:'↺ Ponów', no_photo:'Brak zdjęcia',
+    cats_loading:['Przód','Tył','Lewa strona','Prawa strona','Deska rozdzielcza / km','Uszkodzenia','CMR · Odbiór'],
+    cats_delivery:['Przód','Tył','Lewa strona','Prawa strona','Uszkodzenia','CMR · Dostawa'],
+  },
+  lt:{
+    portal_subtitle:'VEŽĖJO PORTALAS · BE PRISIJUNGIMO',
+    pickup:'PAĖMIMAS', delivery:'PRISTATYMAS',
+    tip:'📋 Fotografuokite paėmimo metu (transporto priemonė + CMR) ir pristatymo metu, tada patvirtinkite kiekvieną etapą.',
+    vin:'VIN', plate:'Valstybinis numeris',
+    docs_received:'📎 GAUTI DOKUMENTAI',
+    doc_open:'↓ Atidaryti', doc_none:'Nėra failo',
+    loading_title:'TRANSPORTO PRIEMONĖS BŪKLĖ · PAĖMIMAS',
+    delivery_title:'TRANSPORTO PRIEMONĖS BŪKLĖ · PRISTATYMAS',
+    confirmed_suffix:' — PATVIRTINTA',
+    delivery_locked:'(prieinama po paėmimo)',
+    btn_confirm_loading:'✓ Patvirtinti pakrovimą',
+    btn_confirm_delivery:'✓ Patvirtinti pristatymą',
+    cmr_required:'⚠️ CMR privalomas prieš patvirtinimą',
+    loading_done:'✓ Pakrovimas patvirtintas',
+    delivery_done:'✓ Pristatymas patvirtintas',
+    badge_loaded:'Pakrautas', badge_delivered:'✓ Pristatytas', badge_pending:'Pakrauti',
+    photo:'📷 Nuotrauka', retake:'↺ Pakartoti', no_photo:'Nėra nuotraukos',
+    cats_loading:['Priekis','Galas','Kairė pusė','Dešinė pusė','Prietaisų skydelis / km','Pažeidimai','CMR · Paėmimas'],
+    cats_delivery:['Priekis','Galas','Kairė pusė','Dešinė pusė','Pažeidimai','CMR · Pristatymas'],
+  },
+  de:{
+    portal_subtitle:'TRANSPORTEURPORTAL · OHNE ANMELDUNG',
+    pickup:'ABHOLUNG', delivery:'LIEFERUNG',
+    tip:'📋 Bitte fotografieren Sie das Fahrzeug beim Laden (Fahrzeug + CMR) und bei der Lieferung, und bestätigen Sie dann jeden Schritt.',
+    vin:'FIN', plate:'Kennzeichen',
+    docs_received:'📎 ERHALTENE DOKUMENTE',
+    doc_open:'↓ Öffnen', doc_none:'Keine Datei',
+    loading_title:'FAHRZEUGZUSTAND · ABHOLUNG',
+    delivery_title:'FAHRZEUGZUSTAND · LIEFERUNG',
+    confirmed_suffix:' — BESTÄTIGT',
+    delivery_locked:'(verfügbar nach Abholung)',
+    btn_confirm_loading:'✓ Beladung bestätigen',
+    btn_confirm_delivery:'✓ Lieferung bestätigen',
+    cmr_required:'⚠️ CMR ist vor der Bestätigung erforderlich',
+    loading_done:'✓ Beladung bestätigt',
+    delivery_done:'✓ Lieferung bestätigt',
+    badge_loaded:'Geladen', badge_delivered:'✓ Geliefert', badge_pending:'Zu laden',
+    photo:'📷 Foto', retake:'↺ Wiederholen', no_photo:'Kein Foto',
+    cats_loading:['Vorne','Hinten','Linke Seite','Rechte Seite','Armaturenbrett / km','Schäden','CMR · Abholung'],
+    cats_delivery:['Vorne','Hinten','Linke Seite','Rechte Seite','Schäden','CMR · Lieferung'],
+  },
+};
+// Langues sans traduction complète → fallback anglais
+function tr(lang){return I18N[lang]||I18N.en;}
+
+// Catégories de photos localisées
+function getPhotoCatsLoading(lang){
+  const L=tr(lang),labels=L.cats_loading;
+  return[
+    {key:'avant',      label:labels[0], icon:'🚗', required:false},
+    {key:'arriere',    label:labels[1], icon:'🚗', required:false},
+    {key:'gauche',     label:labels[2], icon:'🚗', required:false},
+    {key:'droite',     label:labels[3], icon:'🚗', required:false},
+    {key:'tableau',    label:labels[4], icon:'📊', required:false},
+    {key:'dommage',    label:labels[5], icon:'⚠️', required:false, multi:true},
+    {key:'cmr',        label:labels[6], icon:'📋', required:true},
+  ];
+}
+function getPhotoCatsDelivery(lang){
+  const L=tr(lang),labels=L.cats_delivery;
+  return[
+    {key:'avant',      label:labels[0], icon:'🚗', required:false},
+    {key:'arriere',    label:labels[1], icon:'🚗', required:false},
+    {key:'gauche',     label:labels[2], icon:'🚗', required:false},
+    {key:'droite',     label:labels[3], icon:'🚗', required:false},
+    {key:'dommage',    label:labels[4], icon:'⚠️', required:false, multi:true},
+    {key:'cmr',        label:labels[5], icon:'📋', required:true},
+  ];
+}
+
+// ─── UTILS ──────────────────────────────────────────────────────
+const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const getClient=m=>db.clients.find(x=>x.id===m.clientId)||{};
+const getCarrier=m=>db.carriers.find(x=>x.id===m.carrierId)||{};
+const pretty=d=>d?new Date(d+'T12:00:00').toLocaleDateString('fr-BE',{day:'numeric',month:'short',year:'numeric'}):'To be confirmed';
+const val=id=>document.getElementById(id)?.value.trim()||'';
+const setLoading=on=>document.getElementById('loading-bar').classList.toggle('on',on);
+
+// ─── AUTH & ROUTING ──────────────────────────────────────────────
+async function checkAuth(){
+  // Portail transporteur : pas de login requis
+  if(CARRIER_TOKEN){
+    await initCarrierPortal();
+    return;
+  }
+  // Portail inspection livraison : pas de login requis
+  if(INSPECTION_TOKEN){
+    await initInspectionPage(INSPECTION_TOKEN);
+    return;
+  }
+  setLoading(true);
+  const {data:{session}}=await sb.auth.getSession();
+  setLoading(false);
+  if(session){currentUser=session.user;await initApp();}
+  else{document.getElementById('auth-screen').style.display='flex';}
+}
+
+async function login(){
+  const email=document.getElementById('login-email').value.trim();
+  const pwd=document.getElementById('login-pwd').value;
+  const err=document.getElementById('login-err');
+  err.textContent='';
+  if(!email||!pwd){err.textContent='Complète les deux champs.';return;}
+  setLoading(true);
+  try{
+    const ping=await fetch(SUPABASE_URL+'/auth/v1/health',{headers:{'apikey':SUPABASE_ANON}}).catch(e=>({ok:false,_err:e}));
+    if(!ping.ok&&ping._err){
+      setLoading(false);
+      err.textContent='Réseau bloqué: '+ping._err.message+' — vérifiez que le site n\'est pas bloqué par un antivirus ou VPN.';
+      return;
+    }
+    const {data,error}=await sb.auth.signInWithPassword({email,password:pwd});
+    setLoading(false);
+    if(error){err.textContent='Erreur auth: '+error.message+(error.status?' ('+error.status+')':(error.code?' ('+error.code+')':''));return;}
+    currentUser=data.user;
+    await initApp();
+  }catch(e){
+    setLoading(false);
+    err.textContent='Exception: '+e.name+': '+e.message;
+  }
+}
+
+async function logout(){
+  await sb.auth.signOut();
+  currentUser=null;
+  db={clients:[],carriers:[],missions:[],selectedIds:[],sort:'ref',direction:1};
+  document.getElementById('app-shell').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+  document.getElementById('login-err').textContent='';
+}
+
+async function initApp(){
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('app-shell').style.display='flex';
+  document.getElementById('user-info').textContent=currentUser?.email||'';
+  await loadData();
+  boot();
+  realtimeSetup(); // Option 3 : écoute les événements transporteur en temps réel
+}
+
+// ─── DATA LOAD ───────────────────────────────────────────────────
+function mapPartner(x){
+  return{id:x.id,name:x.name||'',contact:x.contact||'',email:x.email||'',
+    billingEmail:x.billing_email||'',vat:x.vat||'',phone:x.phone||'',
+    street:x.street||'',postal:x.postal||'',city:x.city||'',country:x.country||''};
+}
+
+async function loadData(){
+  setLoading(true);
+  try{
+    const[r1,r2,r3,r4,r5,r6]=await Promise.all([
+      sb.from('clients').select('*').order('name'),
+      sb.from('carriers').select('*').order('name'),
+      sb.from('missions').select('*').order('created_at'),
+      sb.from('cars').select('*'),
+      sb.from('notifications').select('*').order('created_at'),
+      sb.from('documents').select('*')
+    ]);
+    db.clients=(r1.data||[]).map(mapPartner);
+    db.carriers=(r2.data||[]).map(mapPartner);
+    // carrier_events : table optionnelle (créée par le SQL portail)
+    try{const r7=await sb.from('carrier_events').select('*').order('confirmed_at');db.carrierEvents=r7.data||[];}
+    catch(e){console.warn('carrier_events non disponible:',e.message);db.carrierEvents=[];};
+    const cars=r4.data||[],notifs=r5.data||[],docs=r6.data||[];
+    db.missions=(r3.data||[]).map(m=>({
+      id:m.id,ref:m.ref||'',
+      clientId:m.client_id||'',carrierId:m.carrier_id||'',
+      carrierToken:m.carrier_token||'',
+      deliveryToken:m.delivery_token||'',
+      inspectionSubmittedAt:m.inspection_submitted_at||'',
+      inspectionSigner:m.inspection_signer||'',
+      inspectionSignatureUrl:m.inspection_signature_url||'',
+      pickupSite:m.pickup_site||'',pickupStreet:m.pickup_street||'',
+      pickupPostal:m.pickup_postal||'',pickupCity:m.pickup_city||'',
+      pickupCountry:m.pickup_country||'',pickupContact:m.pickup_contact||'',
+      deliverySite:m.delivery_site||'',deliveryStreet:m.delivery_street||'',
+      deliveryPostal:m.delivery_postal||'',deliveryCity:m.delivery_city||'',
+      deliveryCountry:m.delivery_country||'',deliveryContact:m.delivery_contact||'',
+      deliveryEmail:m.delivery_email||'',
+      pickupDate:m.pickup_date||'',deliveryDate:m.delivery_date||'',
+      status:m.status||'à planifier',
+      cars:cars.filter(c=>c.mission_id===m.id).map(c=>({
+        id:c.id,make:c.make||'',model:c.model||'',vin:c.vin||'',plate:c.plate||'',
+        status:c.status||'à charger',
+        docs:docs.filter(d=>d.car_id===c.id).map(d=>({id:d.id,name:d.name||'',phase:d.phase||'',date:d.date||'',url:d.url||''}))
+      })),
+      notifications:notifs.filter(n=>n.mission_id===m.id).map(n=>({
+        id:n.id,kind:n.kind||'',status:n.status||'pending',
+        pickupDate:n.pickup_date||'',deliveryDate:n.delivery_date||'',createdAt:n.created_at
+      }))
+    }));
+  }catch(e){console.error(e);alert('Erreur de chargement : '+e.message);}
+  setLoading(false);
+}
+
+async function refreshAll(){
+  await loadData();render();
+  if(detailId)openDetail(detailId);
+}
+
+// ─── REALTIME + TOAST NOTIFICATIONS ─────────────────────────────
+let _realtimeChannel=null,_notifCount=0;
+
+function showToast(title,msg,type,missionId){
+  const c=document.getElementById('toast-container');if(!c)return;
+  const id='t'+Date.now()+Math.random().toString(36).slice(2,6);
+  const icons={success:title.includes('Livraison')?'✅':'🚛',info:'📷',warning:'⚠️',cmr:'📄'};
+  const icon=type==='cmr'?icons.cmr:(type==='success'?icons.success:icons.info);
+  const div=document.createElement('div');
+  div.className='toast '+(type==='cmr'?'info':type||'info');
+  div.id=id;
+  div.innerHTML=`<div class="toast-icon">${icon}</div>
+    <div class="toast-body">
+      <div class="toast-title">${title}</div>
+      <div class="toast-msg">${msg}</div>
+      ${missionId?`<button class="toast-action" onclick="openDetail('${missionId}');dismissToast('${id}')">Voir la mission →</button>`:''}
+    </div>
+    <button class="toast-close" onclick="dismissToast('${id}')">×</button>`;
+  c.appendChild(div);
+  _notifCount++;_updateNotifBell();
+  setTimeout(()=>dismissToast(id),12000);
+}
+
+function dismissToast(id){
+  const el=document.getElementById(id);if(!el)return;
+  el.classList.add('out');
+  setTimeout(()=>{el.remove();_notifCount=Math.max(0,_notifCount-1);_updateNotifBell();},300);
+}
+
+function _updateNotifBell(){
+  const btn=document.getElementById('notif-btn');
+  const badge=document.getElementById('notif-badge');
+  if(!btn||!badge)return;
+  if(_notifCount>0){btn.style.display='';badge.textContent=_notifCount;}
+  else{btn.style.display='none';}
+}
+
+function clearNotifBadge(){
+  _notifCount=0;_updateNotifBell();
+  document.querySelectorAll('.toast').forEach(t=>dismissToast(t.id));
+}
+
+async function handleCarrierEvent(ev){
+  if(!ev)return;
+  // Met à jour le cache local
+  if(!db.carrierEvents.find(e=>e.id===ev.id))db.carrierEvents.push(ev);
+  // Retrouve mission + véhicule dans l'état local
+  const m=db.missions.find(x=>x.id===ev.mission_id);
+  const car=m?.cars?.find(x=>x.id===ev.car_id);
+  const mRef=m?m.ref:(ev.mission_id||'').slice(0,8)+'…';
+  const vLabel=car?`${car.make} ${car.model}`:'Véhicule';
+  const phase=ev.event_type==='loading'||ev.event_type==='confirmed_loading'?'Chargement':'Livraison';
+
+  let title,msg,type;
+  if(ev.event_type==='confirmed_loading'){
+    title='🚛 Chargement confirmé';
+    msg=`${mRef} — ${vLabel}`;type='success';
+    if(car)car.status='chargé';
+    // Si tous les véhicules sont chargés/livrés → déclencher notifyLoaded automatiquement
+    if(m&&m.cars.every(c=>c.status==='chargé'||c.status==='livré')&&!m.notifications.some(n=>n.kind==='loaded')){
+      setTimeout(()=>notifyLoaded(m.id),600);
+    }
+  } else if(ev.event_type==='confirmed_delivery'){
+    title='✅ Livraison confirmée';
+    msg=`${mRef} — ${vLabel}`;type='success';
+    if(car)car.status='livré';
+    // Si tous livrés → passer mission en "livré" et déclencher notification livraison
+    if(m&&m.cars.every(c=>c.status==='livré')&&m.status!=='livré'){
+      m.status='livré';
+      await sb.from('missions').update({status:'livré'}).eq('id',m.id);
+      if(!m.notifications.some(n=>n.kind==='delivered')){
+        const n={id:crypto.randomUUID(),kind:'delivered',pickupDate:m.pickupDate,deliveryDate:m.deliveryDate,status:'pending',createdAt:new Date().toISOString()};
+        m.notifications.push(n);await dbUpsertNotif(n,m.id);
+      }
+    }
+  } else if(ev.notes&&(ev.notes.startsWith('cmr')||ev.notes==='cmr_loading'||ev.notes==='cmr_delivery')){
+    title='📄 CMR reçu';
+    msg=`${mRef} — ${vLabel} — ${phase}`;type='cmr';
+  } else {
+    title='📷 Photo reçue';
+    msg=`${mRef} — ${vLabel} — ${phase}`;type='info';
+  }
+
+  showToast(title,msg,type,ev.mission_id);
+  // Rafraîchit la liste + panneau détail
+  render();
+  if(detailId===ev.mission_id){try{refreshDetail();}catch(_){}}
+}
+
+function realtimeSetup(){
+  if(_realtimeChannel){try{_realtimeChannel.unsubscribe();}catch(_){}}
+  _realtimeChannel=sb.channel('carrier-events-admin-v1')
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'carrier_events'},
+      payload=>{ handleCarrierEvent(payload.new); }
+    )
+    .subscribe(status=>{
+      if(status==='SUBSCRIBED')console.info('[Realtime] ✓ connecté — carrier_events');
+      else if(status==='CHANNEL_ERROR')console.warn('[Realtime] ✗ erreur connexion — carrier_events');
+    });
+}
+
+// ─── DB WRITE ────────────────────────────────────────────────────
+async function dbUpsertMission(m){
+  const{error}=await sb.from('missions').upsert({
+    id:m.id,ref:m.ref,client_id:m.clientId||null,carrier_id:m.carrierId||null,
+    pickup_site:m.pickupSite,pickup_street:m.pickupStreet,pickup_postal:m.pickupPostal,
+    pickup_city:m.pickupCity,pickup_country:m.pickupCountry,pickup_contact:m.pickupContact,
+    delivery_site:m.deliverySite,delivery_street:m.deliveryStreet,delivery_postal:m.deliveryPostal,
+    delivery_city:m.deliveryCity,delivery_country:m.deliveryCountry,delivery_contact:m.deliveryContact,
+    delivery_email:m.deliveryEmail||null,
+    pickup_date:m.pickupDate||null,delivery_date:m.deliveryDate||null,status:m.status,
+    delivery_token:m.deliveryToken||null
+  });
+  if(error)console.error('mission',error);
+}
+
+async function dbUpsertCar(c,missionId){
+  const{error}=await sb.from('cars').upsert({
+    id:c.id,mission_id:missionId,make:c.make,model:c.model,
+    vin:c.vin||null,plate:c.plate||null,status:c.status
+  });
+  if(error)console.error('car',error);
+}
+
+async function dbUpsertNotif(n,missionId){
+  const{error}=await sb.from('notifications').upsert({
+    id:n.id,mission_id:missionId,kind:n.kind,
+    pickup_date:n.pickupDate||null,delivery_date:n.deliveryDate||null,status:n.status
+  });
+  if(error)console.error('notif',error);
+}
+
+async function dbUpsertPartner(table,p){
+  const{error}=await sb.from(table).upsert({
+    id:p.id,name:p.name,contact:p.contact||null,email:p.email||null,
+    billing_email:p.billingEmail||null,vat:p.vat||null,phone:p.phone||null,
+    street:p.street||null,postal:p.postal||null,city:p.city||null,country:p.country||null
+  });
+  if(error)console.error('partner',error);
+}
+
+async function dbDelete(table,id){
+  const{error}=await sb.from(table).delete().eq('id',id);
+  if(error)console.error('delete',error);
+}
+
+// ─── NAV & RENDER ────────────────────────────────────────────────
+function setView(v){
+  current=v;
+  document.getElementById('crumb').textContent=v;
+  render();
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.name===v));
+}
+
+function boot(){
+  document.getElementById('nav').innerHTML=NAV.map(([n,i])=>
+    `<button data-name="${esc(n)}" onclick="setView(this.dataset.name)"><span class="icon">${i}</span><span class="label">${esc(n)}</span></button>`
+  ).join('');
+  setView(current);
+}
+
+function render(){
+  const view=document.getElementById('view');if(!view)return;
+  if(current==="Vue d'ensemble")view.innerHTML=dashboard();
+  else if(current==='Résumé')view.innerHTML=summary();
+  else if(current==='Clients'||current==='Transporteurs')view.innerHTML=partnersPage(current==='Clients'?'clients':'carriers');
+  else if(current==='Planning')view.innerHTML=planning();
+  else if(current==='Missions')view.innerHTML=missionsPage();
+  else if(current==='Véhicules')view.innerHTML=vehiclesPage();
+  else if(current==='Documents')view.innerHTML=documentsPage();
+  else view.innerHTML=financePage();
+}
+
+function heading(title,sub,button=''){
+  return `<div class="heading"><div><div class="eyebrow">AUTODISPATCH</div><h1>${title}</h1><p>${sub}</p></div>${button}</div>`;
+}
+
+// ─── VIEWS ───────────────────────────────────────────────────────
+function dashboard(){
+  const cars=db.missions.reduce((n,m)=>n+m.cars.length,0);
+  const loaded=db.missions.reduce((n,m)=>n+m.cars.filter(c=>c.status==='chargé'||c.status==='livré').length,0);
+  return heading("Vue d'ensemble",'Suivi des missions et des véhicules.')+
+  `<div class="grid stats">
+    <div class="stat"><small>Missions actives</small><strong>${db.missions.filter(m=>m.status!=='livré').length}</strong><em>${db.missions.length} au total</em></div>
+    <div class="stat"><small>Véhicules</small><strong>${cars}</strong><em>${loaded} chargés ou livrés</em></div>
+    <div class="stat"><small>Clients</small><strong>${db.clients.length}</strong><em>dans le répertoire</em></div>
+    <div class="stat"><small>Transporteurs</small><strong>${db.carriers.length}</strong><em>dans le répertoire</em></div>
+  </div>
+  <div class="panel"><div class="panel-title"><h2>Missions récentes <small>· ${db.missions.length}</small></h2><button class="btn" onclick="setView('Missions')">Toutes les missions</button></div>
+  <div class="recent-list">${db.missions.length?db.missions.slice().reverse().slice(0,6).map(m=>`<div class="recent-row"><strong>${esc(m.ref)}<small>${esc(getClient(m).name||'—')}</small></strong><span>${esc(m.pickupCity||'—')} → ${esc(m.deliveryCity||'—')}</span><span>Chargement ${pretty(m.pickupDate)}<small>Livraison ${pretty(m.deliveryDate)}</small></span>${badge(m.status)}</div>`).join(''):'<div class="empty">Aucune mission. Crée une mission pour commencer.</div>'}</div></div>
+  <div class="panel"><div class="panel-title"><h2>Actions rapides</h2></div><div class="toolbar"><button class="btn soft" onclick="setView('Planning')">Ouvrir le planning</button><button class="btn soft" onclick="setView('Clients')">Gérer les clients</button><button class="btn soft" onclick="setView('Transporteurs')">Gérer les transporteurs</button></div></div>`;
+}
+
+function badge(s){return `<span class="badge ${s==='livré'||s==='chargé'||s==='payé'?'green':s==='en transport'?'blue':s==='à planifier'?'amber':''}">${esc(s)}</span>`}
+
+function filterTool(){return `<div class="toolbar"><input type="search" placeholder="Rechercher client, mission, VIN, plaque…" value="${esc(search)}" oninput="search=this.value;render()"><select onchange="filterStatus=this.value;render()"><option>Tous les statuts</option>${['à planifier','attribué','à charger','en transport','livré','à facturer','facturé','payé'].map(x=>`<option ${filterStatus===x?'selected':''}>${x}</option>`).join('')}</select></div>`}
+
+function filteredMissions(){
+  return db.missions.filter(m=>{
+    if(filterStatus!=='Tous les statuts'&&m.status!==filterStatus)return false;
+    if(filterClient!=='Tous les clients'&&m.clientId!==filterClient)return false;
+    if(filterCarrier!=='Tous les transporteurs'&&m.carrierId!==filterCarrier)return false;
+    if(search&&!JSON.stringify([m,getClient(m),getCarrier(m)]).toLowerCase().includes(search.toLowerCase()))return false;
+    return true;
+  });
+}
+
+function tableRows(selectable=false,rows=filteredMissions()){
+  let entries=rows.flatMap(m=>m.cars.map(c=>({m,c})));
+  entries.sort((a,b)=>String(a.m[db.sort]||a.c[db.sort]||'').localeCompare(String(b.m[db.sort]||b.c[db.sort]||''),'fr',{numeric:true})*db.direction);
+  return entries.map(({m,c})=>`<tr>${selectable?`<td class="check-cell"><input type="checkbox" ${db.selectedIds.includes(c.id)?'checked':''} onchange="toggleSelected('${esc(c.id)}',this.checked)"></td>`:''}<td><strong>${esc(m.ref)}</strong><small>${esc(getClient(m).name||'—')}</small></td><td><strong>${esc(c.make)} ${esc(c.model)}</strong><small>${esc(c.vin||'VIN à ajouter')}</small></td><td>${esc(c.plate||'—')}</td><td>${esc(m.pickupCity||'—')}</td><td>${esc(m.deliveryCity||'—')}</td><td>${pretty(m.pickupDate)}</td><td>${pretty(m.deliveryDate)}</td><td>${badge(c.status)}</td><td><button class="btn" onclick="openDetail('${esc(m.id)}')">Ouvrir</button></td></tr>`).join('')||`<tr><td colspan="10" class="empty">Aucun véhicule à afficher.</td></tr>`;
+}
+
+function dataTable(selectable=false){return `<div class="table-wrap"><table><thead><tr>${selectable?'<th class="check-cell">✓</th>':''}${[['ref','Mission / client'],['make','Véhicule / VIN'],['plate','Plaque'],['pickupCity','Ville chargement'],['deliveryCity','Ville déchargement'],['pickupDate','Date chargement'],['deliveryDate','Date livraison'],['status','Statut']].map(([k,l])=>`<th><button onclick="sortBy('${k}')">${l}　↕</button></th>`).join('')}<th></th></tr></thead><tbody>${tableRows(selectable)}</tbody></table></div>`}
+
+function sortBy(k){if(db.sort===k)db.direction*=-1;else{db.sort=k;db.direction=1}render();}
+
+function weekCalendar(){
+  const today=new Date();today.setHours(0,0,0,0);
+  const dow=today.getDay()||7;
+  const monday=new Date(today);monday.setDate(today.getDate()-(dow-1)+(weekOffset*7));
+  const days=Array.from({length:7},(_,i)=>{const d=new Date(monday);d.setDate(monday.getDate()+i);return d;});
+  const sameDay=(d1,d2)=>d1.getFullYear()===d2.getFullYear()&&d1.getMonth()===d2.getMonth()&&d1.getDate()===d2.getDate();
+  const fmt=(d)=>d.toLocaleDateString('fr-BE',{day:'numeric',month:'long',year:'numeric'});
+  const fmtShort=(d)=>d.toLocaleDateString('fr-BE',{day:'numeric',month:'short'}).replace(/ /g,' ');
+  const dayNames=['Lun.','Mar.','Mer.','Jeu.','Ven.','Sam.','Dim.'];
+  const weekLabel=`Semaine du ${fmt(days[0])} au ${fmt(days[6])}`;
+
+  const cols=days.map((d,i)=>{
+    const loads=db.missions.filter(m=>{const p=m.pickupDate?new Date(m.pickupDate):null;return p&&sameDay(p,d);});
+    const delivs=db.missions.filter(m=>{const v=m.deliveryDate?new Date(m.deliveryDate):null;return v&&sameDay(v,d);});
+    const isToday=sameDay(d,today);
+    const isWe=i>=5;
+    const cards=[
+      ...loads.map(m=>`<div onclick="openDetail('${esc(m.id)}')" style="border:1px solid #d0e6f8;border-left:3px solid #2675a9;border-radius:7px;padding:9px;margin-bottom:6px;cursor:pointer;background:white;transition:box-shadow .15s" onmouseenter="this.style.boxShadow='0 2px 8px #2675a920'" onmouseleave="this.style.boxShadow=''">
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="width:7px;height:7px;border-radius:50%;background:#2675a9;flex-shrink:0"></span><strong style="font-size:11px">${esc(m.ref)}</strong></div>
+        <div style="font-size:10.5px;color:#536a7d">Chargement · ${m.cars.length} véh.</div>
+        <div style="font-size:10.5px;color:#536a7d">${esc(m.pickupCity||'—')}${m.deliveryCity?' · '+esc(m.deliveryCity):''}</div>
+        <div style="font-size:10px;color:#8094a6;margin-top:2px">${esc(getClient(m).name||'—')} · ${esc(getCarrier(m).name||'À attribuer')}</div>
+      </div>`),
+      ...delivs.map(m=>`<div onclick="openDetail('${esc(m.id)}')" style="border:1px solid #c3e6cb;border-left:3px solid #24784d;border-radius:7px;padding:9px;margin-bottom:6px;cursor:pointer;background:white;transition:box-shadow .15s" onmouseenter="this.style.boxShadow='0 2px 8px #24784d20'" onmouseleave="this.style.boxShadow=''">
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="width:7px;height:7px;border-radius:50%;background:#24784d;flex-shrink:0"></span><strong style="font-size:11px">${esc(m.ref)}</strong></div>
+        <div style="font-size:10.5px;color:#536a7d">Livraison · ${m.cars.length} véh.</div>
+        <div style="font-size:10.5px;color:#536a7d">${esc(m.deliveryCity||'—')}</div>
+        <div style="font-size:10px;color:#8094a6;margin-top:2px">${esc(getClient(m).name||'—')} · ${esc(getCarrier(m).name||'À attribuer')}</div>
+      </div>`)
+    ];
+    return `<div style="flex:1;min-width:110px;padding:0 8px;${i<6?'border-right:1px solid #e8eef4':''}${isWe?';background:#fafbfc':''}${isToday?';background:#f5f9ff':''}">
+      <div style="font-size:11.5px;font-weight:700;color:${isToday?'#2675a9':'#60778b'};padding:0 0 9px;border-bottom:1px solid #edf1f4;margin-bottom:9px;white-space:nowrap">${dayNames[i]} ${fmtShort(d)}</div>
+      ${cards.length?cards.join(''):'<span style="font-size:11px;color:#c4cdd5">Rien de prévu</span>'}
+    </div>`;
+  }).join('');
+
+  return `<div style="background:white;border:1px solid var(--line);border-radius:9px;padding:18px;margin-bottom:18px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:10px">
+      <div><div style="font-size:15px;font-weight:700">${weekLabel}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px">Chargements et livraisons prévus · sélectionne une mission pour ouvrir sa fiche</div></div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="btn" style="padding:7px 10px" onclick="weekOffset--;render()">‹</button>
+        <button class="btn" style="padding:7px 11px;font-weight:700" onclick="weekOffset=0;render()">Cette semaine</button>
+        <button class="btn" style="padding:7px 10px" onclick="weekOffset++;render()">›</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:4px;align-items:center;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #eef1f4">
+      <span style="width:9px;height:9px;border-radius:50%;background:#2675a9;display:inline-block"></span><span style="font-size:11px;margin-right:14px">Chargement</span>
+      <span style="width:9px;height:9px;border-radius:50%;background:#24784d;display:inline-block"></span><span style="font-size:11px;margin-right:auto">Livraison</span>
+      <span style="font-size:10px;color:var(--muted)">Les dates se modifient dans la fiche mission.</span>
+    </div>
+    <div style="display:flex;overflow-x:auto;margin:0 -8px;padding:0 0 4px">${cols}</div>
+  </div>`;
+}
+
+function missionTableFull(selectable=false){
+  const allMissions=filteredMissions();
+  let entries=allMissions.flatMap(m=>m.cars.map(c=>({m,c})));
+  // filtres par colonne
+  const f=colF;
+  entries=entries.filter(({m,c})=>{
+    if(f.ref&&!`${m.ref} ${getClient(m).name||''}`.toLowerCase().includes(f.ref.toLowerCase()))return false;
+    if(f.make&&!`${c.make} ${c.model}`.toLowerCase().includes(f.make.toLowerCase()))return false;
+    if(f.vin&&!(c.vin||'').toLowerCase().includes(f.vin.toLowerCase()))return false;
+    if(f.plate&&!(c.plate||'').toLowerCase().includes(f.plate.toLowerCase()))return false;
+    if(f.pickupCity&&!(m.pickupCity||'').toLowerCase().includes(f.pickupCity.toLowerCase()))return false;
+    if(f.deliveryCity&&!(m.deliveryCity||'').toLowerCase().includes(f.deliveryCity.toLowerCase()))return false;
+    if(f.pickupDate&&!pretty(m.pickupDate).includes(f.pickupDate))return false;
+    return true;
+  });
+  entries.sort((a,b)=>String(a.m[db.sort]||a.c[db.sort]||'').localeCompare(String(b.m[db.sort]||b.c[db.sort]||''),'fr',{numeric:true})*db.direction);
+  const total=entries.length;
+  const cols=[['ref','Mission / client'],['make','Véhicules'],['vin','VIN'],['plate','Plaque'],['pickupCity','Ville de chargement'],['deliveryCity','Ville de déchargement'],['pickupDate','Date de chargement']];
+  const fPlaceholders={ref:'Mission / client',make:'Véhicule',vin:'VIN',plate:'Plaque',pickupCity:'Ville chargement',deliveryCity:'Ville déchargement',pickupDate:pretty(new Date().toISOString().split('T')[0])};
+  const ck=(v)=>selectable?`<td class="check-cell">${v}</td>`:'';
+  const thead=`<tr>${ck('<input type="checkbox" onchange="selectAll(this.checked)">')}${cols.map(([k,l])=>`<th><button onclick="sortBy('${k}')">${l}　↕</button></th>`).join('')}<th>Statut</th><th></th></tr>
+  <tr style="background:#f2f5f8">${ck('')}${cols.map(([k])=>`<td style="padding:5px 8px"><input value="${esc(f[k]||'')}" placeholder="${esc(fPlaceholders[k]||'')}" style="width:100%;border:1px solid #d8e4ec;border-radius:5px;padding:5px 7px;font-size:11px;background:white;color:#20384e" oninput="colF['${k}']=this.value;render()"></td>`).join('')}<td></td><td></td></tr>`;
+  const tbody=entries.map(({m,c})=>{
+    const chk=selectable?`<td class="check-cell"><input type="checkbox" ${db.selectedIds.includes(c.id)?'checked':''} onchange="toggleSelected('${esc(c.id)}',this.checked)"></td>`:'';
+    return `<tr>${chk}<td><strong>${esc(m.ref)}</strong><small>${esc(getClient(m).name||'—')}</small></td><td><strong>${esc(c.make)} ${esc(c.model)}</strong></td><td style="font-size:11px;color:#536a7d">${esc(c.vin||'—')}</td><td>${esc(c.plate||'—')}</td><td>${esc(m.pickupCity||'—')}</td><td>${esc(m.deliveryCity||'—')}</td><td>${pretty(m.pickupDate)}<small>${pretty(m.deliveryDate)}</small></td><td>${badge(m.status)}</td><td><button class="btn" onclick="openDetail('${esc(m.id)}')">Ouvrir</button></td></tr>`;
+  }).join()||`<tr><td colspan="${selectable?10:9}" class="empty">Aucun véhicule.</td></tr>`;
+  return {html:`<div class="table-wrap"><table><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`,total,missions:allMissions.length};
+}
+
+function advancedFilterBar(totalMissions,totalVehicles){
+  const clientOpts=`<option>Tous les clients</option>${db.clients.map(x=>`<option value="${esc(x.id)}" ${filterClient===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}`;
+  const carrierOpts=`<option>Tous les transporteurs</option>${db.carriers.map(x=>`<option value="${esc(x.id)}" ${filterCarrier===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}`;
+  const statusOpts=['Tous les statuts','à planifier','attribué','à charger','en transport','livré','à facturer','facturé','payé'].map(x=>`<option ${filterStatus===x?'selected':''}>${x}</option>`).join('');
+  return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+    <span style="font-size:12px;color:var(--muted);margin-right:4px">Statut</span>
+    <select style="border:1px solid #d8e4ec;border-radius:6px;padding:6px 9px;font-size:12px;background:#fff" onchange="filterStatus=this.value;render()">${statusOpts}</select>
+    <span style="font-size:12px;color:var(--muted)">Client</span>
+    <select style="border:1px solid #d8e4ec;border-radius:6px;padding:6px 9px;font-size:12px;background:#fff" onchange="filterClient=this.options[this.selectedIndex].text==='Tous les clients'?'Tous les clients':this.value;render()">${clientOpts}</select>
+    <span style="font-size:12px;color:var(--muted)">Transporteur</span>
+    <select style="border:1px solid #d8e4ec;border-radius:6px;padding:6px 9px;font-size:12px;background:#fff" onchange="filterCarrier=this.options[this.selectedIndex].text==='Tous les transporteurs'?'Tous les transporteurs':this.value;render()">${carrierOpts}</select>
+    <span style="font-size:12px;color:var(--muted);margin-left:auto"><strong>${totalMissions}</strong> mission${totalMissions!==1?'s':''} · <strong>${totalVehicles}</strong> véhicule${totalVehicles!==1?'s':''}</span>
+    ${Object.values(colF).some(v=>v)||filterStatus!=='Tous les statuts'||filterClient!=='Tous les clients'||filterCarrier!=='Tous les transporteurs'?`<button class="btn" style="font-size:11px;padding:5px 9px" onclick="filterStatus='Tous les statuts';filterClient='Tous les clients';filterCarrier='Tous les transporteurs';colF={ref:'',make:'',vin:'',plate:'',pickupCity:'',deliveryCity:'',pickupDate:''};render()">✕ Réinitialiser</button>`:''}
+  </div>`;
+}
+
+function planning(){
+  const count=db.selectedIds.length;
+  const tbl=missionTableFull(true);
+  return heading('Planning','Calendrier des opérations et affectation des transporteurs.')+
+  weekCalendar()+
+  `<div class="panel"><div class="panel-title"><h2>Véhicules à planifier</h2><small>La case de sélection se trouve à gauche de Mission / client.</small></div>
+  <div class="bulkbar">
+    <strong>${count} véhicule(s) sélectionné(s)</strong>
+    <select id="bulk-carrier" onchange="autoFillCarrierEmail(this.value)"><option value="">Choisir le transporteur…</option>${db.carriers.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select>
+    <input type="email" id="bulk-email" placeholder="E-mail transporteur (auto-rempli)">
+    <button class="btn primary" onclick="assignCarrier()" title="Affecte le transporteur et ouvre un email avec le lien portail">🔗 Affecter + envoyer lien portail</button>
+    <button class="btn" onclick="openCarrierDraft()">📄 Bon de transport groupé</button>
+    <input type="text" id="truck-plate" placeholder="Plaque camion">
+    <input type="text" id="driver-name" placeholder="Nom du chauffeur">
+    <input type="email" id="yard-email" placeholder="E-mail du parc">
+    <button class="btn" onclick="openYardDraft()">Annonce parc</button>
+    <button class="btn" onclick="selectAll(true)">Tout cocher</button>
+    <button class="btn" onclick="selectAll(false)">Tout décocher</button>
+  </div>
+  ${tbl.html}</div>`;
+}
+
+function missionsPage(){
+  const tbl=missionTableFull(false);
+  const totalM=db.missions.length;const totalV=db.missions.reduce((n,m)=>n+m.cars.length,0);
+  return heading('Missions',`${totalM} mission${totalM!==1?'s':''} · ${totalV} véhicule${totalV!==1?'s':''} · filtre sous chaque titre, tri en touchant un titre`,
+    `<button class="btn primary" onclick="openMissionForm()">＋ Nouvelle mission</button>`)+
+  `<div class="panel"><div style="border-bottom:1px solid var(--line);padding-bottom:13px;margin-bottom:13px">${advancedFilterBar(tbl.missions,tbl.total)}</div>${tbl.html}</div>`;
+}
+function vehiclesPage(){
+  const tbl=missionTableFull(false);
+  const totalM=db.missions.length;const totalV=db.missions.reduce((n,m)=>n+m.cars.length,0);
+  return heading('Véhicules',`${totalM} mission${totalM!==1?'s':''} · ${totalV} véhicule${totalV!==1?'s':''} · VIN et plaques sur des colonnes séparées · filtre sous les titres, tri en touchant un titre`)+
+  `<div class="panel"><div style="border-bottom:1px solid var(--line);padding-bottom:13px;margin-bottom:13px">${advancedFilterBar(tbl.missions,tbl.total)}</div>${tbl.html}</div>`;
+}
+
+function partnersPage(kind){
+  const arr=db[kind],label=kind==='clients'?'client':'transporteur';
+  return heading(kind==='clients'?'Clients':'Transporteurs',`Répertoire des ${kind==='clients'?'clients':'transporteurs'} avec coordonnées complètes.`,`<button class="btn primary" onclick="partnerForm('${kind}')">＋ Ajouter ${label}</button>`)+
+  `<div class="grid cards">${arr.map(x=>`<div class="card entity-card"><h3>${esc(x.name)}</h3><p>${esc(x.contact||'Contact non renseigné')}<br>${esc(x.email||'E-mail non renseigné')}<br>TVA ${esc(x.vat||'—')} · ${esc(x.phone||'Téléphone —')}<br>${esc([x.street,x.postal,x.city,x.country].filter(Boolean).join(', '))}</p><div class="card-actions"><button class="btn" onclick="partnerForm('${kind}','${esc(x.id)}')">Modifier</button><button class="btn danger" onclick="deletePartner('${kind}','${esc(x.id)}')">Supprimer</button></div></div>`).join('')||'<div class="empty">Aucune fiche enregistrée.</div>'}</div>`;
+}
+
+function documentsPage(){
+  // Documents manuels (importés via la fiche véhicule)
+  const manualDocs=db.missions.flatMap(m=>m.cars.flatMap(c=>(c.docs||[]).map(d=>({
+    missionRef:m.ref,clientName:getClient(m).name||'—',
+    vehicleLabel:`${c.make} ${c.model}`,vin:c.vin||'',plate:c.plate||'',
+    label:d.name,phase:d.phase,date:d.date,url:d.url||'',type:'doc',missionId:m.id
+  }))));
+
+  // Photos transporteur (depuis carrier_events)
+  const carrierPhotos=(db.carrierEvents||[]).filter(e=>e.photo_url).map(e=>{
+    const m=db.missions.find(x=>x.id===e.mission_id)||{ref:'—'};
+    const car=db.missions.flatMap(x=>x.cars).find(c=>c.id===e.car_id)||{make:'',model:'',vin:'',plate:''};
+    return{
+      missionRef:m.ref,clientName:getClient(m).name||'—',
+      vehicleLabel:`${car.make} ${car.model}`.trim()||'—',vin:car.vin||'',plate:car.plate||'',
+      label:e.event_type==='loading'?'Photo chargement':'Photo livraison',
+      phase:e.event_type==='loading'?'chargement':'livraison',
+      date:e.confirmed_at?new Date(e.confirmed_at).toLocaleDateString('fr-BE'):'—',
+      url:e.photo_url,type:'photo',missionId:m.id
+    };
+  });
+
+  const all=[...manualDocs,...carrierPhotos].sort((a,b)=>a.missionRef.localeCompare(b.missionRef,'fr'));
+
+  const photoCount=carrierPhotos.length;
+  const docCount=manualDocs.length;
+
+  return heading('Documents',`${all.length} document(s) — ${docCount} importé(s), ${photoCount} photo(s) transporteur.`)+
+  `<div class="panel">
+    <div class="toolbar">
+      <input type="search" placeholder="Rechercher mission, véhicule, VIN…" oninput="docSearch=this.value;render()" value="${esc(typeof docSearch!=='undefined'?docSearch:'')}">
+      <select onchange="docFilter=this.value;render()">
+        <option value="">Tous les types</option>
+        <option value="chargement" ${typeof docFilter!=='undefined'&&docFilter==='chargement'?'selected':''}>Chargement</option>
+        <option value="livraison" ${typeof docFilter!=='undefined'&&docFilter==='livraison'?'selected':''}>Livraison</option>
+        <option value="doc" ${typeof docFilter!=='undefined'&&docFilter==='doc'?'selected':''}>Documents importés</option>
+        <option value="photo" ${typeof docFilter!=='undefined'&&docFilter==='photo'?'selected':''}>Photos transporteur</option>
+      </select>
+    </div>
+    ${all.length?all.filter(x=>{
+      const q=(typeof docSearch!=='undefined'?docSearch:'').toLowerCase();
+      const f=typeof docFilter!=='undefined'?docFilter:'';
+      const matchQ=!q||[x.missionRef,x.vehicleLabel,x.vin,x.plate,x.label,x.clientName].join(' ').toLowerCase().includes(q);
+      const matchF=!f||(f==='doc'?x.type==='doc':f==='photo'?x.type==='photo':x.phase===f);
+      return matchQ&&matchF;
+    }).map(x=>`
+      <div class="doc-row" style="align-items:center;gap:12px">
+        ${x.type==='photo'&&x.url?`<img src="${esc(x.url)}" style="width:64px;height:48px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:pointer;flex-shrink:0" onclick="window.open('${esc(x.url)}','_blank')">`:'<div style="width:64px;height:48px;background:#f0f4f7;border-radius:6px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">📄</div>'}
+        <span style="flex:1">
+          <strong>${esc(x.vehicleLabel)}</strong> ${x.vin?`<small style="color:var(--muted)">VIN ${esc(x.vin)}</small>`:''}
+          <small>Mission ${esc(x.missionRef)} · ${esc(x.clientName)}</small>
+          <small>${esc(x.label)} · <span class="badge ${x.phase==='livraison'?'green':'blue'}" style="font-size:9px">${esc(x.phase)}</span></small>
+        </span>
+        <span style="text-align:right;white-space:nowrap">
+          ${x.url?`<a href="${esc(x.url)}" target="_blank" class="btn" style="font-size:11px">↓ Ouvrir</a>`:'<span style="color:var(--muted);font-size:11px">Pas de fichier</span>'}
+          <small style="display:block;color:var(--muted);margin-top:4px">${esc(x.date)}</small>
+        </span>
+      </div>`).join('')||'<div class="empty">Aucun résultat pour ce filtre.</div>'
+    :'<div class="empty">Aucun document. Les documents importés et les photos des chauffeurs apparaîtront ici.</div>'}
+  </div>`;
+}
+
+function financePage(){
+  return heading('Finance','Suivi des missions prêtes à facturer.')+`<div class="panel">${db.missions.map(m=>`<div class="recent-row"><strong>${esc(m.ref)}<small>${esc(getClient(m).name||'—')}</small></strong><span>${esc(m.pickupCity||'—')} → ${esc(m.deliveryCity||'—')}</span><span>${m.cars.length} véhicule(s)<small>Chargement ${pretty(m.pickupDate)} · Livraison ${pretty(m.deliveryDate)}</small></span>${badge(m.status)}<button class="btn" onclick="openDetail('${esc(m.id)}')">Ouvrir</button></div>`).join('')||'<div class="empty">Aucune mission.</div>'}</div>`;
+}
+
+function summary(){
+  return heading('Récapitulatif','Architecture et fonctions couvertes par AutoDispatch.')+
+  `<div class="panel summary"><h3>Flux opérationnel</h3><ul><li>Créer une mission client avec adresses complètes, sites, contacts et plusieurs véhicules.</li><li>VIN 17 caractères sans I/O/Q et plaques par véhicule.</li><li>Planifier : date de chargement et date prévue de livraison.</li><li>Sélection groupée dans Planning et affectation en une fois à un transporteur.</li><li>Lien portail transporteur généré automatiquement et envoyé par email.</li><li>Transporteur confirme chargement et livraison avec photos (stockées sur Supabase).</li><li>Bon de transport groupé et annonce au parc par e-mail.</li><li>Répertoire clients et transporteurs avec TVA, téléphone, e-mail et adresse.</li><li>Notifications client de planification et de chargement, avec brouillon e-mail.</li></ul><h3>Architecture</h3><ul><li>Base de données PostgreSQL sur Supabase — données partagées entre tous les utilisateurs authentifiés.</li><li>Authentification par e-mail et mot de passe via Supabase Auth.</li><li>Photos et documents : Supabase Storage — bucket carrier-photos.</li><li>Hébergement sur GitHub Pages — déploiement automatique à chaque push.</li><li>Ce fichier HTML unique se connecte directement à Supabase via le SDK JS.</li></ul></div>`;
+}
+
+// ─── ACTIONS ─────────────────────────────────────────────────────
+function autoFillCarrierEmail(carrierId){
+  const carrier=db.carriers.find(x=>x.id===carrierId);
+  const emailInput=document.getElementById('bulk-email');
+  if(emailInput&&carrier?.email)emailInput.value=carrier.email;
+}
+
+function toggleSelected(id,on){db.selectedIds=db.selectedIds.filter(x=>x!==id);if(on)db.selectedIds.push(id);render();}
+function selectAll(on){db.selectedIds=on?db.missions.flatMap(m=>m.cars.map(c=>c.id)):[];render();}
+function selectedVehicles(){return db.missions.flatMap(m=>m.cars.filter(c=>db.selectedIds.includes(c.id)).map(c=>({m,c})));}
+
+async function assignCarrier(){
+  const carrierId=document.getElementById('bulk-carrier').value;
+  if(!carrierId){alert('Choisis un transporteur.');return;}
+  const items=selectedVehicles();
+  if(!items.length){alert('Coche au moins un véhicule.');return;}
+  setLoading(true);
+  const mids=[...new Set(items.map(({m})=>m.id))];
+  const tokens=[];
+  const earlyStatuses=['à planifier','attribué'];
+  for(const mid of mids){
+    const m=db.missions.find(x=>x.id===mid);
+    m.carrierId=carrierId;
+    const shouldUpgradeStatus=earlyStatuses.includes(m.status);
+    if(shouldUpgradeStatus)m.status='attribué';
+    // Récupère le carrier_token depuis Supabase (généré automatiquement par la DB)
+    const updatePayload={carrier_id:carrierId};
+    if(shouldUpgradeStatus)updatePayload.status='attribué';
+    const {data,error}=await sb.from('missions')
+      .update(updatePayload)
+      .eq('id',mid)
+      .select('carrier_token,ref')
+      .single();
+    if(data?.carrier_token){
+      m.carrierToken=data.carrier_token;
+      tokens.push({m,token:data.carrier_token});
+    }
+  }
+  setLoading(false);
+  render();
+
+  if(!tokens.length){alert('Transporteur affecté.');return;}
+
+  const emailInput=document.getElementById('bulk-email').value.trim();
+  const carrier=db.carriers.find(x=>x.id===carrierId);
+  const carrierEmail=emailInput||carrier?.email||'';
+  const baseUrl=window.location.origin+window.location.pathname;
+
+  if(tokens.length===1){
+    const {m,token}=tokens[0];
+    const link=`${baseUrl}?t=${token}`;
+    if(carrierEmail){
+      const subject=`AutoDispatch · Transport Confirmation · ${m.ref}`;
+      const body=buildCarrierEmail(m,link,carrier?.name||'');
+      showEmailDraft(carrierEmail,subject,body);
+    } else {
+      try{await navigator.clipboard.writeText(link);}catch(e){}
+      alert(`✓ Transporteur affecté !\n\nLien portail copié dans le presse-papier :\n${link}\n\nTu peux l'envoyer par e-mail au transporteur.`);
+    }
+  } else {
+    const allLinks=tokens.map(({m,token})=>`${m.ref} : ${baseUrl}?t=${token}`).join('\n');
+    if(carrierEmail){
+      const subject=`AutoDispatch · Transport Confirmation · ${tokens.map(t=>t.m.ref).join(', ')}`;
+      const missionBlocks=tokens.map(({m,token})=>{
+        const link=`${baseUrl}?t=${token}`;
+        const allDocs=m.cars.flatMap(c=>(c.docs||[]).filter(d=>d.url).map(d=>({car:c,doc:d})));
+        const docsSection=allDocs.length
+          ?`\n  📎 Documents:\n`+allDocs.map(({car,doc})=>`    • ${car.make} ${car.model}${car.plate?' ('+car.plate+')':''} – ${doc.name||doc.phase||'Document'}: ${doc.url}`).join('\n')
+          :'';
+        return `Order ${m.ref} · Portal link: ${link}${docsSection}`;
+      }).join('\n\n');
+      const body=`Dear,\n\nPlease use the links below to confirm loading and delivery of the vehicles:\n\n${missionBlocks}\n\nKind regards`;
+      showEmailDraft(carrierEmail,subject,body);
+    } else {
+      try{await navigator.clipboard.writeText(allLinks);}catch(e){}
+      alert(`✓ Transporteur affecté pour ${tokens.length} missions !\n\nLiens copiés dans le presse-papier.`);
+    }
+  }
+}
+
+// Helper — formats an address block on separate lines
+function fmtAddr(site,street,postal,city,country){
+  return [site,street,[postal,city].filter(Boolean).join(' '),country].filter(Boolean).join('\n');
+}
+
+function buildCarrierEmail(m,link,carrierName){
+  const allDocs=m.cars.flatMap(c=>(c.docs||[]).filter(d=>d.url).map(d=>({car:c,doc:d})));
+  const docsSection=allDocs.length
+    ?`\n\n📎 DOCUMENTS TO DOWNLOAD (${allDocs.length}):\n`
+      +allDocs.map(({car,doc})=>`  • ${car.make} ${car.model}${car.plate?' ('+car.plate+')':''} – ${doc.name||doc.phase||'Document'}:\n    ${doc.url}`).join('\n')
+    :'';
+  const sep='─────────────────────────────';
+  const clientObj=getClient(m);
+  const billingLines=clientObj.name?[
+    ``,sep,
+    `🧾 TRANSPORT TO BE INVOICED TO:`,
+    `   ${clientObj.name}${clientObj.vat?' · VAT: '+clientObj.vat:''}`,
+    ...(clientObj.street?[`   ${clientObj.street}${clientObj.postal?' · '+clientObj.postal:''}${clientObj.city?' '+clientObj.city:''}`]:[]),
+    ...(clientObj.billingEmail?[`   Billing e-mail: ${clientObj.billingEmail}`]:[]),
+    sep
+  ]:[];
+  return [
+    `Dear${carrierName?' '+carrierName:''},`,
+    ``,
+    `Please use the tracking link below to confirm loading and delivery of the vehicles:`,
+    ``,
+    link,
+    ``,
+    sep,
+    `Transport Order : ${m.ref}`,
+    `Vehicles        : ${m.cars.length}`,
+    sep,
+    ``,
+    `📦 COLLECTION`,
+    fmtAddr(m.pickupSite,m.pickupStreet,m.pickupPostal,m.pickupCity,m.pickupCountry)||'—',
+    `Date: ${pretty(m.pickupDate)}`,
+    ``,
+    `🏁 DELIVERY`,
+    fmtAddr(m.deliverySite,m.deliveryStreet,m.deliveryPostal,m.deliveryCity,m.deliveryCountry)||'—',
+    `Date: ${pretty(m.deliveryDate)}`,
+    sep,
+    ``,
+    `VEHICLES:`,
+    ...m.cars.map((c,i)=>`  ${i+1}. ${c.make} ${c.model}\n     VIN   : ${c.vin||'—'}\n     Plate : ${c.plate||'—'}`),
+    docsSection||null,
+    ``,
+    `Via this link you will be able to:`,
+    `  • Confirm loading of each vehicle with photos`,
+    `  • Photograph CMRs at pickup and at delivery`,
+    `  • Confirm delivery of each vehicle`,
+    ...billingLines,
+    ``,
+    `Kind regards`
+  ].filter(x=>x!==null).join('\n');
+}
+
+function copyPortalLink(missionId){
+  const m=db.missions.find(x=>x.id===missionId);
+  if(!m?.carrierToken){alert('Aucun lien portail disponible pour cette mission.');return;}
+  const link=`${window.location.origin}${window.location.pathname}?t=${m.carrierToken}`;
+  navigator.clipboard.writeText(link).then(()=>alert('Lien copié !\n'+link)).catch(()=>alert('Lien portail :\n'+link));
+}
+
+function openCarrierDraft(){
+  const items=selectedVehicles(),email=document.getElementById('bulk-email').value.trim();
+  if(!items.length){alert("Please select at least one vehicle.");return;}
+  if(!email){alert("Please enter the carrier email address.");return;}
+  const sep='─────────────────────────────';
+  const vehicleBlocks=items.map(({m,c},i)=>[
+    `${sep}`,
+    `${i+1}. ${c.make} ${c.model}`,
+    `   VIN   : ${c.vin||'TBD'}`,
+    `   Plate : ${c.plate||'TBD'}`,
+    `   Order : ${m.ref}  |  Client : ${getClient(m).name||'—'}`,
+    ``,
+    `   📦 Collection`,
+    ...fmtAddr(m.pickupSite,m.pickupStreet,m.pickupPostal,m.pickupCity,m.pickupCountry).split('\n').map(l=>`   ${l}`),
+    `   Date: ${pretty(m.pickupDate)}`,
+    ``,
+    `   🏁 Delivery`,
+    ...fmtAddr(m.deliverySite,m.deliveryStreet,m.deliveryPostal,m.deliveryCity,m.deliveryCountry).split('\n').map(l=>`   ${l}`),
+    `   Date: ${pretty(m.deliveryDate)}`,
+  ].join('\n')).join('\n\n');
+  const body=[
+    `Dear,`,``,
+    `Please find below the transport order(s) assigned to you.`,``,
+    vehicleBlocks,
+    sep,``,
+    `Kind regards`
+  ].join('\n');
+  showEmailDraft(email,`Transport Order · ${items.length} vehicle(s)`,body);
+}
+
+// Yard email translations (greeting, intro, truck, driver, pickup, order, documents, regards, subject)
+const YARD_I18N={
+  fr:{hello:'Bonjour,',intro:'Annonce des véhicules à charger :',truck:'Camion',driver:'Chauffeur',tbd:'à préciser',pickup:'Enlèvement',order:'Mission',docs:'Documents',regards:'Cordialement',subject:'Annonce parc'},
+  en:{hello:'Dear,',intro:'Vehicle loading announcement:',truck:'Truck',driver:'Driver',tbd:'TBD',pickup:'Pickup',order:'Order',docs:'Documents',regards:'Kind regards',subject:'Yard notice'},
+  ro:{hello:'Bună ziua,',intro:'Anunț vehicule de încărcat:',truck:'Camion',driver:'Șofer',tbd:'de precizat',pickup:'Preluare',order:'Misiune',docs:'Documente',regards:'Cu stimă',subject:'Anunț parc'},
+  pl:{hello:'Dzień dobry,',intro:'Ogłoszenie załadunku pojazdów:',truck:'Ciężarówka',driver:'Kierowca',tbd:'do uzupełnienia',pickup:'Odbiór',order:'Zlecenie',docs:'Dokumenty',regards:'Z poważaniem',subject:'Ogłoszenie parkingu'},
+  lt:{hello:'Laba diena,',intro:'Transporto priemonių pakrovimo pranešimas:',truck:'Sunkvežimis',driver:'Vairuotojas',tbd:'patikslinti',pickup:'Paėmimas',order:'Misija',docs:'Dokumentai',regards:'Pagarbiai',subject:'Aikštelės pranešimas'},
+  de:{hello:'Sehr geehrte Damen und Herren,',intro:'Ankündigung der zu beladenden Fahrzeuge:',truck:'LKW',driver:'Fahrer',tbd:'noch festzulegen',pickup:'Abholung',order:'Auftrag',docs:'Dokumente',regards:'Mit freundlichen Grüßen',subject:'Hofankündigung'},
+  cs:{hello:'Dobrý den,',intro:'Oznámení o nakládce vozidel:',truck:'Nákladní auto',driver:'Řidič',tbd:'doplnit',pickup:'Vyzvednutí',order:'Zakázka',docs:'Dokumenty',regards:'S pozdravem',subject:'Oznámení parkoviště'},
+  sk:{hello:'Dobrý deň,',intro:'Oznam o nakladaní vozidiel:',truck:'Nákladné auto',driver:'Vodič',tbd:'doplniť',pickup:'Vyzdvihnutie',order:'Zákazka',docs:'Dokumenty',regards:'S pozdravom',subject:'Oznam parkovisko'},
+  hu:{hello:'Tisztelt Hölgyem/Uram,',intro:'Rakodandó járművek bejelentése:',truck:'Teherautó',driver:'Sofőr',tbd:'pontosítandó',pickup:'Felvétel',order:'Megbízás',docs:'Dokumentumok',regards:'Üdvözlettel',subject:'Parkoló bejelentő'},
+  bg:{hello:'Уважаеми колеги,',intro:'Обявление за товарене на автомобили:',truck:'Камион',driver:'Шофьор',tbd:'уточнете',pickup:'Взимане',order:'Мисия',docs:'Документи',regards:'С уважение',subject:'Обявление двор'},
+  nl:{hello:'Geachte,',intro:'Aankondiging voertuigen voor belading:',truck:'Vrachtwagen',driver:'Chauffeur',tbd:'nader te bepalen',pickup:'Ophalen',order:'Opdracht',docs:'Documenten',regards:'Met vriendelijke groeten',subject:'Yardaankondiging'},
+  es:{hello:'Estimados,',intro:'Anuncio de vehículos para cargar:',truck:'Camión',driver:'Conductor',tbd:'por concretar',pickup:'Recogida',order:'Misión',docs:'Documentos',regards:'Atentamente',subject:'Aviso patio'},
+  it:{hello:'Gentili,',intro:'Annuncio veicoli da caricare:',truck:'Camion',driver:'Autista',tbd:'da precisare',pickup:'Ritiro',order:'Missione',docs:'Documenti',regards:'Cordiali saluti',subject:'Avviso piazzale'},
+};
+function getYardLang(items){
+  // Detect language from first item's pickup country
+  const country=(items[0]?.m?.pickupCountry||'');
+  const code=detectLang(country);
+  return YARD_I18N[code]||YARD_I18N.en;
+}
+
+function openYardDraft(){
+  const items=selectedVehicles(),email=document.getElementById('yard-email').value.trim();
+  if(!items.length){alert("Coche d'abord les véhicules.");return;}
+  if(!email){alert("Ajoute l'e-mail du parc.");return;}
+  const truckPlate=(document.getElementById('truck-plate')?.value||'').trim();
+  const driverName=(document.getElementById('driver-name')?.value||'').trim();
+  const Y=getYardLang(items);
+  const sep='─────────────────────────────';
+  const truckLine=(truckPlate||driverName)
+    ?[``,`${Y.truck} : ${truckPlate||Y.tbd}`,`${Y.driver} : ${driverName||Y.tbd}`].join('\n')
+    :'';
+  const vehicleBlocks=items.map(({m,c},i)=>{
+    const allDocs=(c.docs||[]).filter(d=>d.url);
+    const docLines=allDocs.length
+      ?[``,`   📎 ${Y.docs} :`,...allDocs.map(d=>`      ${d.name||d.phase||'Document'}\n      ${d.url}`)].join('\n')
+      :'';
+    return [
+      sep,
+      `${i+1}. ${c.make} ${c.model}`,
+      `   VIN   : ${c.vin||Y.tbd}`,
+      `   Plaque: ${c.plate||Y.tbd}`,
+      `   ${Y.order} : ${m.ref}`,
+      ``,
+      `   ${Y.pickup}`,
+      ...fmtAddr(m.pickupSite,m.pickupStreet,m.pickupPostal,m.pickupCity,m.pickupCountry).split('\n').map(l=>`   ${l}`),
+      `   Date : ${pretty(m.pickupDate)}`,
+      docLines||null
+    ].filter(x=>x!==null).join('\n');
+  }).join('\n\n');
+  const body=[`${Y.hello}`,``,`${Y.intro}`,truckLine||null,``,vehicleBlocks,``,sep,``,`${Y.regards}`].filter(x=>x!==null).join('\n');
+  showEmailDraft(email,`${Y.subject} · ${items.length} vehicle(s)`,body);
+}
+
+function openMissionForm(id){
+  editingMission=id||null;
+  const m=id?db.missions.find(x=>x.id===id):null;
+  document.getElementById('modal-content').innerHTML=`<div class="modal-header"><div><h2>${m?'Modifier':'Créer'} une mission</h2><p>Client, adresses et véhicules à transporter.</p></div><button class="x" onclick="closeModal()">×</button></div><div class="form-grid"><div class="field"><label>CLIENT *</label><select id="f-client"><option value="">Choisir…</option>${db.clients.map(x=>`<option value="${esc(x.id)}" ${m?.clientId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div><div class="field"><label>RÉFÉRENCE</label><input id="f-ref" value="${esc(m?.ref||'FL-'+new Date().toISOString().slice(2,10).replaceAll('-',''))}"></div><div class="form-section">ADRESSE D'ENLÈVEMENT</div><div class="field"><label>Site / nom client *</label><input id="f-picksite" value="${esc(m?.pickupSite||'')}" placeholder="GCA · Bouchain"></div><div class="field"><label>Contact</label><input id="f-pickcontact" value="${esc(m?.pickupContact||'')}"></div><div class="field wide"><label>Rue et numéro *</label><input id="f-pickstreet" value="${esc(m?.pickupStreet||'')}"></div><div class="field"><label>Code postal *</label><input id="f-pickpostal" value="${esc(m?.pickupPostal||'')}"></div><div class="field"><label>Ville *</label><input id="f-pickcity" value="${esc(m?.pickupCity||'')}"></div><div class="field"><label>Pays *</label><input id="f-pickcountry" value="${esc(m?.pickupCountry||'Belgique')}"></div><div class="form-section">ADRESSE DE LIVRAISON</div><div class="field"><label>Site / nom client *</label><input id="f-delivsite" value="${esc(m?.deliverySite||'')}" placeholder="Online Car · Graz"></div><div class="field"><label>Contact</label><input id="f-delivcontact" value="${esc(m?.deliveryContact||'')}"></div><div class="field"><label>E-mail site de livraison</label><input id="f-delivEmail" type="email" value="${esc(m?.deliveryEmail||'')}" placeholder="reception@client.com"></div><div class="field wide"><label>Rue et numéro *</label><input id="f-delivstreet" value="${esc(m?.deliveryStreet||'')}"></div><div class="field"><label>Code postal *</label><input id="f-delivpostal" value="${esc(m?.deliveryPostal||'')}"></div><div class="field"><label>Ville *</label><input id="f-delivcity" value="${esc(m?.deliveryCity||'')}"></div><div class="field"><label>Pays *</label><input id="f-delivcountry" value="${esc(m?.deliveryCountry||'Belgique')}"></div><div class="form-section">DATES</div><div class="field"><label>Date de chargement</label><input id="f-load-date" type="date" value="${esc(m?.pickupDate||'')}"></div><div class="field"><label>Date prévue de livraison</label><input id="f-deliv-date" type="date" value="${esc(m?.deliveryDate||'')}"></div><div class="form-section">VÉHICULE</div><div class="car-form"><div class="field"><label>Marque *</label><input id="f-make" value="${esc(m?.cars?.[0]?.make||'')}" placeholder="BMW"></div><div class="field"><label>Modèle *</label><input id="f-model" value="${esc(m?.cars?.[0]?.model||'')}" placeholder="X5"></div><div class="field"><label>VIN</label><input id="f-vin" value="${esc(m?.cars?.[0]?.vin||'')}" placeholder="17 caractères"></div><div class="field"><label>Plaque</label><input id="f-plate" value="${esc(m?.cars?.[0]?.plate||'')}"></div><button class="btn" onclick="addVehicleField()">＋ véhicule</button></div><div id="extra-cars" class="field wide"></div></div><div id="form-error"></div><div class="modal-footer"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn primary" onclick="saveMission()">${m?'Enregistrer':'Créer la mission'}</button></div>`;
+  document.getElementById('modal').classList.add('open');
+}
+
+function addVehicleField(){
+  const node=document.createElement('div');
+  node.className='car-form';node.style.marginTop='8px';
+  node.innerHTML='<div class="field"><label>Marque</label><input data-extra="make"></div><div class="field"><label>Modèle</label><input data-extra="model"></div><div class="field"><label>VIN</label><input data-extra="vin"></div><div class="field"><label>Plaque</label><input data-extra="plate"></div><button class="btn" type="button" onclick="this.parentElement.remove()">Retirer</button>';
+  document.getElementById('extra-cars').appendChild(node);
+}
+
+async function saveMission(){
+  const err=document.getElementById('form-error');
+  const vin=val('f-vin').toUpperCase();
+  if(!val('f-client')||!val('f-picksite')||!val('f-pickstreet')||!val('f-pickpostal')||!val('f-pickcity')||!val('f-delivsite')||!val('f-delivstreet')||!val('f-delivpostal')||!val('f-delivcity')||!val('f-make')||!val('f-model')){err.innerHTML='<div class="notice error">Complète le client, les noms de site, les deux adresses et la marque / le modèle.</div>';return;}
+  if(vin&&!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)){err.innerHTML='<div class="notice error">Le VIN doit faire 17 caractères sans I, O ni Q.</div>';return;}
+  const old=editingMission?db.missions.find(x=>x.id===editingMission):null;
+  let cars=old?[...old.cars]:[];
+  if(old)cars[0]={...cars[0],make:val('f-make'),model:val('f-model'),vin,plate:val('f-plate')};
+  else cars=[{id:crypto.randomUUID(),make:val('f-make'),model:val('f-model'),vin,plate:val('f-plate'),status:'à charger',docs:[]}];
+  document.querySelectorAll('#extra-cars .car-form').forEach(row=>{
+    const get=k=>row.querySelector(`[data-extra="${k}"]`).value.trim();
+    cars.push({id:crypto.randomUUID(),make:get('make'),model:get('model'),vin:get('vin').toUpperCase(),plate:get('plate').toUpperCase(),status:'à charger',docs:[]});
+  });
+  const m={...(old||{}),id:old?.id||crypto.randomUUID(),ref:val('f-ref'),clientId:val('f-client'),
+    pickupSite:val('f-picksite'),pickupContact:val('f-pickcontact'),pickupStreet:val('f-pickstreet'),
+    pickupPostal:val('f-pickpostal'),pickupCity:val('f-pickcity'),pickupCountry:val('f-pickcountry'),
+    deliverySite:val('f-delivsite'),deliveryContact:val('f-delivcontact'),deliveryEmail:val('f-delivEmail'),deliveryStreet:val('f-delivstreet'),
+    deliveryPostal:val('f-delivpostal'),deliveryCity:val('f-delivcity'),deliveryCountry:val('f-delivcountry'),
+    pickupDate:val('f-load-date'),deliveryDate:val('f-deliv-date'),
+    status:old?.status||'à planifier',cars,notifications:old?.notifications||[]};
+  if(old&&(old.pickupDate!==m.pickupDate||old.deliveryDate!==m.deliveryDate)&&(m.pickupDate||m.deliveryDate))
+    m.notifications.push({id:crypto.randomUUID(),kind:'planned',pickupDate:m.pickupDate,deliveryDate:m.deliveryDate,status:'pending',createdAt:new Date().toISOString()});
+  if(!old&&(m.pickupDate||m.deliveryDate))
+    m.notifications.push({id:crypto.randomUUID(),kind:'planned',pickupDate:m.pickupDate,deliveryDate:m.deliveryDate,status:'pending',createdAt:new Date().toISOString()});
+  setLoading(true);
+  await dbUpsertMission(m);
+  for(const c of m.cars)await dbUpsertCar(c,m.id);
+  for(const n of m.notifications)await dbUpsertNotif(n,m.id);
+  setLoading(false);
+  if(old)db.missions=db.missions.map(x=>x.id===old.id?m:x);else db.missions.push(m);
+  closeModal();render();
+  // Auto-email client si une notification 'planned' vient d'être créée
+  const newPlanned=m.notifications.filter(n=>n.kind==='planned'&&n.status==='pending');
+  if(newPlanned.length){
+    const latest=newPlanned[newPlanned.length-1];
+    setTimeout(()=>autoEmailClient(m,latest),400);
+  }
+}
+
+function partnerForm(kind,id){
+  const arr=db[kind],p=id?arr.find(x=>x.id===id):{};
+  document.getElementById('modal-content').innerHTML=`<div class="modal-header"><div><h2>${id?'Modifier':'Ajouter'} ${kind==='clients'?'un client':'un transporteur'}</h2><p>Coordonnées de contact et facturation.</p></div><button class="x" onclick="closeModal()">×</button></div><div class="form-grid"><div class="field"><label>SOCIÉTÉ *</label><input id="p-name" value="${esc(p.name||'')}"></div><div class="field"><label>TVA</label><input id="p-vat" value="${esc(p.vat||'')}"></div><div class="field"><label>CONTACT</label><input id="p-contact" value="${esc(p.contact||'')}"></div><div class="field"><label>TÉLÉPHONE</label><input id="p-phone" value="${esc(p.phone||'')}"></div><div class="field"><label>E-MAIL PRINCIPAL</label><input id="p-email" type="email" value="${esc(p.email||'')}"></div><div class="field"><label>E-MAIL FACTURATION</label><input id="p-billing" type="email" value="${esc(p.billingEmail||'')}"></div><div class="field wide"><label>RUE ET NUMÉRO</label><input id="p-street" value="${esc(p.street||'')}"></div><div class="field"><label>CODE POSTAL</label><input id="p-postal" value="${esc(p.postal||'')}"></div><div class="field"><label>VILLE</label><input id="p-city" value="${esc(p.city||'')}"></div><div class="field"><label>PAYS</label><input id="p-country" value="${esc(p.country||'Belgique')}"></div></div><div id="form-error"></div><div class="modal-footer"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn primary" onclick="savePartner('${kind}','${esc(id||'')}')">Enregistrer</button></div>`;
+  document.getElementById('modal').classList.add('open');
+}
+
+async function savePartner(kind,id){
+  if(!val('p-name')){document.getElementById('form-error').innerHTML='<div class="notice error">Indique le nom de la société.</div>';return;}
+  const p={id:id||crypto.randomUUID(),name:val('p-name'),vat:val('p-vat'),contact:val('p-contact'),phone:val('p-phone'),email:val('p-email'),billingEmail:val('p-billing'),street:val('p-street'),postal:val('p-postal'),city:val('p-city'),country:val('p-country')};
+  const table=kind==='clients'?'clients':'carriers';
+  setLoading(true);
+  await dbUpsertPartner(table,p);
+  setLoading(false);
+  db[kind]=id?db[kind].map(x=>x.id===id?p:x):[...db[kind],p];
+  closeModal();render();
+}
+
+async function deletePartner(kind,id){
+  if(!confirm('Supprimer cette fiche ?'))return;
+  const table=kind==='clients'?'clients':'carriers';
+  setLoading(true);
+  await dbDelete(table,id);
+  setLoading(false);
+  db[kind]=db[kind].filter(x=>x.id!==id);render();
+}
+
+function closeModal(){document.getElementById('modal').classList.remove('open');}
+
+function openDetail(id){
+  detailId=id;
+  const m=db.missions.find(x=>x.id===id);if(!m)return;
+  const portalLink=m.carrierToken?`${window.location.origin}${window.location.pathname}?t=${m.carrierToken}`:'';
+  const d=document.getElementById('detail');
+  d.innerHTML=`<div class="detail-head"><div><div class="eyebrow">FICHE MISSION</div><h2>${esc(m.ref)}</h2><p>${esc(getClient(m).name||'—')} · ${badge(m.status)}</p></div><button class="x" onclick="closeDetail()">×</button></div>
+  <div class="detail-block"><h3>Dates et adresses</h3><div class="route"><div class="routebox"><small>ENLÈVEMENT · ${pretty(m.pickupDate)}</small><strong>${esc(m.pickupSite)}</strong><p>${esc([m.pickupStreet,m.pickupPostal,m.pickupCity,m.pickupCountry].filter(Boolean).join(', '))}<br>Contact : ${esc(m.pickupContact||'—')}</p></div><div class="routebox"><small>LIVRAISON · ${pretty(m.deliveryDate)}</small><strong>${esc(m.deliverySite)}</strong><p>${esc([m.deliveryStreet,m.deliveryPostal,m.deliveryCity,m.deliveryCountry].filter(Boolean).join(', '))}<br>Contact : ${esc(m.deliveryContact||'—')}${m.deliveryEmail?`<br>E-mail : <a href="mailto:${esc(m.deliveryEmail)}" style="color:var(--blue)">${esc(m.deliveryEmail)}</a>`:''}</p>${m.deliveryEmail?`<button class="btn soft" style="margin-top:7px;font-size:11px" onclick="draftDeliverySite('${esc(m.id)}')">📧 Notifier site de livraison (${detectLang(m.deliveryCountry).toUpperCase()})</button>`:`<div style="font-size:10px;color:var(--muted);margin-top:6px">Pas d'e-mail livraison — modifier la mission pour en ajouter un.</div>`}</div></div><p><button class="btn" onclick="openMissionForm('${esc(m.id)}')">Modifier la mission / dates</button></p></div>
+  <div class="detail-block"><h3>Transporteur</h3><div class="info-grid"><span>Société<strong>${esc(getCarrier(m).name||'À attribuer')}</strong></span><span>E-mail<strong>${esc(getCarrier(m).email||'—')}</strong></span></div>${portalLink?`<div style="margin-top:12px;padding:11px;background:#edf6fc;border:1px solid #d0e8f5;border-radius:7px;font-size:11px"><div style="font-size:10px;font-weight:800;letter-spacing:1px;color:var(--blue);margin-bottom:6px">🔗 LIEN PORTAIL TRANSPORTEUR</div><div style="word-break:break-all;color:#1e6592;margin-bottom:8px">${esc(portalLink)}</div><button class="btn soft" style="font-size:11px" onclick="copyPortalLink('${esc(m.id)}')">Copier le lien</button> <a href="${esc(portalLink)}" target="_blank" class="btn" style="font-size:11px;text-decoration:none">Ouvrir le portail ↗</a></div>`:'<p style="font-size:12px;color:var(--muted)">Aucun lien portail — affecte un transporteur depuis le Planning.</p>'}</div>
+  <div class="detail-block"><h3>Notifications client</h3>
+  ${(()=>{
+    const kindLabels={planned:'📅 Planification',loaded:'🚛 Chargement',delivered:'✅ Livraison'};
+    const sentNots=m.notifications||[];
+    const hasSent=k=>sentNots.some(n=>n.kind===k&&n.status==='sent');
+    const hasDraft=k=>sentNots.some(n=>n.kind===k);
+    const lastOf=k=>sentNots.filter(n=>n.kind===k).slice(-1)[0];
+    const notifLang=getClientLang(m);
+    const langTag=getClientLangCode(m).toUpperCase();
+    const rows=['planned','loaded','delivered'].map(kind=>{
+      const n=lastOf(kind);
+      const sent=hasSent(kind);
+      const draft=hasDraft(kind);
+      const readyToSend=(kind==='planned'&&m.carrierId)||(kind==='loaded'&&m.cars.every(c=>c.status==='chargé'||c.status==='livré'))||(kind==='delivered'&&m.status==='livré');
+      const label=kindLabels[kind];
+      if(sent)return`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span style="font-size:12px">${label} <span style="color:var(--green);font-weight:700">✓ envoyée</span> <span style="color:var(--muted);font-size:11px">${pretty(n?.createdAt?.slice(0,10))}</span></span><button class="btn soft" style="font-size:11px" onclick="draftClient('${esc(m.id)}','${esc(n.id)}')">Renvoyer</button></div>`;
+      if(draft)return`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span style="font-size:12px">${label} <span style="color:#e0850c;font-weight:700">⏳ brouillon</span></span><div style="display:flex;gap:6px"><button class="btn primary" style="font-size:11px" onclick="draftClient('${esc(m.id)}','${esc(n.id)}')">Ouvrir email</button><button class="btn" style="font-size:11px" onclick="markSent('${esc(m.id)}','${esc(n.id)}')">Marquer envoyé</button></div></div>`;
+      return`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span style="font-size:12px">${label} <span style="color:var(--muted)">— non envoyée</span></span>${readyToSend?`<button class="btn" style="font-size:11px" onclick="triggerClientNotif('${esc(m.id)}','${kind}')">Préparer (${langTag})</button>`:'<span style="font-size:11px;color:var(--muted)">en attente</span>'}</div>`;
+    });
+    return`<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Email client en <strong>${langTag}</strong> (pays client de facturation)</div>`+rows.join('');
+  })()}
+  </div>
+  <div class="detail-block"><h3>Véhicules · ${m.cars.length}</h3>${m.cars.map(c=>`<div class="notification"><h4>${esc(c.make)} ${esc(c.model)} · ${badge(c.status)}</h4><p>VIN ${esc(c.vin||'—')}<br>Plaque ${esc(c.plate||'—')}</p><div class="toolbar"><select onchange="vehicleStatus('${esc(m.id)}','${esc(c.id)}',this.value)">${['à charger','chargé','livré'].map(s=>`<option ${c.status===s?'selected':''}>${s}</option>`).join('')}</select><label class="btn">Ajouter document<input type="file" hidden onchange="addDoc('${esc(m.id)}','${esc(c.id)}',this.files[0])"></label></div>${(c.docs||[]).map(x=>`<div class="doc-row">${esc(x.name)}<small>${esc(x.phase)}</small>${x.url?`<a href="${esc(x.url)}" target="_blank" style="color:var(--blue);margin-left:8px">↓ Télécharger</a>`:''}</div>`).join('')}</div>`).join('')}</div>
+  <div class="detail-block"><h3>Suivi</h3><select onchange="missionStatus('${esc(m.id)}',this.value)">${['à planifier','attribué','à charger','en transport','livré','à facturer','facturé','payé'].map(s=>`<option ${m.status===s?'selected':''}>${s}</option>`).join('')}</select> <button class="btn" onclick="notifyLoaded('${esc(m.id)}')">Confirmer chargé et notifier</button></div>`;
+  d.classList.add('open');
+}
+
+function closeDetail(){document.getElementById('detail').classList.remove('open');detailId=null;}
+function refreshDetail(){render();if(detailId)openDetail(detailId);}
+
+// ── Client notification i18n (language = delivery country language) ──
+const CLIENT_NOTIF_I18N={
+  fr:{
+    planned:{subject:'📅 Planification confirmée · Mission',body_intro:'Nous vous confirmons la planification de la mission',body_route:'Vos véhicules seront enlevés et acheminés vers votre site selon le calendrier ci-dessous.'},
+    loaded:{subject:'🚛 Véhicule(s) chargé(s) · Mission',body_intro:'Nous vous confirmons le chargement de la mission',body_route:'Vos véhicules sont en route et seront livrés à la date prévue.'},
+    delivered:{subject:'✅ Livraison confirmée · Mission',body_intro:'Nous vous confirmons la livraison de la mission',body_route:'Tous vos véhicules ont été livrés. Merci pour votre confiance.'},
+    hello:'Bonjour',pickup_lbl:'Date d\'enlèvement',delivery_lbl:'Date prévue de livraison',delivered_lbl:'Date de livraison',
+    vehicles_lbl:'Véhicule(s) concerné(s)',pickup_addr:'Lieu d\'enlèvement',delivery_addr:'Lieu de livraison',
+    contact_us:'N\'hésitez pas à nous contacter pour toute question.',regards:'Cordialement',
+    inspection_title:'📋 ÉTAT DES LIEUX À LA LIVRAISON',
+    inspection_text:'Veuillez utiliser le lien ci-dessous à l\'arrivée de votre/vos véhicule(s) pour signaler d\'éventuels dommages et signer le bon de réception :',
+    inspection_text_delivery:'Veuillez utiliser le lien ci-dessous pour signaler d\'éventuels dommages constatés à la livraison et signer le bon de réception :',
+    inspection_note:'(Ce lien est valable pour cette livraison uniquement — à compléter à la réception des véhicules)'
+  },
+  en:{
+    planned:{subject:'📅 Transport scheduled · Order',body_intro:'We confirm the scheduling of transport order',body_route:'Your vehicles will be collected and delivered to your site as per the schedule below.'},
+    loaded:{subject:'🚛 Vehicle(s) loaded · Order',body_intro:'We confirm that the vehicles for transport order',body_route:'Your vehicles are on their way and will be delivered on the expected date.'},
+    delivered:{subject:'✅ Delivery confirmed · Order',body_intro:'We confirm the delivery of transport order',body_route:'All your vehicles have been delivered. Thank you for your trust.'},
+    hello:'Dear',pickup_lbl:'Collection date',delivery_lbl:'Expected delivery date',delivered_lbl:'Delivery date',
+    vehicles_lbl:'Vehicle(s)',pickup_addr:'Collection point',delivery_addr:'Delivery point',
+    contact_us:'Please do not hesitate to contact us for any questions.',regards:'Kind regards'
+  },
+  ro:{
+    planned:{subject:'📅 Transport programat · Comanda',body_intro:'Vă confirmăm programarea comenzii de transport',body_route:'Vehiculele dumneavoastră vor fi preluate și livrate la locația indicată conform calendarului de mai jos.'},
+    loaded:{subject:'🚛 Vehicule(e) încărcat(e) · Comanda',body_intro:'Vă confirmăm că încărcarea pentru comanda',body_route:'Vehiculele dumneavoastră sunt în drum spre destinație și vor fi livrate la data prevăzută.'},
+    delivered:{subject:'✅ Livrare confirmată · Comanda',body_intro:'Vă confirmăm livrarea comenzii',body_route:'Toate vehiculele dumneavoastră au fost livrate. Vă mulțumim pentru încrederea acordată.'},
+    hello:'Stimate client',pickup_lbl:'Data de preluare',delivery_lbl:'Data estimată de livrare',delivered_lbl:'Data livrării',
+    vehicles_lbl:'Vehicul(e)',pickup_addr:'Punct de preluare',delivery_addr:'Punct de livrare',
+    contact_us:'Nu ezitați să ne contactați pentru orice întrebare.',regards:'Cu stimă'
+  },
+  pl:{
+    planned:{subject:'📅 Transport zaplanowany · Zlecenie',body_intro:'Potwierdzamy zaplanowanie zlecenia transportowego',body_route:'Państwa pojazdy zostaną odebrane i dostarczone na wskazane miejsce zgodnie z poniższym harmonogramem.'},
+    loaded:{subject:'🚛 Pojazd(y) załadowany(e) · Zlecenie',body_intro:'Potwierdzamy załadunek dla zlecenia',body_route:'Państwa pojazdy są w drodze i zostaną dostarczone w przewidzianym terminie.'},
+    delivered:{subject:'✅ Dostawa potwierdzona · Zlecenie',body_intro:'Potwierdzamy dostawę zlecenia',body_route:'Wszystkie Państwa pojazdy zostały dostarczone. Dziękujemy za zaufanie.'},
+    hello:'Szanowni Państwo',pickup_lbl:'Data odbioru',delivery_lbl:'Szacowana data dostawy',delivered_lbl:'Data dostawy',
+    vehicles_lbl:'Pojazd(y)',pickup_addr:'Punkt odbioru',delivery_addr:'Punkt dostawy',
+    contact_us:'W razie pytań prosimy o kontakt.',regards:'Z poważaniem'
+  },
+  lt:{
+    planned:{subject:'📅 Transportas suplanuotas · Užsakymas',body_intro:'Patvirtinome transporto užsakymo suplanovimą',body_route:'Jūsų transporto priemonės bus paimtos ir pristatytos į nurodytą vietą pagal žemiau pateiktą grafiką.'},
+    loaded:{subject:'🚛 Transporto priemonė(s) pakrauta(s) · Užsakymas',body_intro:'Patvirtinome pakrovimą užsakymui',body_route:'Jūsų transporto priemonės keliauja ir bus pristatytos numatytą dieną.'},
+    delivered:{subject:'✅ Pristatymas patvirtintas · Užsakymas',body_intro:'Patvirtinome užsakymo pristatymą',body_route:'Visos jūsų transporto priemonės pristatytos. Dėkojame už pasitikėjimą.'},
+    hello:'Gerbiamas kliente',pickup_lbl:'Paėmimo data',delivery_lbl:'Numatyta pristatymo data',delivered_lbl:'Pristatymo data',
+    vehicles_lbl:'Transporto priemonė(s)',pickup_addr:'Paėmimo punktas',delivery_addr:'Pristatymo punktas',
+    contact_us:'Nesivaržykite susisiekite su mumis dėl bet kokių klausimų.',regards:'Pagarbiai'
+  },
+  de:{
+    planned:{subject:'📅 Transport geplant · Auftrag',body_intro:'Wir bestätigen die Planung des Transportauftrags',body_route:'Ihre Fahrzeuge werden gemäß dem unten stehenden Zeitplan abgeholt und an Ihren Standort geliefert.'},
+    loaded:{subject:'🚛 Fahrzeug(e) geladen · Auftrag',body_intro:'Wir bestätigen die Verladung für Auftrag',body_route:'Ihre Fahrzeuge sind unterwegs und werden zum vorgesehenen Termin geliefert.'},
+    delivered:{subject:'✅ Lieferung bestätigt · Auftrag',body_intro:'Wir bestätigen die Lieferung des Auftrags',body_route:'Alle Ihre Fahrzeuge wurden geliefert. Vielen Dank für Ihr Vertrauen.'},
+    hello:'Sehr geehrte Damen und Herren',pickup_lbl:'Abholdatum',delivery_lbl:'Voraussichtliches Lieferdatum',delivered_lbl:'Lieferdatum',
+    vehicles_lbl:'Fahrzeug(e)',pickup_addr:'Abholpunkt',delivery_addr:'Lieferort',
+    contact_us:'Für Fragen stehen wir Ihnen gerne zur Verfügung.',regards:'Mit freundlichen Grüßen'
+  },
+  cs:{
+    planned:{subject:'📅 Přeprava naplánována · Zakázka',body_intro:'Potvrzujeme naplánování přepravní zakázky',body_route:'Vaše vozidla budou vyzvednuty a doručena na vaše místo dle níže uvedeného harmonogramu.'},
+    loaded:{subject:'🚛 Vozidlo(a) naložena · Zakázka',body_intro:'Potvrzujeme nakládku pro zakázku',body_route:'Vaše vozidla jsou na cestě a budou doručena v předpokládaném termínu.'},
+    delivered:{subject:'✅ Doručení potvrzeno · Zakázka',body_intro:'Potvrzujeme doručení zakázky',body_route:'Všechna vaše vozidla byla doručena. Děkujeme za důvěru.'},
+    hello:'Vážený zákazníku',pickup_lbl:'Datum vyzvednutí',delivery_lbl:'Předpokládané datum doručení',delivered_lbl:'Datum doručení',
+    vehicles_lbl:'Vozidlo(a)',pickup_addr:'Místo vyzvednutí',delivery_addr:'Místo doručení',
+    contact_us:'V případě dotazů nás neváhejte kontaktovat.',regards:'S pozdravem'
+  },
+  sk:{
+    planned:{subject:'📅 Preprava naplánovaná · Zákazka',body_intro:'Potvrdzujeme naplánovanie prepravnej zákazky',body_route:'Vaše vozidlá budú vyzdvihnuté a doručené na vaše miesto podľa nižšie uvedeného harmonogramu.'},
+    loaded:{subject:'🚛 Vozidlo(á) naložené · Zákazka',body_intro:'Potvrdzujeme nakladanie pre zákazku',body_route:'Vaše vozidlá sú na ceste a budú doručené v predpokladanom termíne.'},
+    delivered:{subject:'✅ Doručenie potvrdené · Zákazka',body_intro:'Potvrdzujeme doručenie zákazky',body_route:'Všetky vaše vozidlá boli doručené. Ďakujeme za dôveru.'},
+    hello:'Vážený zákazník',pickup_lbl:'Dátum vyzdvihnutia',delivery_lbl:'Predpokladaný dátum doručenia',delivered_lbl:'Dátum doručenia',
+    vehicles_lbl:'Vozidlo(á)',pickup_addr:'Miesto vyzdvihnutia',delivery_addr:'Miesto doručenia',
+    contact_us:'V prípade otázok nás neváhajte kontaktovať.',regards:'S pozdravom'
+  },
+  hu:{
+    planned:{subject:'📅 Szállítás megtervezve · Megbízás',body_intro:'Megerősítjük a szállítási megbízás tervezését',body_route:'Jármüveit az alábbi ütemterv szerint vesszük fel és szállítjuk a helyszínére.'},
+    loaded:{subject:'🚛 Jármű(vek) berakodva · Megbízás',body_intro:'Megerősítjük a berakodást a megbízáshoz',body_route:'Jármüvei úton vannak, és a tervezett időpontra meg fognak érkezni.'},
+    delivered:{subject:'✅ Kiszállítás megerősítve · Megbízás',body_intro:'Megerősítjük a megbízás teljesítését',body_route:'Összes járműve kiszállításra került. Köszönjük bizalmát.'},
+    hello:'Tisztelt Ügyfelünk',pickup_lbl:'Felvétel dátuma',delivery_lbl:'Várható kiszállítási dátum',delivered_lbl:'Kiszállítás dátuma',
+    vehicles_lbl:'Jármű(vek)',pickup_addr:'Felvételi pont',delivery_addr:'Kiszállítási pont',
+    contact_us:'Kérdés esetén kérjük keressen minket bizalommal.',regards:'Üdvözlettel'
+  },
+  nl:{
+    planned:{subject:'📅 Transport gepland · Opdracht',body_intro:'Wij bevestigen de planning van transportopdracht',body_route:'Uw voertuigen worden opgehaald en op uw locatie geleverd volgens het onderstaande schema.'},
+    loaded:{subject:'🚛 Voertuig(en) geladen · Opdracht',body_intro:'Wij bevestigen de belading voor opdracht',body_route:'Uw voertuigen zijn onderweg en worden op de geplande datum afgeleverd.'},
+    delivered:{subject:'✅ Levering bevestigd · Opdracht',body_intro:'Wij bevestigen de levering van opdracht',body_route:'Al uw voertuigen zijn geleverd. Bedankt voor uw vertrouwen.'},
+    hello:'Geachte',pickup_lbl:'Ophaaldatum',delivery_lbl:'Verwachte leverdatum',delivered_lbl:'Leverdatum',
+    vehicles_lbl:'Voertuig(en)',pickup_addr:'Ophaaladres',delivery_addr:'Leveradres',
+    contact_us:'Aarzel niet om contact met ons op te nemen bij vragen.',regards:'Met vriendelijke groeten'
+  },
+  bg:{
+    planned:{subject:'📅 Транспортът е планиран · Поръчка',body_intro:'Потвърждаваме планирането на транспортна поръчка',body_route:'Вашите превозни средства ще бъдат взети и доставени на вашето място според графика по-долу.'},
+    loaded:{subject:'🚛 Превозно(и) средство(а) натоварено · Поръчка',body_intro:'Потвърждаваме товаренето за поръчка',body_route:'Вашите превозни средства са на път и ще бъдат доставени на предвидената дата.'},
+    delivered:{subject:'✅ Доставката е потвърдена · Поръчка',body_intro:'Потвърждаваме доставката на поръчка',body_route:'Всички ваши превозни средства са доставени. Благодарим ви за доверието.'},
+    hello:'Уважаеми клиент',pickup_lbl:'Дата на вземане',delivery_lbl:'Очаквана дата на доставка',delivered_lbl:'Дата на доставка',
+    vehicles_lbl:'Превозно(и) средство(а)',pickup_addr:'Място на вземане',delivery_addr:'Място на доставка',
+    contact_us:'Не се колебайте да се свържете с нас при въпроси.',regards:'С уважение'
+  },
+};
+function getClientLang(m){
+  const clientObj=getClient(m);
+  const code=detectLang(clientObj.country||m.deliveryCountry);
+  return CLIENT_NOTIF_I18N[code]||CLIENT_NOTIF_I18N.en;
+}
+function getClientLangCode(m){
+  const clientObj=getClient(m);
+  return detectLang(clientObj.country||m.deliveryCountry);
+}
+
+function buildClientEmail(m,n){
+  const clientObj=getClient(m);
+  const email=clientObj.email||clientObj.billingEmail;
+  if(!email)return null;
+  const clientName=clientObj.name||'';
+  const kind=n.kind||'planned';
+  const C=getClientLang(m);
+  const t=C[kind]||C.planned;
+  const delivLbl=(kind==='delivered')?C.delivered_lbl:C.delivery_lbl;
+  const sep='─────────────────────────────';
+  const subject=`${t.subject} ${m.ref}`;
+  const body=[
+    `${C.hello}${clientName?' '+clientName+',':','}`,
+    ``,
+    `${t.body_intro} ${m.ref}.`,
+    `${t.body_route}`,
+    ``,
+    sep,
+    `📦 ${C.pickup_lbl} : ${pretty(n.pickupDate)}`,
+    ``,
+    ...fmtAddr(m.pickupSite,m.pickupStreet,m.pickupPostal,m.pickupCity,m.pickupCountry).split('\n'),
+    ``,
+    `🏁 ${delivLbl} : ${pretty(n.deliveryDate)}`,
+    ``,
+    ...fmtAddr(m.deliverySite,m.deliveryStreet,m.deliveryPostal,m.deliveryCity,m.deliveryCountry).split('\n'),
+    sep,
+    ``,
+    `${C.vehicles_lbl} :`,
+    ...m.cars.map(c=>`  • ${c.make} ${c.model}${c.vin?'  |  VIN '+c.vin:''}${c.plate?'  |  '+c.plate:''}`),
+    ``,
+    `${C.contact_us}`,
+    ``,
+    ...((kind==='loaded'||kind==='delivered')&&m.deliveryToken&&!m.inspectionSubmittedAt?[
+      ``,
+      `─────────────────────────────`,
+      ``,
+      C.inspection_title||'📋 VEHICLE INSPECTION AT DELIVERY',
+      kind==='delivered'
+        ?(C.inspection_text_delivery||C.inspection_text||'Please use the link below to report any damage and sign the delivery receipt:')
+        :(C.inspection_text||'Please use the link below when your vehicle(s) arrive to report any damage and sign the delivery receipt:'),
+      ``,
+      `👉 ${window.location.origin}${window.location.pathname}?inspection=${m.deliveryToken}`,
+      ``,
+      C.inspection_note||'(This link is valid for this delivery only — please complete the form on arrival of the vehicles)',
+    ]:[]),
+    `${C.regards}`
+  ].join('\n');
+  return{email,subject,body};
+}
+
+// ── Email vers le site de livraison (dans la langue du pays) ────────
+const DELIVERY_SITE_I18N={
+  en:{subject:'🚗 Vehicle delivery scheduled',hello:'Dear,',intro:'Please be informed that the following vehicle(s) are scheduled for delivery to your site:',date_lbl:'Expected delivery date:',vehicles_lbl:'Vehicles:',sender_lbl:'Sent by:',contact:'For any questions, please do not hesitate to contact us.',regards:'Kind regards',
+    insp_title:'📋 VEHICLE CONDITION REPORT',insp_text:'Please use the link below on vehicle arrival to report any damage and sign the delivery receipt:',insp_note:'(One-time link — to be completed upon arrival of the vehicles)'},
+  fr:{subject:'🚗 Livraison de véhicule(s) programmée',hello:'Bonjour,',intro:'Veuillez noter que les véhicules suivants sont prévus en livraison sur votre site :',date_lbl:'Date de livraison prévue :',vehicles_lbl:'Véhicules :',sender_lbl:'Envoyé par :',contact:'N\'hésitez pas à nous contacter pour toute question.',regards:'Cordialement',
+    insp_title:'📋 ÉTAT DES LIEUX À LA RÉCEPTION',insp_text:'Veuillez utiliser le lien ci-dessous à réception des véhicules pour signaler tout dommage et signer le bon de livraison :',insp_note:'(Lien à usage unique — à compléter à l\'arrivée des véhicules)'},
+  nl:{subject:'🚗 Voertuiglevering gepland',hello:'Geachte,',intro:'Hierbij informeren wij u dat de volgende voertuigen gepland zijn voor levering op uw locatie:',date_lbl:'Verwachte leveringsdatum:',vehicles_lbl:'Voertuigen:',sender_lbl:'Verzonden door:',contact:'Aarzel niet om contact met ons op te nemen bij vragen.',regards:'Met vriendelijke groeten',
+    insp_title:'📋 STAAT VAN HET VOERTUIG',insp_text:'Gebruik onderstaande link bij ontvangst van de voertuigen om eventuele schade te melden en de afleverbon te ondertekenen:',insp_note:'(Eenmalige link — in te vullen bij aankomst van de voertuigen)'},
+  de:{subject:'🚗 Fahrzeuglieferung geplant',hello:'Sehr geehrte Damen und Herren,',intro:'Wir informieren Sie, dass folgende Fahrzeuge für eine Lieferung an Ihren Standort geplant sind:',date_lbl:'Voraussichtliches Lieferdatum:',vehicles_lbl:'Fahrzeuge:',sender_lbl:'Gesendet von:',contact:'Bitte zögern Sie nicht, uns bei Fragen zu kontaktieren.',regards:'Mit freundlichen Grüßen',
+    insp_title:'📋 FAHRZEUGZUSTANDSBERICHT',insp_text:'Bitte verwenden Sie den folgenden Link bei Ankunft der Fahrzeuge, um Schäden zu melden und den Lieferschein zu unterzeichnen:',insp_note:'(Einmaliger Link — bei Ankunft der Fahrzeuge auszufüllen)'},
+  cs:{subject:'🚗 Naplánovaná dodávka vozidla',hello:'Dobrý den,',intro:'Dovolujeme si vás informovat, že následující vozidla jsou naplánována k dodání na vaše místo:',date_lbl:'Předpokládané datum dodání:',vehicles_lbl:'Vozidla:',sender_lbl:'Odesláno od:',contact:'V případě dotazů nás neváhejte kontaktovat.',regards:'S pozdravem',
+    insp_title:'📋 PROTOKOL O STAVU VOZIDLA',insp_text:'Při přijetí vozidel použijte níže uvedený odkaz k nahlášení případných poškození a podepsání dodacího listu:',insp_note:'(Jednorázový odkaz — vyplňte při příjezdu vozidel)'},
+  sk:{subject:'🚗 Naplánované doručenie vozidla',hello:'Dobrý deň,',intro:'Dovoľujeme si vás informovať, že nasledujúce vozidlá sú naplánované na doručenie na vaše miesto:',date_lbl:'Predpokladaný dátum doručenia:',vehicles_lbl:'Vozidlá:',sender_lbl:'Odoslané od:',contact:'V prípade otázok nás neváhajte kontaktovať.',regards:'S pozdravom',
+    insp_title:'📋 PROTOKOL O STAVE VOZIDLA',insp_text:'Pri príjme vozidiel použite nižšie uvedený odkaz na nahlásenie prípadných poškodení a podpísanie dodacieho listu:',insp_note:'(Jednorazový odkaz — vyplňte pri príchode vozidiel)'},
+  pl:{subject:'🚗 Zaplanowana dostawa pojazdu',hello:'Dzień dobry,',intro:'Informujemy, że następujące pojazdy są zaplanowane do dostarczenia na Państwa lokalizację:',date_lbl:'Przewidywana data dostawy:',vehicles_lbl:'Pojazdy:',sender_lbl:'Wysłane przez:',contact:'W razie pytań prosimy o kontakt.',regards:'Z poważaniem',
+    insp_title:'📋 PROTOKÓŁ STANU POJAZDU',insp_text:'Przy odbiorze pojazdów prosimy użyć poniższego linku, aby zgłosić ewentualne uszkodzenia i podpisać protokół odbioru:',insp_note:'(Jednorazowy link — do wypełnienia przy przyjeździe pojazdów)'},
+  ro:{subject:'🚗 Livrare vehicul programată',hello:'Bună ziua,',intro:'Vă informăm că următoarele vehicule sunt programate pentru livrare la locația dumneavoastră:',date_lbl:'Data estimată de livrare:',vehicles_lbl:'Vehicule:',sender_lbl:'Trimis de:',contact:'Nu ezitați să ne contactați pentru orice întrebări.',regards:'Cu stimă',
+    insp_title:'📋 RAPORT STARE VEHICUL',insp_text:'La primirea vehiculelor, utilizați linkul de mai jos pentru a raporta eventualele daune și a semna procesul-verbal de predare-primire:',insp_note:'(Link de unică folosință — de completat la sosirea vehiculelor)'},
+  hu:{subject:'🚗 Tervezett járműszállítás',hello:'Tisztelt Hölgyem/Uram,',intro:'Tájékoztatjuk Önt, hogy az alábbi jármű(vek) szállítása az Ön telephelyére tervezett:',date_lbl:'Várható szállítási dátum:',vehicles_lbl:'Járművek:',sender_lbl:'Feladó:',contact:'Kérdés esetén állunk rendelkezésére.',regards:'Üdvözlettel',
+    insp_title:'📋 JÁRMŰÁLLAPOT-JELENTÉS',insp_text:'A járművek átvételekor kérjük, használja az alábbi linket az esetleges sérülések rögzítéséhez és az átvételi igazolás aláírásához:',insp_note:'(Egyszer használható link — a járművek megérkezésekor töltendő ki)'},
+  bg:{subject:'🚗 Планирана доставка на автомобил',hello:'Уважаеми колеги,',intro:'Уведомяваме ви, че следните автомобили са планирани за доставка до вашия обект:',date_lbl:'Очаквана дата на доставка:',vehicles_lbl:'Автомобили:',sender_lbl:'Изпратено от:',contact:'Не се колебайте да се свържете с нас при въпроси.',regards:'С уважение',
+    insp_title:'📋 ПРОТОКОЛ ЗА СЪСТОЯНИЕТО НА АВТОМОБИЛА',insp_text:'При получаване на автомобилите, моля използвайте линка по-долу за отчитане на евентуални повреди и подписване на приемо-предавателния протокол:',insp_note:'(Еднократен линк — попълва се при пристигането на автомобилите)'},
+  lt:{subject:'🚗 Suplanuotas transporto priemonės pristatymas',hello:'Laba diena,',intro:'Informuojame, kad šios transporto priemonės suplanuotos pristatyti į jūsų vietą:',date_lbl:'Numatoma pristatymo data:',vehicles_lbl:'Transporto priemonės:',sender_lbl:'Siuntėjas:',contact:'Kilus klausimų, susisiekite su mumis.',regards:'Pagarbiai',
+    insp_title:'📋 TRANSPORTO PRIEMONĖS BŪKLĖS PROTOKOLAS',insp_text:'Gavus transporto priemones, naudokite žemiau esantį nuorodą žaloms registruoti ir priėmimo aktui pasirašyti:',insp_note:'(Vienkartinė nuoroda — pildoma atvykus transporto priemonėms)'},
+  it:{subject:'🚗 Consegna veicolo programmata',hello:'Gentili,',intro:'Vi informiamo che i seguenti veicoli sono programmati per la consegna presso la vostra sede:',date_lbl:'Data di consegna prevista:',vehicles_lbl:'Veicoli:',sender_lbl:'Inviato da:',contact:'Non esitate a contattarci per qualsiasi domanda.',regards:'Cordiali saluti',
+    insp_title:'📋 VERBALE DI CONSEGNA',insp_text:'Al ricevimento dei veicoli, utilizzate il link sottostante per segnalare eventuali danni e firmare il verbale di consegna:',insp_note:'(Link monouso — da compilare all\'arrivo dei veicoli)'},
+  es:{subject:'🚗 Entrega de vehículo programada',hello:'Estimados,',intro:'Le informamos que los siguientes vehículos están programados para su entrega en su ubicación:',date_lbl:'Fecha de entrega prevista:',vehicles_lbl:'Vehículos:',sender_lbl:'Enviado por:',contact:'No dude en contactarnos si tiene alguna pregunta.',regards:'Atentamente',
+    insp_title:'📋 INFORME DE ESTADO DEL VEHÍCULO',insp_text:'Al recibir los vehículos, utilice el enlace de abajo para reportar daños y firmar el acta de entrega:',insp_note:'(Enlace de uso único — a cumplimentar a la llegada de los vehículos)'},
+};
+// Ouvre le client mail natif (Mail sur Mac) avec l'email pré-rempli
+function showEmailDraft(email,subject,body){
+  location.href='mailto:'+email+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+}
+
+function draftDeliverySite(mid){
+  const m=db.missions.find(x=>x.id===mid);
+  if(!m)return;
+  const email=m.deliveryEmail;
+  if(!email){alert('Ajoute d\'abord l\'e-mail du site de livraison dans la fiche mission.');return;}
+  const code=detectLang(m.deliveryCountry);
+  const T=DELIVERY_SITE_I18N[code]||DELIVERY_SITE_I18N.en;
+  const clientObj=getClient(m);
+  const sep='─────────────────────────────';
+  const subject=`${T.subject} — ${m.ref}`;
+  const body=[
+    T.hello,``,
+    T.intro,``,sep,
+    `${T.date_lbl} ${pretty(m.deliveryDate)}`,``,
+    `${m.deliverySite||''}`,
+    ...fmtAddr('',m.deliveryStreet,m.deliveryPostal,m.deliveryCity,m.deliveryCountry).split('\n').filter(Boolean),
+    sep,``,
+    `${T.vehicles_lbl}`,
+    ...m.cars.map(c=>`  • ${c.make} ${c.model}${c.vin?'  |  VIN '+c.vin:''}${c.plate?'  |  '+c.plate:''}`),
+    ``,
+    ...(clientObj.name?[`${T.sender_lbl} ${clientObj.name}`]:[]),
+    ``,
+    T.contact,``,T.regards,
+    // Bloc inspection : inclus si un token existe et que l'état des lieux n'est pas encore soumis
+    ...(m.deliveryToken&&!m.inspectionSubmittedAt?[
+      ``,sep,``,
+      T.insp_title||'📋 VEHICLE CONDITION REPORT',
+      T.insp_text||'Please use the link below upon vehicle arrival to report any damage and sign the delivery receipt:',
+      ``,
+      `👉 ${window.location.origin}${window.location.pathname}?inspection=${m.deliveryToken}`,
+      ``,
+      T.insp_note||'(One-time link — to be completed upon arrival of the vehicles)',
+    ]:[])
+  ].join('\n');
+  showEmailDraft(email,subject,body);
+}
+
+function draftClient(mid,nid){
+  const m=db.missions.find(x=>x.id===mid),n=(m.notifications||[]).find(x=>x.id===nid);
+  if(!n)return;
+  const mail=buildClientEmail(m,n);
+  if(!mail){alert('Ajoute une adresse e-mail à la fiche client (onglet Clients).');return;}
+  showEmailDraft(mail.email,mail.subject,mail.body);
+}
+
+async function triggerClientNotif(mid,kind){
+  const m=db.missions.find(x=>x.id===mid);
+  if(!m)return;
+  if((m.notifications||[]).some(n=>n.kind===kind&&n.status==='sent')){
+    if(!confirm('Une notification de ce type a déjà été envoyée. Créer un nouveau brouillon quand même ?'))return;
+  }
+  // Pour "livraison" : générer le delivery_token si pas encore présent
+  if(kind==='delivered'&&!m.deliveryToken){
+    m.deliveryToken=crypto.randomUUID();
+    sb.from('missions').update({delivery_token:m.deliveryToken}).eq('id',mid).then(({error})=>{if(error)console.error('delivery_token',error);});
+  }
+  const n={id:crypto.randomUUID(),kind,pickupDate:m.pickupDate,deliveryDate:m.deliveryDate,status:'pending',createdAt:new Date().toISOString()};
+  m.notifications=m.notifications||[];
+  m.notifications.push(n);
+  const mail=buildClientEmail(m,n);
+  dbUpsertNotif(n,mid).catch(e=>console.error('notif',e));
+  refreshDetail();
+  if(mail){
+    showEmailDraft(mail.email,mail.subject,mail.body);
+  } else {
+    alert('Ajoute une adresse e-mail à la fiche client (onglet Clients).');
+  }
+}
+
+function autoEmailClient(m,n){
+  const mail=buildClientEmail(m,n);
+  if(mail)showEmailDraft(mail.email,mail.subject,mail.body);
+}
+
+async function markSent(mid,nid){
+  if(!confirm('As-tu bien envoyé le message depuis ta messagerie ?'))return;
+  const m=db.missions.find(x=>x.id===mid),n=m.notifications.find(x=>x.id===nid);
+  n.status='sent';
+  await sb.from('notifications').update({status:'sent'}).eq('id',nid);
+  refreshDetail();
+}
+
+async function notifyLoaded(id){
+  const m=db.missions.find(x=>x.id===id);
+  if(m.notifications.some(n=>n.kind==='loaded')){alert('La notification de chargement existe déjà.');return;}
+  m.status='en transport';m.cars.forEach(c=>c.status='chargé');
+  setLoading(true);
+  // Génère le delivery_token pour la page d'inspection si pas encore existant
+  if(!m.deliveryToken){
+    m.deliveryToken=crypto.randomUUID();
+    await sb.from('missions').update({status:'en transport',delivery_token:m.deliveryToken}).eq('id',id);
+  } else {
+    await sb.from('missions').update({status:'en transport'}).eq('id',id);
+  }
+  for(const c of m.cars)await sb.from('cars').update({status:'chargé'}).eq('id',c.id);
+  const n={id:crypto.randomUUID(),kind:'loaded',pickupDate:m.pickupDate,deliveryDate:m.deliveryDate,status:'pending',createdAt:new Date().toISOString()};
+  m.notifications.push(n);
+  await dbUpsertNotif(n,id);
+  setLoading(false);
+  refreshDetail();
+  // Auto-email client : chargement confirmé (avec lien inspection)
+  setTimeout(()=>autoEmailClient(m,n),400);
+}
+
+async function missionStatus(id,status){
+  const m=db.missions.find(x=>x.id===id);m.status=status;
+  setLoading(true);
+  await sb.from('missions').update({status}).eq('id',id);
+  m.notifications=m.notifications||[];
+  if(status==='en transport'&&!m.notifications.some(n=>n.kind==='loaded')){
+    const n={id:crypto.randomUUID(),kind:'loaded',pickupDate:m.pickupDate,deliveryDate:m.deliveryDate,status:'pending',createdAt:new Date().toISOString()};
+    m.notifications.push(n);await dbUpsertNotif(n,id);
+  }
+  if(status==='livré'&&!m.notifications.some(n=>n.kind==='delivered')){
+    const n={id:crypto.randomUUID(),kind:'delivered',pickupDate:m.pickupDate,deliveryDate:m.deliveryDate,status:'pending',createdAt:new Date().toISOString()};
+    m.notifications.push(n);await dbUpsertNotif(n,id);
+  }
+  setLoading(false);refreshDetail();
+}
+
+async function vehicleStatus(mid,vid,status){
+  const m=db.missions.find(x=>x.id===mid),c=m.cars.find(x=>x.id===vid);
+  c.status=status;
+  await sb.from('cars').update({status}).eq('id',vid);
+  if(status==='chargé'&&m.cars.every(x=>x.status==='chargé'||x.status==='livré')&&!m.notifications.some(n=>n.kind==='loaded'))
+    await notifyLoaded(mid);
+  else refreshDetail();
+}
+
+async function addDoc(mid,vid,file){
+  if(!file)return;
+  const m=db.missions.find(x=>x.id===mid),c=m.cars.find(x=>x.id===vid);
+  setLoading(true);
+  try{
+    let fileUrl=null;
+    const ext=file.name.split('.').pop()||'pdf';
+    const path=`docs/${mid}/${vid}/${Date.now()}.${ext}`;
+    const {error:uploadErr}=await sb.storage.from('carrier-photos').upload(path,file,{contentType:file.type,upsert:true});
+    if(!uploadErr){
+      const {data}=sb.storage.from('carrier-photos').getPublicUrl(path);
+      fileUrl=data.publicUrl;
+    }
+    const phase=c.status==='livré'?'livraison':'chargement';
+    const doc={id:crypto.randomUUID(),name:file.name,phase,date:new Date().toLocaleDateString('fr-BE'),url:fileUrl};
+    c.docs=c.docs||[];c.docs.push(doc);
+    await sb.from('documents').insert({id:doc.id,car_id:vid,mission_id:mid,name:doc.name,phase:doc.phase,date:doc.date,url:fileUrl});
+    refreshDetail();
+    if(uploadErr)alert('Document enregistré mais upload Storage échoué : '+uploadErr.message);
+  }catch(e){alert('Erreur : '+e.message);}
+  setLoading(false);
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  PORTAIL TRANSPORTEUR — accès sans login via ?t=TOKEN
+// ══════════════════════════════════════════════════════════════════
+
+async function initCarrierPortal(){
+  const portal=document.getElementById('carrier-portal');
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('app-shell').style.display='none';
+  portal.style.display='block';
+  setLoading(true);
+  try{
+    // Récupère la mission par son token (anon, pas d'auth)
+    const {data:missions,error}=await sb.from('missions')
+      .select('*, clients(name), carriers(name)')
+      .eq('carrier_token',CARRIER_TOKEN);
+    if(error)throw error;
+    if(!missions||!missions.length){renderPortalError('Lien invalide ou expiré.');setLoading(false);return;}
+    portalMission=missions[0];
+    const [{data:cars},{data:events},{data:docs}]=await Promise.all([
+      sb.from('cars').select('*').eq('mission_id',portalMission.id),
+      sb.from('carrier_events').select('*').eq('mission_id',portalMission.id),
+      sb.from('documents').select('*').eq('mission_id',portalMission.id)
+    ]);
+    portalCars=cars||[];
+    portalEvents=events||[];
+    portalDocs=docs||[];
+    renderCarrierPortal();
+  }catch(e){
+    renderPortalError('Erreur : '+e.message);
+  }
+  setLoading(false);
+}
+
+function renderCarrierPortal(){
+  const m=portalMission;
+  const lang=portalLang();
+  const L=tr(lang);
+  const portal=document.getElementById('carrier-portal');
+  portal.className='portal-wrap';
+  // Date locale selon la langue du portail
+  const localeMap={fr:'fr-BE',en:'en-GB',ro:'ro-RO',pl:'pl-PL',lt:'lt-LT',de:'de-DE',lv:'lv-LV',et:'et-EE',cs:'cs-CZ',sk:'sk-SK',hu:'hu-HU',bg:'bg-BG',sl:'sl-SI',hr:'hr-HR',sr:'sr-RS',es:'es-ES',it:'it-IT',nl:'nl-NL'};
+  const loc=localeMap[lang]||'en-GB';
+  const fmtDate=d=>d?new Date(d+'T12:00:00').toLocaleDateString(loc,{day:'numeric',month:'short'}):'—';
+  portal.innerHTML=`
+    <div class="portal-header">
+      <div class="brand">auto<span>dispatch</span></div>
+      <div style="font-size:11px;opacity:.7;margin-bottom:10px">${L.portal_subtitle}</div>
+      <div class="portal-mission-bar" style="background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2);margin-bottom:0">
+        <div style="font-size:19px;font-weight:800">${esc(m.ref)}</div>
+        <div style="font-size:12px;opacity:.8;margin-top:4px">${esc(m.clients?.name||'—')}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;font-size:12px">
+          <div><div style="font-size:9px;letter-spacing:1px;opacity:.6">${L.pickup}</div><strong>${esc(m.pickup_city||'—')}</strong><br><span style="opacity:.7">${fmtDate(m.pickup_date)}</span></div>
+          <div><div style="font-size:9px;letter-spacing:1px;opacity:.6">${L.delivery}</div><strong>${esc(m.delivery_city||'—')}</strong><br><span style="opacity:.7">${fmtDate(m.delivery_date)}</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="portal-body">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px;padding:10px;background:white;border-radius:8px;border:1px solid var(--line)">${L.tip}</div>
+      ${portalCars.map(car=>renderCarPortalCard(car,lang,L)).join('')}
+    </div>
+  `;
+}
+
+// Catégories de photos — désormais localisées via getPhotoCatsLoading(lang) / getPhotoCatsDelivery(lang)
+
+function getPortalEvents(carId,type){return portalEvents.filter(e=>e.car_id===carId&&e.event_type===type);}
+function getEventsByKey(carId,type,key){return portalEvents.filter(e=>e.car_id===carId&&e.event_type===type&&e.notes===key);}
+function phaseComplete(carId,type){
+  // Phase complète si au moins la CMR est confirmée (photo ou confirmation manuelle)
+  const cmr=getEventsByKey(carId,type,'cmr');
+  return cmr.length>0;
+}
+
+function renderPhotoRow(cat,carId,eventType,locked,L){
+  const evts=getEventsByKey(carId,eventType,cat.key);
+  const photos=evts.filter(e=>e.photo_url);
+  const confirmed=evts.length>0;
+  const isRequired=cat.required;
+  return `
+    <div style="border:1px solid ${confirmed?'#c3e6cb':'var(--line)'};border-radius:8px;padding:11px;margin-bottom:8px;background:${confirmed?'#f6fcf8':'white'}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${photos.length?'8px':'0'}">
+        <span style="font-size:12px;font-weight:700">${cat.icon} ${cat.label}${isRequired?' <span style="color:#e05c5c;font-size:10px">*</span>':''}</span>
+        <span style="display:flex;gap:6px;align-items:center">
+          ${confirmed?`<span style="color:var(--green);font-size:11px;font-weight:700">✓</span>`:''}
+          ${!locked?`<button type="button" style="cursor:pointer;background:${confirmed?'#e8f5ec':'var(--pale)'};border:1px solid ${confirmed?'#b8dfc4':'#d0e8f5'};color:${confirmed?'var(--green)':'var(--blue)'};padding:5px 9px;border-radius:6px;font-size:11px;font-weight:700" onclick="document.getElementById('ph_${carId}_${eventType}_${cat.key}').click()">
+            ${confirmed&&!cat.multi?L.retake:L.photo}
+          </button>
+          <input id="ph_${carId}_${eventType}_${cat.key}" type="file" accept="image/*" capture="environment" style="display:none" onchange="portalUploadPhoto('${esc(carId)}','${esc(eventType)}',this,'${esc(cat.key)}')">
+          ${!confirmed?`<button style="background:white;border:1px solid #d9e2e9;color:var(--muted);padding:5px 9px;border-radius:6px;font-size:11px;cursor:pointer" onclick="portalSkipPhoto('${esc(carId)}','${esc(eventType)}','${esc(cat.key)}')">${L.no_photo}</button>`:''}
+          `:''}
+        </span>
+      </div>
+      ${photos.length?`<div class="portal-photos" style="margin:0">${photos.map(e=>`<img src="${esc(e.photo_url)}" onclick="portalOpenPhoto('${esc(e.photo_url)}')">`).join('')}</div>`:''}
+    </div>`;
+}
+
+function renderCarPortalCard(car,lang,L){
+  const isLoaded=phaseComplete(car.id,'loading');
+  const isDelivered=phaseComplete(car.id,'delivery');
+  const loadCmrDone=getEventsByKey(car.id,'loading','cmr').length>0;
+  const delivCmrDone=getEventsByKey(car.id,'delivery','cmr').length>0;
+  const carDocs=portalDocs.filter(d=>d.car_id===car.id);
+  const catsLoad=getPhotoCatsLoading(lang);
+  const catsDel=getPhotoCatsDelivery(lang);
+
+  return `
+    <div class="portal-car">
+      <div class="portal-car-head">
+        <div>
+          <div style="font-weight:800;font-size:16px">${esc(car.make)} ${esc(car.model)}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px">${L.vin} : ${esc(car.vin||'—')}　·　${L.plate} : ${esc(car.plate||'—')}</div>
+        </div>
+        <span class="badge ${isDelivered?'green':isLoaded?'blue':''}">${isDelivered?L.badge_delivered:isLoaded?L.badge_loaded:L.badge_pending}</span>
+      </div>
+
+      <!-- DOCUMENTS REÇUS -->
+      ${carDocs.length?`
+      <div style="border:1px solid #d0e8f5;border-radius:8px;padding:11px;margin-bottom:10px;background:#f5fafd">
+        <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:#2675a9;margin-bottom:8px">${L.docs_received} (${carDocs.length})</div>
+        ${carDocs.map(d=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-top:1px solid #e0eef7">
+            <span style="font-size:12px;font-weight:600">📄 ${esc(d.name||'Document')}</span>
+            ${d.url?`<a href="${esc(d.url)}" target="_blank" style="font-size:11px;background:var(--blue);color:white;padding:5px 10px;border-radius:6px;font-weight:700;text-decoration:none">${L.doc_open}</a>`:`<span style="font-size:11px;color:var(--muted)">${L.doc_none}</span>`}
+          </div>`).join('')}
+      </div>`:''}
+
+      <!-- CHARGEMENT -->
+      <div class="portal-section ${isLoaded?'done':''}">
+        <div class="portal-section-label" style="margin-bottom:12px">${isLoaded?'✓ ':''}${L.loading_title}${isLoaded?L.confirmed_suffix:''}</div>
+        ${catsLoad.map(cat=>renderPhotoRow(cat,car.id,'loading',isLoaded,L)).join('')}
+        ${!isLoaded?`
+          <button class="portal-confirm-btn" ${!loadCmrDone?'disabled style="opacity:.45;cursor:not-allowed"':''} onclick="portalConfirmPhase('${esc(car.id)}','loading')">
+            ${L.btn_confirm_loading}
+          </button>
+          ${!loadCmrDone?`<div style="text-align:center;font-size:11px;color:var(--muted);margin-top:6px">${L.cmr_required}</div>`:''}
+        `:`
+          <div style="text-align:center;padding:8px;font-size:12px;color:var(--green);font-weight:700">${L.loading_done}</div>
+        `}
+      </div>
+
+      <!-- LIVRAISON -->
+      <div class="portal-section ${isDelivered?'done':''} ${!isLoaded&&!isDelivered?'locked':''}">
+        <div class="portal-section-label" style="margin-bottom:${isLoaded?'12px':'0'}">${isDelivered?'✓ ':''}${L.delivery_title}${isDelivered?L.confirmed_suffix:!isLoaded?' ('+L.delivery_locked+')':''}</div>
+        ${isLoaded?catsDel.map(cat=>renderPhotoRow(cat,car.id,'delivery',isDelivered,L)).join(''):''}
+        ${isLoaded&&!isDelivered?`
+          <button class="portal-confirm-btn" ${!delivCmrDone?'disabled style="opacity:.45;cursor:not-allowed"':''} onclick="portalConfirmPhase('${esc(car.id)}','delivery')">
+            ${L.btn_confirm_delivery}
+          </button>
+          ${!delivCmrDone?`<div style="text-align:center;font-size:11px;color:var(--muted);margin-top:6px">${L.cmr_required}</div>`:''}
+        `:''}
+        ${isDelivered?`<div style="text-align:center;padding:8px;font-size:12px;color:var(--green);font-weight:700">${L.delivery_done}</div>`:''}
+      </div>
+    </div>
+  `;
+}
+
+function portalOpenPhoto(url){window.open(url,'_blank');}
+
+// Compresse une image via canvas — max 1920px, JPEG 80% → ~200–400KB au lieu de 3–8MB
+function compressImage(file,maxPx=1920,quality=0.80){
+  return new Promise((resolve)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      let{width:w,height:h}=img;
+      if(w>maxPx||h>maxPx){const r=Math.min(maxPx/w,maxPx/h);w=Math.round(w*r);h=Math.round(h*r);}
+      const canvas=document.createElement('canvas');
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      canvas.toBlob(blob=>resolve(blob||file),'image/jpeg',quality);
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);resolve(file);};
+    img.src=url;
+  });
+}
+
+async function portalUploadPhoto(carId,eventType,input,photoKey){
+  const rawFile=input.files[0];
+  if(!rawFile)return;
+  // Reset input pour permettre de reprendre la même photo
+  input.value='';
+  setLoading(true);
+  try{
+    // Compression avant upload : 1920px max, JPEG 80% → ~10x moins de stockage
+    const file=await compressImage(rawFile);
+    const path=`${portalMission.id}/${carId}/${eventType}_${photoKey}_${Date.now()}.jpg`;
+    const {error:uploadErr}=await sb.storage.from('carrier-photos').upload(path,file,{contentType:'image/jpeg'});
+    if(uploadErr)throw uploadErr;
+    const {data:{publicUrl}}=sb.storage.from('carrier-photos').getPublicUrl(path);
+    const {data:ev,error:evErr}=await sb.from('carrier_events')
+      .insert({mission_id:portalMission.id,car_id:carId,event_type:eventType,photo_url:publicUrl,notes:photoKey})
+      .select().single();
+    if(evErr)throw evErr;
+    portalEvents.push(ev);
+    renderCarrierPortal();
+  }catch(e){
+    alert('Erreur upload : '+e.message+'\n\nVérifie que le bucket carrier-photos est créé et public dans Supabase Storage.');
+  }
+  setLoading(false);
+}
+
+async function portalSkipPhoto(carId,eventType,photoKey){
+  // Marque la case comme "pas de photo" (confirmation sans fichier)
+  setLoading(true);
+  try{
+    const {data:ev,error}=await sb.from('carrier_events')
+      .insert({mission_id:portalMission.id,car_id:carId,event_type:eventType,photo_url:null,notes:photoKey})
+      .select().single();
+    if(error)throw error;
+    portalEvents.push(ev);
+    renderCarrierPortal();
+  }catch(e){alert('Erreur : '+e.message);}
+  setLoading(false);
+}
+
+async function portalConfirmPhase(carId,eventType){
+  // Confirme la phase (chargement ou livraison) — met à jour le statut véhicule
+  if(!confirm(eventType==='loading'?'Confirmer le chargement de ce véhicule ?':'Confirmer la livraison de ce véhicule ?'))return;
+  setLoading(true);
+  try{
+    const newStatus=eventType==='loading'?'chargé':'livré';
+    const {error}=await sb.from('cars').update({status:newStatus}).eq('id',carId);
+    if(error)throw error;
+    // ── Option 3 : insère un événement de confirmation
+    // → déclenche le Realtime dans l'app admin + le webhook Edge Function (email opérateur)
+    const car=portalCars.find(c=>c.id===carId);
+    const evPayload={
+      mission_id:portalMission.id,
+      car_id:carId,
+      event_type:'confirmed_'+eventType,   // 'confirmed_loading' | 'confirmed_delivery'
+      photo_url:null,
+      notes:`${car?car.make+' '+car.model:'Véhicule'} — confirmed at ${new Date().toISOString()}`
+    };
+    const {error:evErr}=await sb.from('carrier_events').insert(evPayload);
+    if(evErr)console.warn('[portalConfirmPhase] carrier_events insert:',evErr.message);
+    // Mise à jour état local portail
+    if(car)car.status=newStatus;
+    renderCarrierPortal();
+  }catch(e){
+    alert('Erreur : '+e.message);
+  }
+  setLoading(false);
+}
+
+function renderPortalError(msg){
+  document.getElementById('carrier-portal').innerHTML=`
+    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:24px">
+      <div style="max-width:360px;text-align:center;background:white;border:1px solid var(--line);border-radius:12px;padding:32px">
+        <div style="font-size:44px;margin-bottom:16px">⚠️</div>
+        <div style="font-size:20px;font-weight:800;color:var(--navy);margin-bottom:10px">Lien invalide</div>
+        <p style="color:var(--muted);font-size:13px">${esc(msg||'Ce lien est invalide ou a expiré.')}</p>
+      </div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// PORTAIL D'INSPECTION LIVRAISON (accès via ?inspection=UUID)
+// ══════════════════════════════════════════════════════════════════
+
+const INSPECTION_ZONES=[
+  {id:'pare_choc_av',label:'Pare-choc avant'},
+  {id:'capot',label:'Capot'},
+  {id:'aile_av_g',label:'Aile avant gauche'},
+  {id:'aile_av_d',label:'Aile avant droite'},
+  {id:'porte_av_g',label:'Portière avant gauche'},
+  {id:'porte_av_d',label:'Portière avant droite'},
+  {id:'toit',label:'Toit'},
+  {id:'porte_ar_g',label:'Portière arrière gauche'},
+  {id:'porte_ar_d',label:'Portière arrière droite'},
+  {id:'aile_ar_g',label:'Aile arrière gauche'},
+  {id:'aile_ar_d',label:'Aile arrière droite'},
+  {id:'coffre',label:'Coffre / hayon'},
+  {id:'pare_choc_ar',label:'Pare-choc arrière'},
+];
+
+// État local du portail inspection
+const inspState={
+  mission:null,
+  damages:[],         // [{zone,zoneLabel,description,photoBlob,photoDataUrl,lat,lng,ts}]
+  signatureDataUrl:null,
+  sigCanvas:null,
+  sigCtx:null,
+  sigDrawing:false,
+};
+
+async function initInspectionPage(token){
+  const portal=document.getElementById('inspection-portal');
+  document.getElementById('app').style.display='none';
+  portal.style.display='block';
+  portal.innerHTML=`<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f0f4f8"><div style="font-size:32px">⏳</div></div>`;
+
+  // Charger la mission via delivery_token
+  const{data,error}=await sb.from('missions').select('*').eq('delivery_token',token).single();
+  if(error||!data){
+    portal.innerHTML=`<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px">
+      <div style="max-width:360px;text-align:center;background:white;border-radius:12px;padding:32px;box-shadow:0 4px 20px rgba(0,0,0,.1)">
+        <div style="font-size:44px;margin-bottom:12px">⚠️</div>
+        <div style="font-size:18px;font-weight:800;color:#1a2e4a;margin-bottom:8px">Lien invalide</div>
+        <p style="color:#6b7a8d;font-size:13px">Ce lien d'inspection est invalide ou a expiré.</p>
+      </div></div>`;
+    return;
+  }
+  // Charger les voitures
+  const{data:cars}=await sb.from('cars').select('*').eq('mission_id',data.id);
+  inspState.mission={...data,cars:cars||[]};
+
+  // Vérifier si déjà soumis
+  if(data.inspection_submitted_at){
+    portal.innerHTML=`<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px">
+      <div style="max-width:380px;text-align:center;background:white;border-radius:12px;padding:32px;box-shadow:0 4px 20px rgba(0,0,0,.1)">
+        <div style="font-size:44px;margin-bottom:12px">✅</div>
+        <div style="font-size:18px;font-weight:800;color:#1a2e4a;margin-bottom:8px">État des lieux déjà complété</div>
+        <p style="color:#6b7a8d;font-size:13px">Cet état des lieux a été soumis le ${new Date(data.inspection_submitted_at).toLocaleDateString('fr-BE')} par ${esc(data.inspection_signer||'—')}.</p>
+      </div></div>`;
+    return;
+  }
+  renderInspectionPage();
+}
+
+function renderInspectionPage(){
+  const m=inspState.mission;
+  if(!m)return;
+  const carsHtml=m.cars.map(c=>`<span style="display:inline-block;background:#e8edf3;border-radius:6px;padding:3px 10px;font-size:12px;margin:2px">${esc(c.make)} ${esc(c.model)}${c.vin?` — VIN: ${esc(c.vin)}`:''}</span>`).join('');
+  const portal=document.getElementById('inspection-portal');
+  portal.innerHTML=`
+  <div class="insp-header">
+    <div style="font-size:11px;opacity:.7;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">État des lieux de livraison</div>
+    <div style="font-size:20px;font-weight:800">${esc(m.ref||'Mission')}</div>
+    <div style="font-size:12px;opacity:.8;margin-top:4px">${m.delivery_site?esc(m.delivery_site)+' — ':''} ${esc(m.delivery_city||'')} ${esc(m.delivery_country||'')}</div>
+  </div>
+  <div style="padding:14px;max-width:640px;margin:0 auto;padding-bottom:120px">
+
+    <!-- Info véhicules -->
+    <div class="insp-card">
+      <div style="font-size:12px;font-weight:700;color:#6b7a8d;text-transform:uppercase;margin-bottom:8px">Véhicule(s)</div>
+      <div>${carsHtml||'—'}</div>
+    </div>
+
+    <!-- Schéma voiture -->
+    <div class="insp-card">
+      <div style="font-size:12px;font-weight:700;color:#6b7a8d;text-transform:uppercase;margin-bottom:10px">🚗 Cliquez sur la zone endommagée</div>
+      ${buildCarSVG()}
+      <div style="font-size:11px;color:#6b7a8d;margin-top:8px;text-align:center">Appuyez sur une zone pour photographier un dommage</div>
+    </div>
+
+    <!-- Liste des dommages -->
+    <div id="insp-damages-list"></div>
+
+    <!-- Signature -->
+    <div class="insp-card" id="insp-sig-section">
+      <div style="font-size:12px;font-weight:700;color:#6b7a8d;text-transform:uppercase;margin-bottom:10px">✍️ Signature</div>
+      <input type="text" id="insp-signer-name" placeholder="Votre nom et prénom" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:10px 12px;font-size:14px;margin-bottom:10px;box-sizing:border-box">
+      <canvas id="insp-sig-canvas" class="insp-sig-canvas" width="400" height="160"></canvas>
+      <button onclick="clearInspSignature()" style="margin-top:6px;font-size:12px;color:#6b7a8d;background:none;border:none;cursor:pointer;text-decoration:underline">Effacer la signature</button>
+    </div>
+
+    <!-- Bouton soumettre -->
+    <div class="insp-submit-bar">
+      <button id="insp-submit-btn" onclick="submitInspection()" style="width:100%;background:var(--navy);color:white;border:none;border-radius:10px;padding:16px;font-size:16px;font-weight:700;cursor:pointer">
+        ✅ Soumettre l'état des lieux
+      </button>
+    </div>
+  </div>
+
+  <!-- Input camera (caché) -->
+  <input type="file" id="insp-camera-input" accept="image/*" capture="environment" style="display:none" onchange="handleInspPhoto(this)">
+  `;
+
+  // Zone click handlers via SVG
+  document.querySelectorAll('.car-svg-zone').forEach(el=>{
+    el.addEventListener('click',()=>openZoneCamera(el.dataset.zone,el.dataset.label));
+  });
+
+  // Signature pad
+  initInspSignaturePad();
+}
+
+function buildCarSVG(){
+  // SVG vue de dessus d'une voiture (top-down), 13 zones cliquables
+  return `<svg viewBox="0 0 240 520" style="width:100%;max-width:280px;display:block;margin:0 auto;cursor:pointer" xmlns="http://www.w3.org/2000/svg">
+  <!-- Carrosserie principale -->
+  <rect x="30" y="20" width="180" height="480" rx="40" fill="#c8d0da" stroke="#8a97a8" stroke-width="1.5"/>
+
+  <!-- Pare-choc avant -->
+  <rect class="car-svg-zone" data-zone="pare_choc_av" data-label="Pare-choc avant"
+    x="35" y="15" width="170" height="55" rx="20" fill="#e2e8f0" stroke="#7a8899" stroke-width="1.5"/>
+
+  <!-- Capot -->
+  <rect class="car-svg-zone" data-zone="capot" data-label="Capot"
+    x="50" y="68" width="140" height="100" rx="8" fill="#e8edf3" stroke="#7a8899" stroke-width="1.5"/>
+
+  <!-- Aile avant gauche -->
+  <rect class="car-svg-zone" data-zone="aile_av_g" data-label="Aile avant gauche"
+    x="18" y="68" width="32" height="100" rx="5" fill="#dde3ec" stroke="#7a8899" stroke-width="1.5"/>
+
+  <!-- Aile avant droite -->
+  <rect class="car-svg-zone" data-zone="aile_av_d" data-label="Aile avant droite"
+    x="190" y="68" width="32" height="100" rx="5" fill="#dde3ec" stroke="#7a8899" stroke-width="1.5"/>
+
+  <!-- Portière avant gauche -->
+  <rect class="car-svg-zone" data-zone="porte_av_g" data-label="Portière avant gauche"
+    x="18" y="175" width="32" height="80" rx="4" fill="#dde3ec" stroke="#7a8899" stroke-width="1.5"/>
+
+  <!-- Portière avant droite -->
+  <rect class="car-svg-zone" data-zone="porte_av_d" data-label="Portière avant droite"
+    x="190" y="175" width="32" height="80" rx="4" fill="#dde3ec" stroke="#7a8899" stroke-width="1.5"/>
+
+  <!-- Toit (habitacle) -->
+  <rect class="car-svg-zone" data-zone="toit" data-label="Toit"
+    x="50" y="170" width="140" height="120" rx="6" fill="#d0d8e4" stroke="#7a8899" stroke-width="1.5"/>
+
+  <!-- Portière arrière gauche -->
+  <rect class="car-svg-zone" data-zone="porte_ar_g" data-label="Portière arrière gauche"
+    x="18" y="262" width="32" height="80" rx="4" fill="#dde3ec" stroke="#7a8899" stroke-width="1.5"/>
+
+  <!-- Portière arrière droite -->
+  <rect class="car-svg-zone" data-zone="porte_ar_d" data-label="Portière arrière droite"
+    x="190" y="262" width="32" height="80" rx="4" fill="#dde3ec" stroke="#7a8899" stroke-width="1.5"/>
+
+  <!-- Aile arrière gauche -->
+  <rect class="car-svg-zone" data-zone="aile_ar_g" data-label="Aile arrière gauche"
+    x="18" y="349" width="32" height="100" rx="5" fill="#dde3ec" stroke="#7a8899" stroke-width="1.5"/>
+
+  <!-- Aile arrière droite -->
+  <rect class="car-svg-zone" data-zone="aile_ar_d" data-label="Aile arrière droite"
+    x="190" y="349" width="32" height="100" rx="5" fill="#dde3ec" stroke="#7a8899" stroke-width="1.5"/>
+
+  <!-- Coffre -->
+  <rect class="car-svg-zone" data-zone="coffre" data-label="Coffre / hayon"
+    x="50" y="295" width="140" height="120" rx="6" fill="#e8edf3" stroke="#7a8899" stroke-width="1.5"/>
+
+  <!-- Pare-choc arrière -->
+  <rect class="car-svg-zone" data-zone="pare_choc_ar" data-label="Pare-choc arrière"
+    x="35" y="453" width="170" height="52" rx="20" fill="#e2e8f0" stroke="#7a8899" stroke-width="1.5"/>
+
+  <!-- Labels direction -->
+  <text x="120" y="10" text-anchor="middle" font-size="9" fill="#6b7a8d">AVANT</text>
+  <text x="120" y="515" text-anchor="middle" font-size="9" fill="#6b7a8d">ARRIÈRE</text>
+  <text x="8" y="262" text-anchor="middle" font-size="8" fill="#6b7a8d" transform="rotate(-90,8,262)">GAUCHE</text>
+  <text x="232" y="262" text-anchor="middle" font-size="8" fill="#6b7a8d" transform="rotate(90,232,262)">DROITE</text>
+</svg>`;
+}
+
+let _currentZone=null,_currentZoneLabel=null;
+
+function openZoneCamera(zone,label){
+  _currentZone=zone;
+  _currentZoneLabel=label;
+  document.getElementById('insp-camera-input').value='';
+  document.getElementById('insp-camera-input').click();
+}
+
+async function handleInspPhoto(input){
+  if(!input.files||!input.files[0])return;
+  const file=input.files[0];
+  // Demander la géolocalisation
+  let lat=null,lng=null;
+  try{
+    const pos=await new Promise((res,rej)=>navigator.geolocation.getCurrentPosition(res,rej,{timeout:5000}));
+    lat=pos.coords.latitude;lng=pos.coords.longitude;
+  }catch(e){console.warn('Géoloc refusée')}
+
+  const ts=new Date();
+  // Watermark sur la photo
+  const dataUrl=await watermarkPhoto(file,ts,lat,lng,_currentZoneLabel);
+
+  inspState.damages.push({
+    zone:_currentZone,
+    zoneLabel:_currentZoneLabel,
+    description:'',
+    photoBlob:file,
+    photoDataUrl:dataUrl,
+    lat,lng,
+    ts:ts.toISOString(),
+  });
+  // Mettre à jour le SVG (zone colorée)
+  updateSVGZone(_currentZone,true);
+  renderDamageList();
+}
+
+async function watermarkPhoto(file,ts,lat,lng,zoneLabel){
+  return new Promise(resolve=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const canvas=document.createElement('canvas');
+      // Limiter à max 1600px pour économiser la mémoire
+      const maxW=1600;
+      const scale=img.width>maxW?maxW/img.width:1;
+      canvas.width=img.width*scale;
+      canvas.height=img.height*scale;
+      const ctx=canvas.getContext('2d');
+      ctx.drawImage(img,0,0,canvas.width,canvas.height);
+
+      // Barre de watermark en bas
+      const barH=Math.round(canvas.height*0.09);
+      ctx.fillStyle='rgba(0,0,0,0.62)';
+      ctx.fillRect(0,canvas.height-barH,canvas.width,barH);
+
+      const fs=Math.max(12,Math.round(barH*0.28));
+      ctx.fillStyle='white';
+      ctx.font=`bold ${fs}px Arial`;
+      const dateStr=ts.toLocaleString('fr-BE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      const gpsStr=lat!=null?`📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}`:'📍 GPS non disponible';
+      ctx.fillText(`📅 ${dateStr}`,10,canvas.height-barH+fs+4);
+      ctx.fillText(gpsStr,10,canvas.height-barH+fs*2+8);
+      ctx.fillText(`🔍 Zone : ${zoneLabel}`,10,canvas.height-barH+fs*3+12);
+
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg',0.82));
+    };
+    img.src=url;
+  });
+}
+
+function updateSVGZone(zoneId,hasDamage){
+  const el=document.querySelector(`.car-svg-zone[data-zone="${zoneId}"]`);
+  if(!el)return;
+  if(hasDamage){
+    el.classList.add('has-damage');
+    el.setAttribute('fill','#ffe8a1');
+  } else {
+    el.classList.remove('has-damage');
+    el.removeAttribute('fill');
+  }
+}
+
+function renderDamageList(){
+  const el=document.getElementById('insp-damages-list');
+  if(!el)return;
+  if(!inspState.damages.length){el.innerHTML='';return;}
+  el.innerHTML=`<div class="insp-card">
+    <div style="font-size:12px;font-weight:700;color:#6b7a8d;text-transform:uppercase;margin-bottom:10px">📋 Dommages constatés (${inspState.damages.length})</div>
+    ${inspState.damages.map((d,i)=>`
+    <div class="damage-item" id="damage-item-${i}">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <img src="${d.photoDataUrl}" class="damage-thumb" style="width:80px;height:60px;object-fit:cover;border-radius:6px;flex-shrink:0">
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:13px;color:#1a2e4a;margin-bottom:4px">${esc(d.zoneLabel)}</div>
+          <div style="font-size:10px;color:#6b7a8d;margin-bottom:6px">${new Date(d.ts).toLocaleString('fr-BE')}</div>
+          <textarea placeholder="Description du dommage (optionnel)"
+            style="width:100%;border:1px solid #d1d5db;border-radius:6px;padding:7px 9px;font-size:12px;resize:vertical;min-height:50px;box-sizing:border-box"
+            oninput="inspState.damages[${i}].description=this.value">${esc(d.description)}</textarea>
+        </div>
+        <button onclick="removeDamage(${i})" style="color:#e53e3e;background:none;border:none;font-size:18px;cursor:pointer;flex-shrink:0;padding:0">🗑</button>
+      </div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function removeDamage(i){
+  const zone=inspState.damages[i]?.zone;
+  inspState.damages.splice(i,1);
+  // Retirer la couleur SVG si plus de dommage sur cette zone
+  if(zone&&!inspState.damages.some(d=>d.zone===zone))updateSVGZone(zone,false);
+  renderDamageList();
+}
+
+function initInspSignaturePad(){
+  const canvas=document.getElementById('insp-sig-canvas');
+  if(!canvas)return;
+  // Adapter la résolution écran
+  const rect=canvas.getBoundingClientRect();
+  canvas.width=rect.width||340;
+  canvas.height=160;
+  const ctx=canvas.getContext('2d');
+  ctx.strokeStyle='#1a2e4a';ctx.lineWidth=2.5;ctx.lineCap='round';ctx.lineJoin='round';
+  inspState.sigCanvas=canvas;inspState.sigCtx=ctx;inspState.sigDrawing=false;
+
+  const getPos=(e)=>{
+    const r=canvas.getBoundingClientRect();
+    const src=e.touches?e.touches[0]:e;
+    return{x:(src.clientX-r.left)*(canvas.width/r.width),y:(src.clientY-r.top)*(canvas.height/r.height)};
+  };
+  canvas.addEventListener('mousedown',e=>{inspState.sigDrawing=true;const p=getPos(e);ctx.beginPath();ctx.moveTo(p.x,p.y);});
+  canvas.addEventListener('mousemove',e=>{if(!inspState.sigDrawing)return;const p=getPos(e);ctx.lineTo(p.x,p.y);ctx.stroke();});
+  canvas.addEventListener('mouseup',()=>{inspState.sigDrawing=false;inspState.signatureDataUrl=canvas.toDataURL();});
+  canvas.addEventListener('touchstart',e=>{e.preventDefault();inspState.sigDrawing=true;const p=getPos(e);ctx.beginPath();ctx.moveTo(p.x,p.y);},{passive:false});
+  canvas.addEventListener('touchmove',e=>{e.preventDefault();if(!inspState.sigDrawing)return;const p=getPos(e);ctx.lineTo(p.x,p.y);ctx.stroke();},{passive:false});
+  canvas.addEventListener('touchend',e=>{e.preventDefault();inspState.sigDrawing=false;inspState.signatureDataUrl=canvas.toDataURL();},{passive:false});
+}
+
+function clearInspSignature(){
+  const{sigCanvas,sigCtx}=inspState;
+  if(!sigCanvas||!sigCtx)return;
+  sigCtx.clearRect(0,0,sigCanvas.width,sigCanvas.height);
+  inspState.signatureDataUrl=null;
+}
+
+async function submitInspection(){
+  const m=inspState.mission;
+  const signerName=document.getElementById('insp-signer-name')?.value?.trim();
+  if(!signerName){alert('Veuillez indiquer votre nom et prénom.');return;}
+  if(!inspState.signatureDataUrl){alert('Veuillez signer le bon de réception avant de soumettre.');return;}
+
+  const btn=document.getElementById('insp-submit-btn');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Envoi en cours…';}
+
+  try{
+    const missionId=m.id;
+    const ts=new Date().toISOString();
+
+    // 1. Upload chaque photo + insérer dans delivery_inspections
+    for(const d of inspState.damages){
+      let photoUrl=null;
+      if(d.photoDataUrl){
+        // Convertir dataUrl en blob
+        const res=await fetch(d.photoDataUrl);
+        const blob=await res.blob();
+        const fname=`inspections/${missionId}/${d.zone}_${Date.now()}.jpg`;
+        const{data:upData,error:upErr}=await sb.storage.from('carrier-photos').upload(fname,blob,{contentType:'image/jpeg',upsert:true});
+        if(!upErr){
+          const{data:urlData}=sb.storage.from('carrier-photos').getPublicUrl(fname);
+          photoUrl=urlData?.publicUrl||null;
+        }
+      }
+      await sb.from('delivery_inspections').insert({
+        mission_id:missionId,
+        zone:d.zone,
+        description:d.description||null,
+        photo_url:photoUrl,
+        lat:d.lat||null,
+        lng:d.lng||null,
+        created_at:d.ts,
+      });
+    }
+
+    // 2. Upload signature
+    let sigUrl=null;
+    {
+      const res=await fetch(inspState.signatureDataUrl);
+      const blob=await res.blob();
+      const fname=`inspections/${missionId}/signature.png`;
+      const{error:sigErr}=await sb.storage.from('carrier-photos').upload(fname,blob,{contentType:'image/png',upsert:true});
+      if(!sigErr){
+        const{data:urlData}=sb.storage.from('carrier-photos').getPublicUrl(fname);
+        sigUrl=urlData?.publicUrl||null;
+      }
+    }
+
+    // 3. Mettre à jour la mission
+    await sb.from('missions').update({
+      inspection_submitted_at:ts,
+      inspection_signer:signerName,
+      inspection_signature_url:sigUrl,
+    }).eq('id',missionId);
+
+    // 4. Générer et proposer le PDF
+    const pdfDataUrl=await generateInspectionPDF(m,signerName,ts,sigUrl);
+
+    // 5. Page de confirmation
+    const portal=document.getElementById('inspection-portal');
+    portal.innerHTML=`<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#f0f4f8">
+      <div style="max-width:400px;text-align:center;background:white;border-radius:16px;padding:36px 28px;box-shadow:0 4px 24px rgba(0,0,0,.1)">
+        <div style="font-size:54px;margin-bottom:14px">✅</div>
+        <div style="font-size:20px;font-weight:800;color:#1a2e4a;margin-bottom:8px">État des lieux soumis</div>
+        <p style="color:#6b7a8d;font-size:14px;margin-bottom:20px">Merci ${esc(signerName)}. Votre état des lieux a bien été enregistré le ${new Date(ts).toLocaleDateString('fr-BE')} à ${new Date(ts).toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})}.</p>
+        ${inspState.damages.length?`<p style="font-size:13px;color:#e57c00;margin-bottom:16px">📋 ${inspState.damages.length} dommage(s) signalé(s)</p>`:`<p style="font-size:13px;color:#38a169;margin-bottom:16px">✔ Aucun dommage constaté</p>`}
+        <a href="${pdfDataUrl}" download="etat_des_lieux_${(m.ref||'inspection').replace(/\s/g,'_')}.pdf"
+          style="display:block;background:var(--navy);color:white;border-radius:10px;padding:14px;font-size:15px;font-weight:700;text-decoration:none;margin-bottom:12px">
+          📄 Télécharger le PDF
+        </a>
+      </div></div>`;
+  }catch(e){
+    console.error(e);
+    if(btn){btn.disabled=false;btn.textContent='✅ Soumettre l\'état des lieux';}
+    alert('Erreur lors de la soumission : '+e.message);
+  }
+}
+
+async function generateInspectionPDF(m,signerName,ts,sigUrl){
+  const{jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
+  const W=210,margin=14;
+  let y=margin;
+
+  // ── Header ──
+  doc.setFillColor(26,46,74);doc.rect(0,0,W,28,'F');
+  doc.setTextColor(255,255,255);doc.setFontSize(15);doc.setFont('helvetica','bold');
+  doc.text('ÉTAT DES LIEUX DE LIVRAISON',W/2,11,{align:'center'});
+  doc.setFontSize(9);doc.setFont('helvetica','normal');
+  doc.text('AutoDispatch — Rapport généré automatiquement',W/2,18,{align:'center'});
+  doc.setFontSize(8);doc.text(new Date(ts).toLocaleString('fr-BE'),W/2,24,{align:'center'});
+  y=36;
+
+  // ── Infos mission ──
+  doc.setTextColor(26,46,74);doc.setFontSize(10);doc.setFont('helvetica','bold');
+  doc.text('INFORMATIONS DE LA MISSION',margin,y);y+=5;
+  doc.setDrawColor(220,224,230);doc.line(margin,y,W-margin,y);y+=4;
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(50,50,50);
+  const infoLines=[
+    ['Référence mission',m.ref||'—'],
+    ['Lieu de livraison',`${m.delivery_site||''} ${m.delivery_city||''} ${m.delivery_country||''}`.trim()||'—'],
+    ['Date de livraison',m.delivery_date?new Date(m.delivery_date).toLocaleDateString('fr-BE'):'—'],
+    ['Signataire',signerName],
+    ['Date & heure de signature',new Date(ts).toLocaleString('fr-BE')],
+  ];
+  for(const[k,v]of infoLines){
+    doc.setFont('helvetica','bold');doc.text(k+' :',margin,y);
+    doc.setFont('helvetica','normal');doc.text(v,margin+52,y);
+    y+=5;
+  }
+  y+=4;
+
+  // ── Véhicules ──
+  doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(26,46,74);
+  doc.text('VÉHICULE(S)',margin,y);y+=5;
+  doc.setDrawColor(220,224,230);doc.line(margin,y,W-margin,y);y+=4;
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(50,50,50);
+  (m.cars||[]).forEach(c=>{
+    doc.text(`• ${c.make} ${c.model}${c.vin?' — VIN: '+c.vin:''}${c.plate?' — Plaque: '+c.plate:''}`,margin,y);
+    y+=5;
+  });
+  if(!m.cars||!m.cars.length){doc.text('—',margin,y);y+=5;}
+  y+=4;
+
+  // ── Dommages ──
+  doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(26,46,74);
+  doc.text('DOMMAGES CONSTATÉS',margin,y);y+=5;
+  doc.setDrawColor(220,224,230);doc.line(margin,y,W-margin,y);y+=4;
+
+  if(!inspState.damages.length){
+    doc.setFont('helvetica','italic');doc.setFontSize(9);doc.setTextColor(80,80,80);
+    doc.text('Aucun dommage signalé — véhicule(s) réceptionné(s) en bon état.',margin,y);y+=8;
+  } else {
+    for(let i=0;i<inspState.damages.length;i++){
+      const d=inspState.damages[i];
+      // Nouvelle page si besoin
+      if(y>240){doc.addPage();y=margin;}
+      doc.setFillColor(240,244,248);doc.roundedRect(margin,y-2,W-margin*2,d.photoDataUrl?46:20,3,3,'F');
+      doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(26,46,74);
+      doc.text(`${i+1}. ${d.zoneLabel}`,margin+3,y+4);
+      doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(80,80,80);
+      doc.text(new Date(d.ts).toLocaleString('fr-BE'),margin+3,y+9);
+      if(d.lat!=null)doc.text(`GPS: ${d.lat.toFixed(5)}, ${d.lng.toFixed(5)}`,margin+3,y+14);
+      if(d.description)doc.text(doc.splitTextToSize('Desc: '+d.description,W-margin*2-60),margin+3,y+(d.lat!=null?19:14));
+
+      // Photo à droite
+      if(d.photoDataUrl){
+        try{
+          doc.addImage(d.photoDataUrl,'JPEG',W-margin-44,y-1,44,40);
+        }catch(e){console.warn('Image PDF',e);}
+        y+=48;
+      } else {y+=24;}
+    }
+  }
+  y+=4;
+
+  // ── Signature ──
+  if(y>240){doc.addPage();y=margin;}
+  doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(26,46,74);
+  doc.text('SIGNATURE',margin,y);y+=5;
+  doc.setDrawColor(220,224,230);doc.line(margin,y,W-margin,y);y+=4;
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(50,50,50);
+  doc.text(`Signataire : ${signerName}`,margin,y);y+=5;
+  if(inspState.signatureDataUrl){
+    try{doc.addImage(inspState.signatureDataUrl,'PNG',margin,y,70,28);}catch(e){}
+    y+=32;
+  }
+  doc.text(`Lu et approuvé — ${new Date(ts).toLocaleString('fr-BE')}`,margin,y);y+=8;
+
+  // ── Footer ──
+  const pages=doc.getNumberOfPages();
+  for(let p=1;p<=pages;p++){
+    doc.setPage(p);
+    doc.setFontSize(7);doc.setTextColor(160,160,160);
+    doc.text(`AutoDispatch — État des lieux ${m.ref||''} — Page ${p}/${pages}`,W/2,292,{align:'center'});
+  }
+
+  return doc.output('datauristring');
+}
+
+// ══════════════════════════════════════════════════════════════════
+document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
+
+checkAuth();
+</script>
+</body>
+</html>
