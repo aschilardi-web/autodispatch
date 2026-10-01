@@ -534,15 +534,15 @@ async function refreshAll(){
 }
 
 // ─── REALTIME + TOAST NOTIFICATIONS ─────────────────────────────
-let _realtimeChannel=null,_notifCount=0;
+let _realtimeChannel=null,_inspChannel=null,_notifCount=0;
 
 function showToast(title,msg,type,missionId){
   const c=document.getElementById('toast-container');if(!c)return;
   const id='t'+Date.now()+Math.random().toString(36).slice(2,6);
   const icons={success:title.includes('Livraison')?'✅':'🚛',info:'📷',warning:'⚠️',cmr:'📄'};
-  const icon=type==='cmr'?icons.cmr:(type==='success'?icons.success:icons.info);
+  const icon=type==='inspection'?'📋':(type==='cmr'?icons.cmr:(type==='success'?icons.success:icons.info));
   const div=document.createElement('div');
-  div.className='toast '+(type==='cmr'?'info':type||'info');
+  div.className='toast '+(type==='cmr'?'info':type==='inspection'?'success':type||'info');
   div.id=id;
   div.innerHTML=`<div class="toast-icon">${icon}</div>
     <div class="toast-body">
@@ -632,6 +632,34 @@ function realtimeSetup(){
       if(status==='SUBSCRIBED')console.info('[Realtime] ✓ connecté — carrier_events');
       else if(status==='CHANNEL_ERROR')console.warn('[Realtime] ✗ erreur connexion — carrier_events');
     });
+  // Cloche + notification quand une inspection de véhicule est terminée (PDF rattaché sur cars)
+  if(_inspChannel){try{_inspChannel.unsubscribe();}catch(_){}}
+  _inspChannel=sb.channel('inspection-done-admin-v1')
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'cars'},
+      payload=>{ handleInspectionDone(payload.new); }
+    )
+    .subscribe(status=>{
+      if(status==='SUBSCRIBED')console.info('[Realtime] ✓ connecté — inspections (cars)');
+      else if(status==='CHANNEL_ERROR')console.warn('[Realtime] ✗ erreur connexion — inspections (cars)');
+    });
+}
+
+// Une inspection de véhicule vient d'être terminée (PDF rattaché) : met à jour l'état local + toast + cloche.
+// N'affecte AUCUN statut et ne crée aucune notification client (pas d'automatisme).
+function handleInspectionDone(row){
+  if(!row||!row.inspection_pdf_url)return;
+  const m=db.missions.find(x=>x.id===row.mission_id);
+  const car=m?m.cars.find(c=>c.id===row.id):null;
+  if(car&&car.inspectionPdfUrl===row.inspection_pdf_url)return;   // déjà connue : simple mise à jour de statut
+  if(car){
+    car.inspectionSubmittedAt=row.inspection_submitted_at||'';
+    car.inspectionSigner=row.inspection_signer||'';
+    car.inspectionPdfUrl=row.inspection_pdf_url;
+  }
+  const label=car?`${car.make||''} ${car.model||''}`.trim():'Véhicule';
+  showToast('📋 Inspection terminée',esc(`${m?m.ref:''} — ${label}`),'inspection',row.mission_id);
+  render();
+  if(detailId&&detailId===row.mission_id){try{refreshDetail();}catch(_){}}
 }
 
 // ─── DB WRITE ────────────────────────────────────────────────────
