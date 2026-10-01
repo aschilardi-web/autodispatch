@@ -1829,7 +1829,7 @@ function profitBlock(m){
     <span>Prix d'achat (transporteur)<strong>${eur(m.priceBuy)}</strong></span>
     <span>Marge<strong style="color:${col}">${mg!=null?eur(mg)+(pct!=null?' ('+pct.toFixed(1)+' %)':''):'—'}</strong></span>
     <span>Vente / km<strong>${km&&m.priceSell!=null?eur(m.priceSell/km):'—'}</strong></span>
-    <span>Marge / km<strong style="color:${col}">${km&&mg!=null?eur(mg/km):'—'}</strong></span>
+    <span>Coût transport / km<strong>${km&&m.priceBuy!=null?eur(m.priceBuy/km):'—'}</strong></span>
   </div>
   <p>${km?'':`<button class="btn soft" onclick="calcKmForMission('${esc(m.id)}')">📍 Calculer les km</button> `}<button class="btn" onclick="openMissionForm('${esc(m.id)}')">Modifier les prix</button></p></div>`;
 }
@@ -1847,7 +1847,11 @@ function deadlineBlock(m){
 
 // ─── CARTE : une couleur par mission ; rond ⬆ = chargement, carré ⬇ = déchargement, flèche = sens du trajet ───
 let mapFilter={group:'En cours',urgent:false,lines:true};
-let _map=null,_mapView=null,_mapItems={},mapSel=null;
+let _map=null,_mapView=null,_mapItems={},mapSel=null,_selLayer=null,_drawLayer=null;
+let mapSelected=new Set(),mapSelMode=null,mapSelTarget='pickup',truckPanelOpen=true,_lastTour=null;
+let truckCostKm=(()=>{try{return localStorage.getItem('adCostKm')||'';}catch(_){return'';}})();
+const _tourKmCache={};
+const TOUR_RULES={pickupSpreadKm:250,deliverySpreadKm:600,detourRatio:1.5};   // règles « tournée qui a du sens » (ajustables)
 const MAP_PALETTE=['#e6194b','#4363d8','#f58231','#911eb4','#008080','#9a6324','#d2308f','#3a7d00','#0b3d91','#b8860b','#c0392b','#17a2b8'];
 const mapColor=id=>{let h=0;for(const ch of String(id))h=(h*31+ch.charCodeAt(0))>>>0;return MAP_PALETTE[h%MAP_PALETTE.length];};
 const hasGeo=m=>m.pickupLat!=null&&m.deliveryLat!=null;
@@ -1863,7 +1867,8 @@ function mapUrgency(m){
 function mapItemHtml(m){
   const u=mapUrgency(m),geo=hasGeo(m);
   const chip=u.dl?`<span style="color:${u.ring||'var(--muted)'};font-weight:${u.ring?800:400}">${u.left<0?'⚠ '+(-u.left)+' j de retard':u.left+' j'}</span>`:'';
-  return `<div class="map-item${mapSel===m.id?' sel':''}" data-id="${esc(m.id)}" data-q="${esc((m.ref+' '+(getClient(m).name||'')+' '+(m.pickupCity||'')+' '+(m.deliveryCity||'')).toLowerCase())}" style="--c:${mapColor(m.id)}" onmouseenter="mapHover('${esc(m.id)}')" onmouseleave="mapHover(null)" onclick="mapSelect('${esc(m.id)}')">
+  return `<div class="map-item${mapSel===m.id?' sel':''}${mapSelected.has(m.id)?' chk':''}" data-id="${esc(m.id)}" data-geo="${geo?1:0}" data-q="${esc((m.ref+' '+(getClient(m).name||'')+' '+(m.pickupCity||'')+' '+(m.deliveryCity||'')).toLowerCase())}" style="--c:${mapColor(m.id)}" onmouseenter="mapHover('${esc(m.id)}')" onmouseleave="mapHover(null)" onclick="mapSelect('${esc(m.id)}')">
+    <input type="checkbox" ${geo?'':'disabled'} ${mapSelected.has(m.id)?'checked':''} title="Ajouter à la sélection (camion)" onclick="event.stopPropagation();mapToggle('${esc(m.id)}')" style="margin:3px 2px 0 0;flex-shrink:0">
     <div style="flex:1;min-width:0"><strong style="font-size:12px">${esc(m.ref)}</strong> <span style="font-size:11px;color:var(--muted)">${esc(getClient(m).name||'')}</span>
     <div style="font-size:11px;color:#536a7d">${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}</div>
     <div style="font-size:10.5px;color:var(--muted)">${m.cars.length} véh. · ${fmtPts(missionPoints(m))} pts${m.distanceKm?' · '+m.distanceKm+' km':''} ${chip}${geo?'':' <b style="color:var(--amber)">· à géolocaliser</b>'}</div></div></div>`;
@@ -1877,11 +1882,12 @@ function mapPage(){
     `<button class="btn" onclick="geocodeBatch()">📍 Géolocaliser les missions</button>`)+
   `<style>
     .map-layout{display:flex;gap:12px;align-items:stretch}
-    #map-canvas{flex:1;min-width:0;min-height:420px;height:70vh;border-radius:8px;border:1px solid var(--line)}
+    #map-canvas{flex:1;min-width:0;min-height:420px;height:70vh;border-radius:8px;border:1px solid var(--line);isolation:isolate}
     .map-side{width:310px;display:flex;flex-direction:column;height:70vh;min-height:420px}
     #map-list{overflow:auto;flex:1;border:1px solid var(--line);border-radius:8px;margin-top:6px;background:#fff}
     .map-item{display:flex;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);cursor:pointer;border-left:6px solid var(--c)}
     .map-item:hover,.map-item.sel{background:var(--pale)}
+    .map-item.chk{background:#e7f4e7}
     @media(max-width:900px){.map-layout{flex-direction:column}.map-side{width:auto;height:320px;min-height:0}}
     .mk{width:24px;height:24px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.55)}
     .mk.r{border-radius:50%}.mk.q{border-radius:6px}
@@ -1889,24 +1895,41 @@ function mapPage(){
     .nolabels .mk-label{display:none}
     .mk-cl{width:30px;height:30px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:12px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.55)}
     .mk-cl.p{background:#2f4858;border-radius:50%}.mk-cl.d{background:#2f4858;border-radius:7px}
+    .stop-n{width:17px;height:17px;border-radius:50%;background:#111;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;border:1.5px solid #fff}
     .leaflet-tile-pane{filter:grayscale(.9) contrast(.85) brightness(1.08)}
+    .truck-panel{position:fixed;left:230px;right:0;bottom:0;max-height:42vh;overflow:auto;background:#fff;border-top:3px solid var(--navy);box-shadow:0 -6px 22px rgba(0,0,0,.2);z-index:8;padding:10px 18px 14px}
+    @media(max-width:900px){.truck-panel{left:0}}
+    .tp-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+    @media(max-width:1100px){.tp-grid{grid-template-columns:1fr}}
+    .tp-h{font-size:11px;font-weight:800;color:#6b7a8d;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+    .tp-gauge{height:16px;border-radius:8px;background:#e6edf3;overflow:hidden}
+    .tp-gauge>div{height:100%}
+    .tp-al{font-size:12px;padding:5px 8px;border-radius:6px;margin-bottom:5px}
+    .tp-al.red{background:#fce8e8;color:#a54b48}.tp-al.amb{background:#fff4df;color:#9a6b18}.tp-al.grn{background:#e7f4e7;color:#24784d}
   </style>
   <div class="panel">
-    <div class="toolbar" style="margin-bottom:10px;gap:12px;flex-wrap:wrap;align-items:center">
+    <div class="toolbar" style="margin-bottom:10px;gap:10px;flex-wrap:wrap;align-items:center">
       <select onchange="mapFilter.group=this.value;render()">${['En cours','Toutes','Terminées'].map(g=>`<option ${mapFilter.group===g?'selected':''}>${g}</option>`).join('')}</select>
-      <label style="font-size:12px"><input type="checkbox" ${mapFilter.urgent?'checked':''} onchange="mapFilter.urgent=this.checked;render()"> Urgentes (≤ 2 jours)</label>
-      <label style="font-size:12px"><input type="checkbox" ${mapFilter.lines?'checked':''} onchange="mapFilter.lines=this.checked;render()"> Afficher les liaisons</label>
-      <span style="font-size:12px;color:var(--muted)">● rond ⬆ chargement · ■ carré ⬇ déchargement · ▶ sens du trajet · une couleur par mission · anneau <b style="color:#c0392b">rouge</b> en retard, <b style="color:#e0850c">orange</b> urgent</span>
+      <label style="font-size:12px"><input type="checkbox" ${mapFilter.urgent?'checked':''} onchange="mapFilter.urgent=this.checked;render()"> Urgentes (≤ 2 j)</label>
+      <label style="font-size:12px"><input type="checkbox" ${mapFilter.lines?'checked':''} onchange="mapFilter.lines=this.checked;render()"> Liaisons</label>
+      <span style="border-left:1px solid var(--line);height:22px"></span>
+      <button class="btn" id="btn-lasso" onclick="mapDrawMode('lasso')">✏ Lasso</button>
+      <button class="btn" id="btn-rect" onclick="mapDrawMode('rect')">▭ Rectangle</button>
+      <select title="Que sélectionner dans la zone dessinée ?" onchange="mapSelTarget=this.value"><option value="pickup" ${mapSelTarget==='pickup'?'selected':''}>zone = chargements</option><option value="delivery" ${mapSelTarget==='delivery'?'selected':''}>zone = déchargements</option><option value="both" ${mapSelTarget==='both'?'selected':''}>zone = les deux</option></select>
+      <button class="btn" id="btn-clearsel" onclick="mapClear()" style="display:none">✕ Désélectionner</button>
     </div>
+    <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px">● rond ⬆ chargement · ■ carré ⬇ déchargement · ▶ sens du trajet · une couleur par mission · bulle = nombre de véhicules · anneau <b style="color:#c0392b">rouge</b> en retard, <b style="color:#e0850c">orange</b> urgent · <b>Maj + clic</b> sur un point ou case à cocher dans la liste = sélection</div>
     <div class="map-layout">
       <div id="map-canvas"></div>
       <div class="map-side">
         <input type="search" placeholder="Rechercher mission, client, ville…" oninput="mapListFilter(this.value)">
+        <button class="btn" style="margin-top:6px;font-size:11px" onclick="mapSelectVisible()">☑ Sélectionner les missions affichées</button>
         <div id="map-list">${sorted.map(mapItemHtml).join('')||'<div style="padding:16px;color:var(--muted);font-size:12px">Aucune mission à afficher.</div>'}</div>
       </div>
     </div>
     <div style="font-size:12px;color:var(--muted);margin-top:8px">${geo.length} mission${geo.length!==1?'s':''} sur la carte · ${fmtPts(pts)} points de chargement${missing.length?` · <b style="color:var(--amber)">${missing.length} sans coordonnées</b> (bouton « Géolocaliser »)`:''}</div>
-  </div>`;
+  </div>
+  <div id="truck-panel-host"></div>`;
 }
 function mapListFilter(q){
   const t=String(q||'').toLowerCase().trim();
@@ -1928,6 +1951,239 @@ function mapSelect(id){
   _map.fitBounds([it.pa,it.pb],{padding:[70,70],maxZoom:8});
   setTimeout(()=>{try{it.ga.zoomToShowLayer(it.a,()=>it.a.openPopup());}catch(_){it.a.openPopup();}},350);
 }
+
+// ─── SÉLECTION (camion) : clic, Maj+clic, case à cocher, lasso, rectangle ───
+function mapToggle(id){
+  if(mapSelected.has(id))mapSelected.delete(id);else mapSelected.add(id);
+  refreshSelectionUI();
+}
+function mapClear(){mapSelected.clear();refreshSelectionUI();}
+function mapSelectVisible(){
+  document.querySelectorAll('#map-list .map-item').forEach(el=>{if(el.style.display!=='none'&&el.dataset.geo==='1')mapSelected.add(el.dataset.id);});
+  refreshSelectionUI();
+}
+function ptInPoly(lat,lng,poly){
+  let inside=false;
+  for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+    const xi=poly[i].lng,yi=poly[i].lat,xj=poly[j].lng,yj=poly[j].lat;
+    if(((yi>lat)!==(yj>lat))&&(lng<(xj-xi)*(lat-yi)/(yj-yi)+xi))inside=!inside;
+  }
+  return inside;
+}
+function mapSelectInZone(test){
+  let n=0;
+  mapMissions().filter(hasGeo).forEach(m=>{
+    const inP=test(m.pickupLat,m.pickupLng),inD=test(m.deliveryLat,m.deliveryLng);
+    const ok=mapSelTarget==='pickup'?inP:(mapSelTarget==='delivery'?inD:(inP||inD));
+    if(ok&&!mapSelected.has(m.id)){mapSelected.add(m.id);n++;}
+  });
+  refreshSelectionUI();
+  return n;
+}
+function mapDrawMode(mode){
+  mapSelMode=(mapSelMode===mode)?null:mode;
+  applyDrawMode();
+}
+function applyDrawMode(){
+  const l=document.getElementById('btn-lasso'),r=document.getElementById('btn-rect');
+  if(l)l.classList.toggle('primary',mapSelMode==='lasso');
+  if(r)r.classList.toggle('primary',mapSelMode==='rect');
+  if(!_map)return;
+  const c=_map.getContainer();
+  if(mapSelMode){_map.dragging.disable();c.style.cursor='crosshair';}
+  else{_map.dragging.enable();c.style.cursor='';}
+}
+function setupDrawing(){
+  const c=_map.getContainer();
+  let pts=[],start=null,shape=null,drawing=false;
+  const ll=e=>_map.mouseEventToLatLng(e);
+  c.addEventListener('pointerdown',e=>{
+    if(!mapSelMode||e.button>0||e.target.closest('.leaflet-control'))return;
+    drawing=true;start=ll(e);pts=[start];
+    try{c.setPointerCapture(e.pointerId);}catch(_){}
+    e.preventDefault();
+  });
+  c.addEventListener('pointermove',e=>{
+    if(!drawing)return;
+    const p=ll(e);
+    if(mapSelMode==='lasso'){
+      pts.push(p);
+      if(shape)_map.removeLayer(shape);
+      shape=L.polygon(pts,{color:'#111',weight:2,dashArray:'5 5',fillOpacity:.08}).addTo(_map);
+    }else{
+      if(shape)_map.removeLayer(shape);
+      shape=L.rectangle(L.latLngBounds(start,p),{color:'#111',weight:2,dashArray:'5 5',fillOpacity:.08}).addTo(_map);
+    }
+  });
+  const end=e=>{
+    if(!drawing)return;
+    drawing=false;
+    try{c.releasePointerCapture(e.pointerId);}catch(_){}
+    let n=0;
+    if(mapSelMode==='lasso'&&pts.length>=3){const poly=pts.map(p=>({lat:p.lat,lng:p.lng}));n=mapSelectInZone((la,ln)=>ptInPoly(la,ln,poly));}
+    else if(mapSelMode==='rect'&&shape){const bd=shape.getBounds();n=mapSelectInZone((la,ln)=>bd.contains([la,ln]));}
+    if(shape){_map.removeLayer(shape);shape=null;}
+    pts=[];
+  };
+  c.addEventListener('pointerup',end);
+  c.addEventListener('pointercancel',end);
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&mapSelMode){mapSelMode=null;applyDrawMode();}});
+
+// ─── CALCULS DE TOURNÉE (sans enregistrement) ───
+const hav=(a,b)=>{const R=6371,r=x=>x*Math.PI/180,dl=r(b.lat-a.lat),dn=r(b.lng-a.lng),q=Math.sin(dl/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(q));};
+// Ordre des arrêts : tous les chargements (du plus éloigné vers le plus proche), puis tous les déchargements
+function orderStops(ms){
+  if(!ms.length)return[];
+  const D=ms.map(m=>({t:'D',m,lat:m.deliveryLat,lng:m.deliveryLng}));
+  const rest=ms.map(m=>({t:'P',m,lat:m.pickupLat,lng:m.pickupLng}));
+  const cen={lat:D.reduce((s,d)=>s+d.lat,0)/D.length,lng:D.reduce((s,d)=>s+d.lng,0)/D.length};
+  rest.sort((a,b)=>hav(b,cen)-hav(a,cen));
+  let cur=rest.shift();const seq=[cur];
+  while(rest.length){rest.sort((a,b)=>hav(cur,a)-hav(cur,b));cur=rest.shift();seq.push(cur);}
+  const rd=[...D];
+  while(rd.length){rd.sort((a,b)=>hav(cur,a)-hav(cur,b));cur=rd.shift();seq.push(cur);}
+  return seq;
+}
+const maxSpread=pts=>{let mx=0;for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++)mx=Math.max(mx,hav(pts[i],pts[j]));return mx;};
+function tourMetrics(ms){
+  const pts=ms.reduce((s,m)=>s+missionPoints(m),0);
+  const veh=ms.reduce((s,m)=>s+m.cars.length,0);
+  const counts={};ms.forEach(m=>m.cars.forEach(c=>{const k=catOf(c);counts[k]=(counts[k]||0)+1;}));
+  // missions non scindables : nombre minimal de camions (first-fit decreasing)
+  const bins=[];
+  [...ms].sort((a,b)=>missionPoints(b)-missionPoints(a)).forEach(m=>{
+    const p=missionPoints(m),i=bins.findIndex(x=>x+p<=TRUCK_CAPACITY+1e-6);
+    if(i>=0)bins[i]+=p;else bins.push(p);
+  });
+  const stops=orderStops(ms);
+  let kmEst=0;for(let i=1;i<stops.length;i++)kmEst+=hav(stops[i-1],stops[i])*1.25;
+  const direct=m=>m.distanceKm>0?m.distanceKm:hav({lat:m.pickupLat,lng:m.pickupLng},{lat:m.deliveryLat,lng:m.deliveryLng})*1.25;
+  const directKm=ms.reduce((s,m)=>s+direct(m),0);
+  const longest=Math.max(0,...ms.map(direct));
+  const pSpread=maxSpread(ms.map(m=>({lat:m.pickupLat,lng:m.pickupLng}))),dSpread=maxSpread(ms.map(m=>({lat:m.deliveryLat,lng:m.deliveryLng})));
+  const late=ms.filter(m=>{const u=mapUrgency(m);return u.left!=null&&u.left<0;}).length;
+  const urgent=ms.filter(m=>{const u=mapUrgency(m);return u.left!=null&&u.left>=0&&u.left<=2;}).length;
+  const deadlines=ms.map(m=>deadlineOf(m)).filter(Boolean).sort();
+  const key=stops.map(x=>x.lat.toFixed(3)+','+x.lng.toFixed(3)).join('|');
+  const real=_tourKmCache[key]||null;
+  return{ms,pts,veh,counts,trucksMin:bins.length,maxMission:Math.max(0,...ms.map(missionPoints)),stops,kmEst,directKm,longest,pSpread,dSpread,late,urgent,firstDeadline:deadlines[0]||null,key,realKm:real?real.km:null,realMode:real?real.mode:null};
+}
+async function tourRealKm(){
+  const t=_lastTour;if(!t||t.stops.length<2)return;
+  // les arrêts consécutifs au même endroit comptent 0 km : on les fusionne
+  const k4=x=>x.lat.toFixed(4)+','+x.lng.toFixed(4);
+  const pts=[];t.stops.forEach(x=>{if(!pts.length||k4(pts[pts.length-1])!==k4(x))pts.push(x);});
+  if(pts.length>20){alert('Trop d\'arrêts pour le calcul routier (20 maximum).');return;}
+  const btn=document.getElementById('tp-real-btn');if(btn){btn.disabled=true;btn.textContent='⏳ Calcul…';}
+  try{
+    let km=0,mode='camion';
+    if(pts.length>=2){
+      km=null;
+      for(const costing of ['truck','auto']){
+        const q=encodeURIComponent(JSON.stringify({locations:pts.map(x=>({lat:x.lat,lon:x.lng,type:'break'})),costing,directions_options:{units:'kilometers'}}));
+        const res=await fetch('https://valhalla1.openstreetmap.de/route?json='+q);
+        if(res.ok){const j=await res.json();if(j&&j.trip&&j.trip.summary){km=Math.round(j.trip.summary.length);mode=costing==='truck'?'camion':'voiture';break;}}
+      }
+      if(km==null)throw new Error('itinéraire introuvable');
+    }
+    _tourKmCache[t.key]={km,mode};
+    refreshSelectionUI();
+  }catch(e){alert('Km routiers impossibles : '+e.message);if(btn){btn.disabled=false;btn.textContent='📏 Calculer les km routiers';}}
+}
+function setTruckCost(v){
+  truckCostKm=String(v);
+  try{localStorage.setItem('adCostKm',truckCostKm);}catch(_){}
+  renderTruckProfit();
+}
+function renderTruckProfit(){
+  const el=document.getElementById('tp-profit');if(!el||!_lastTour)return;
+  const t=_lastTour,ms=t.ms;
+  const sell=ms.filter(m=>m.priceSell!=null),buy=ms.filter(m=>m.priceBuy!=null);
+  const rev=sell.reduce((s,m)=>s+m.priceSell,0),charter=buy.reduce((s,m)=>s+m.priceBuy,0);
+  const km=t.realKm??t.kmEst,cost=parseNum(truckCostKm);
+  const allSell=sell.length===ms.length,allBuy=buy.length===ms.length;
+  const own=(cost!=null&&cost>0)?km*cost:null;
+  const perKm=v=>(v!=null&&km>0)?eur(v/km)+' / km':'';
+  let reco='';
+  if(own!=null&&allBuy)reco=own<=charter?`<div class="tp-al grn">✔ Camion propre moins cher de ${eur(charter-own)}</div>`:`<div class="tp-al amb">→ Affréter : ${eur(own-charter)} de moins qu'avec un camion propre</div>`;
+  el.innerHTML=`<div style="font-size:12.5px;line-height:1.75">
+    <b>Coût réel du transport</b> (${Math.round(km)} km)<br>
+    Affrètement : <b>${allBuy?eur(charter):(buy.length?eur(charter)+' (partiel)':'—')}</b> ${allBuy?`<span style="color:var(--muted)">· ${perKm(charter)}</span>`:`<span style="color:var(--amber)">· ${ms.length-buy.length} prix d'achat manquant(s)</span>`}<br>
+    Camion propre : <input type="number" step="0.01" min="0" value="${esc(truckCostKm)}" placeholder="€/km" oninput="setTruckCost(this.value)" style="width:74px;padding:3px 6px"> €/km → <b>${own!=null?eur(own):'—'}</b><br>
+    <span style="color:var(--muted)">Chiffre d'affaires : ${sell.length?eur(rev):'—'}${allSell?'':' (partiel)'}</span>
+  </div>${reco}`;
+}
+function truckPanelHtml(t){
+  const pct=Math.min(100,t.pts/TRUCK_CAPACITY*100),over=t.pts>TRUCK_CAPACITY+1e-6;
+  const gcol=over?'#c0392b':(t.pts>=TRUCK_CAPACITY*0.85?'#24784d':'#2675a9');
+  const types=Object.entries(t.counts).map(([k,n])=>`${n} ${CATS[k].label}`).join(' · ');
+  const al=[];
+  if(over)al.push(['red',`Dépasse la capacité d'un camion de ${fmtPts(t.pts-TRUCK_CAPACITY)} pts : au moins ${t.trucksMin} camion${t.trucksMin>1?'s':''} (missions non scindables).`]);
+  if(t.maxMission>TRUCK_CAPACITY+1e-6)al.push(['red','Une mission dépasse à elle seule la capacité d\'un camion.']);
+  if(t.late)al.push(['red',`${t.late} mission${t.late>1?'s':''} en retard (date limite dépassée).`]);
+  if(t.urgent)al.push(['amb',`${t.urgent} mission${t.urgent>1?'s':''} urgente${t.urgent>1?'s':''} (≤ 2 jours).`]);
+  if(t.pSpread>TOUR_RULES.pickupSpreadKm)al.push(['amb',`Chargements très éloignés (${Math.round(t.pSpread)} km entre les plus distants).`]);
+  if(t.dSpread>TOUR_RULES.deliverySpreadKm)al.push(['amb',`Déchargements très éloignés (${Math.round(t.dSpread)} km entre les plus distants) : tournée peu cohérente ?`]);
+  const km=t.realKm??t.kmEst;
+  if(t.longest>0&&t.ms.length>1&&km/t.longest>TOUR_RULES.detourRatio)al.push(['amb',`Détour important : ${Math.round(km)} km pour une mission la plus longue de ${Math.round(t.longest)} km.`]);
+  if(!al.length)al.push(['grn','Aucune alerte : capacité, dates et cohérence géographique OK.']);
+  const saving=t.directKm-km;
+  return `<div class="truck-panel">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+      <strong style="font-size:15px">🚛 Camion — ${t.ms.length} mission${t.ms.length>1?'s':''} · ${t.veh} véhicule${t.veh>1?'s':''}</strong>
+      <span style="font-size:12px;color:var(--muted)">${t.firstDeadline?'1re date limite : '+pretty(t.firstDeadline):''}</span>
+      <span style="flex:1"></span>
+      <button class="btn" onclick="mapZoomSel()">⌖ Zoom</button>
+      <button class="btn" onclick="mapClear()">✕ Effacer</button>
+      <button class="btn" onclick="truckPanelOpen=!truckPanelOpen;refreshSelectionUI()">${truckPanelOpen?'▾ Réduire':'▴ Ouvrir'}</button>
+    </div>
+    ${truckPanelOpen?`<div class="tp-grid">
+      <div><div class="tp-h">Remplissage</div>
+        <div class="tp-gauge"><div style="width:${pct}%;background:${gcol}"></div></div>
+        <div style="font-size:13px;margin-top:6px"><b style="color:${gcol}">${fmtPts(t.pts)}</b> / ${TRUCK_CAPACITY} points · ${fmtPts(Math.max(0,TRUCK_CAPACITY-t.pts))} libres</div>
+        <div style="font-size:12px;color:var(--muted)">${esc(types)}</div>
+        <div class="tp-h" style="margin-top:12px">Alertes</div>${al.map(([c,x])=>`<div class="tp-al ${c}">${esc(x)}</div>`).join('')}</div>
+      <div><div class="tp-h">Itinéraire (ordre proposé)</div>
+        <ol style="margin:0;padding-left:20px;font-size:12px;line-height:1.6">${t.stops.map(x=>`<li>${x.t==='P'?'⬆ chargement':'⬇ déchargement'} <b>${esc(x.m.ref)}</b> — ${esc(place(x.t==='P'?x.m.pickupCountry:x.m.deliveryCountry,x.t==='P'?x.m.pickupCity:x.m.deliveryCity))}</li>`).join('')}</ol>
+        <div style="font-size:12.5px;margin-top:8px">${t.realKm!=null?`<b>${t.realKm} km</b> routiers (${t.realMode==='camion'?'itinéraire poids lourd':'itinéraire voiture : poids lourd indisponible ici'})`:`≈ <b>${Math.round(t.kmEst)} km</b> estimés`} · missions séparées : ${Math.round(t.directKm)} km<br>
+          ${saving>=0?`<span style="color:var(--green)">économie de ${Math.round(saving)} km grâce au regroupement</span>`:`<span style="color:var(--red)">${Math.round(-saving)} km de plus qu'en missions séparées</span>`}</div>
+        ${t.realKm==null?'<button class="btn" id="tp-real-btn" style="margin-top:6px;font-size:11px" onclick="tourRealKm()">📏 Calculer les km routiers</button>':''}
+        <div style="font-size:10.5px;color:var(--muted);margin-top:4px">Sans retour à vide ni temps de conduite (à venir).</div></div>
+      <div><div class="tp-h">Coût du transport</div><div id="tp-profit"></div></div>
+    </div>`:''}
+  </div>`;
+}
+function refreshSelectionUI(){
+  // ne garde que les missions encore affichées et géolocalisées
+  const ok=new Set(mapMissions().filter(hasGeo).map(m=>m.id));
+  [...mapSelected].forEach(id=>{if(!ok.has(id))mapSelected.delete(id);});
+  document.querySelectorAll('#map-list .map-item').forEach(el=>{
+    const on=mapSelected.has(el.dataset.id);
+    el.classList.toggle('chk',on);
+    const cb=el.querySelector('input[type=checkbox]');if(cb)cb.checked=on;
+  });
+  const clr=document.getElementById('btn-clearsel');
+  if(clr){clr.style.display=mapSelected.size?'':'none';clr.textContent=`✕ Désélectionner (${mapSelected.size})`;}
+  const host=document.getElementById('truck-panel-host');
+  const ms=db.missions.filter(m=>mapSelected.has(m.id)&&hasGeo(m));
+  if(_selLayer){_selLayer.clearLayers();}
+  if(!ms.length){_lastTour=null;if(host)host.innerHTML='';return;}
+  const t=tourMetrics(ms);_lastTour=t;
+  if(host){host.innerHTML=truckPanelHtml(t)+`<div style="height:${truckPanelOpen?'44vh':'70px'}"></div>`;renderTruckProfit();}
+  if(_map&&_selLayer){
+    ms.forEach(m=>{
+      [[m.pickupLat,m.pickupLng],[m.deliveryLat,m.deliveryLng]].forEach(p=>L.circleMarker(p,{radius:18,color:'#111',weight:3,fill:false,interactive:false}).addTo(_selLayer));
+    });
+    if(t.stops.length>1)L.polyline(t.stops.map(x=>[x.lat,x.lng]),{color:'#111',weight:2.5,opacity:.85,dashArray:'2 7'}).addTo(_selLayer);
+    t.stops.forEach((x,i)=>L.marker([x.lat,x.lng],{interactive:false,keyboard:false,icon:L.divIcon({className:'',iconSize:[17,17],iconAnchor:[-4,26],html:`<div class="stop-n">${i+1}</div>`})}).addTo(_selLayer));
+  }
+}
+function mapZoomSel(){
+  if(!_map||!_lastTour)return;
+  _map.fitBounds(_lastTour.stops.map(x=>[x.lat,x.lng]),{padding:[60,60],maxZoom:8});
+}
+
 function initMapView(){
   const el=document.getElementById('map-canvas');if(!el)return;
   if(_map){try{_map.remove();}catch(_){}_map=null;}
@@ -1936,7 +2192,11 @@ function initMapView(){
   _map=L.map(el,{worldCopyJump:true,maxZoom:11}).setView(_mapView?_mapView.c:[49,8],_mapView?_mapView.z:5);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:11,attribution:'© OpenStreetMap'}).addTo(_map);
   const mkCluster=kind=>L.markerClusterGroup({maxClusterRadius:32,showCoverageOnHover:false,spiderfyOnMaxZoom:true,
-    iconCreateFunction:c=>L.divIcon({html:`<div class="mk-cl ${kind}">${c.getChildCount()}</div>`,className:'',iconSize:[30,30]})});
+    iconCreateFunction:c=>{
+      const ms=c.getAllChildMarkers();
+      const veh=ms.reduce((s,x)=>s+(x.options.veh||0),0),pts=ms.reduce((s,x)=>s+(x.options.pts||0),0);
+      return L.divIcon({html:`<div class="mk-cl ${kind}" title="${ms.length} mission(s) · ${veh} véhicule(s) · ${fmtPts(pts)} pts">${veh}</div>`,className:'',iconSize:[30,30]});
+    }});
   const gA=mkCluster('p'),gB=mkCluster('d');
   const mer=l=>Math.log(Math.tan(Math.PI/4+l*Math.PI/360));
   const bounds=[];
@@ -1947,12 +2207,20 @@ function initMapView(){
       ${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}<br>
       ${m.cars.length} véhicule(s) · ${fmtPts(missionPoints(m))} pts${m.distanceKm?' · '+m.distanceKm+' km':''}<br>
       ${u.dl?`Date limite : <b style="color:${u.ring||'inherit'}">${pretty(u.dl)}</b>${u.left==null?'':(u.left<0?' (dépassée)':` (${u.left} j)`)}<br>`:''}
-      <button class="btn" style="margin-top:6px;font-size:11px" onclick="openDetail('${esc(m.id)}')">Ouvrir la mission</button></div>`;
+      <button class="btn" style="margin-top:6px;font-size:11px" onclick="openDetail('${esc(m.id)}')">Ouvrir la mission</button>
+      <button class="btn primary" style="margin-top:6px;font-size:11px" onclick="mapToggle('${esc(m.id)}')">☑ Sélection camion</button></div>`;
     const icon=(shape,glyph)=>L.divIcon({className:'',iconSize:[24,24],iconAnchor:[12,12],
       html:`<div class="mk ${shape}" style="background:${color};${u.ring?`border-color:${u.ring};border-width:3px`:''}">${glyph}</div>`});
-    const a=L.marker(pa,{icon:icon('r','⬆')}).bindPopup(pop).bindTooltip(`${m.ref} · ${m.pickupCity||''}`,{permanent:true,direction:'right',offset:[12,0],className:'mk-label'});
-    const b=L.marker(pb,{icon:icon('q','⬇')}).bindPopup(pop).bindTooltip(`${m.ref} · ${m.deliveryCity||''}`,{permanent:true,direction:'right',offset:[12,0],className:'mk-label'});
-    [a,b].forEach(mk=>{mk.on('mouseover',()=>mapHover(m.id));mk.on('mouseout',()=>mapHover(null));mk.on('click',()=>{mapSel=m.id;document.querySelectorAll('#map-list .map-item').forEach(e=>e.classList.toggle('sel',e.dataset.id===m.id));});});
+    const opt={veh:m.cars.length,pts:missionPoints(m)};
+    const a=L.marker(pa,{...opt,icon:icon('r','⬆')}).bindPopup(pop).bindTooltip(`${m.ref} · ${m.pickupCity||''}`,{permanent:true,direction:'right',offset:[12,0],className:'mk-label'});
+    const b=L.marker(pb,{...opt,icon:icon('q','⬇')}).bindPopup(pop).bindTooltip(`${m.ref} · ${m.deliveryCity||''}`,{permanent:true,direction:'right',offset:[12,0],className:'mk-label'});
+    [a,b].forEach(mk=>{
+      mk.on('mouseover',()=>mapHover(m.id));mk.on('mouseout',()=>mapHover(null));
+      mk.on('click',ev=>{
+        mapSel=m.id;document.querySelectorAll('#map-list .map-item').forEach(e=>e.classList.toggle('sel',e.dataset.id===m.id));
+        if(ev.originalEvent&&ev.originalEvent.shiftKey){mk.closePopup();mapToggle(m.id);}   // Maj + clic = sélection
+      });
+    });
     gA.addLayer(a);gB.addLayer(b);
     const it={a,b,pa,pb,ga:gA};
     if(mapFilter.lines){
@@ -1965,10 +2233,13 @@ function initMapView(){
     bounds.push(pa,pb);
   });
   _map.addLayer(gA);_map.addLayer(gB);
+  _selLayer=L.layerGroup().addTo(_map);
   const labels=()=>el.classList.toggle('nolabels',_map.getZoom()<6);
   labels();_map.on('zoomend',labels);
   if(!_mapView&&bounds.length)_map.fitBounds(bounds,{padding:[40,40],maxZoom:7});
   _map.on('moveend',()=>{_mapView={c:[_map.getCenter().lat,_map.getCenter().lng],z:_map.getZoom()};});
+  setupDrawing();applyDrawMode();
+  refreshSelectionUI();
 }
 
 function financePage(){
@@ -1981,9 +2252,9 @@ function financePage(){
   const cost=withBoth.reduce((s,m)=>s+m.priceBuy,0);
   const marge=caBoth-cost;
   const pct=caBoth>0?marge/caBoth*100:null;
-  const kmRows=withBoth.filter(m=>m.distanceKm>0);
+  const kmRows=rows.filter(m=>m.distanceKm>0&&m.priceBuy!=null);   // coût réel du transport = prix d'achat transporteur
   const kmTot=kmRows.reduce((s,m)=>s+m.distanceKm,0);
-  const margeKm=kmTot>0?kmRows.reduce((s,m)=>s+marginOf(m),0)/kmTot:null;
+  const coutKm=kmTot>0?kmRows.reduce((s,m)=>s+m.priceBuy,0)/kmTot:null;
   const missing=rows.filter(m=>m.priceSell==null||m.priceBuy==null).length;
   const colorM=v=>v==null?'inherit':(v>=0?'var(--green)':'var(--red)');
   return heading('Finance','Chiffre d\'affaires, marges et rentabilité par mission.',
@@ -1992,12 +2263,12 @@ function financePage(){
     <div class="stat"><small>Chiffre d'affaires</small><strong style="${kpiStyle('var(--blue)')}">${eur(ca)}</strong><em>${rows.length} mission(s)</em></div>
     <div class="stat"><small>Coût transporteurs</small><strong style="${kpiStyle('#8094a6')}">${eur(cost)}</strong><em>${withBoth.length} mission(s) avec vente et achat</em></div>
     <div class="stat"><small>Marge</small><strong style="${kpiStyle(colorM(withBoth.length?marge:null))}">${withBoth.length?eur(marge):'—'}</strong><em>${pct!=null?pct.toFixed(1)+' % du CA':'—'}</em></div>
-    <div class="stat"><small>Marge / km</small><strong style="${kpiStyle(colorM(margeKm))}">${margeKm!=null?eur(margeKm):'—'}</strong><em>${kmTot>0?kmTot.toLocaleString('fr-BE')+' km':'km non calculés'}</em></div>
+    <div class="stat"><small>Coût transport / km</small><strong style="${kpiStyle('#2f4858')}">${coutKm!=null?eur(coutKm):'—'}</strong><em>${kmTot>0?'sur '+kmTot.toLocaleString('fr-BE')+' km':'km ou prix d\'achat manquants'}</em></div>
   </div>
   ${missing?`<div class="notice" style="margin:8px 0">${missing} mission(s) sans prix de vente ou d'achat : la marge n'est calculée que sur les missions complètes.</div>`:''}
-  <div class="panel"><div class="table-wrap"><table><thead><tr><th>Mission / client</th><th>Trajet</th><th>Km</th><th>Vente</th><th>Achat</th><th>Marge</th><th>%</th><th>Marge / km</th><th>Statut</th><th></th></tr></thead><tbody>
+  <div class="panel"><div class="table-wrap"><table><thead><tr><th>Mission / client</th><th>Trajet</th><th>Km</th><th>Vente</th><th>Achat</th><th>Marge</th><th>%</th><th>Coût / km</th><th>Statut</th><th></th></tr></thead><tbody>
   ${rows.map(m=>{const mg=marginOf(m);const p=(mg!=null&&m.priceSell>0)?mg/m.priceSell*100:null;const km=m.distanceKm>0?m.distanceKm:null;
-    return `<tr><td><strong>${esc(m.ref)}</strong><small>${esc(getClient(m).name||'—')}</small></td><td style="font-size:12px">${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}</td><td>${km?km.toLocaleString('fr-BE'):'—'}</td><td>${eur(m.priceSell)}</td><td>${eur(m.priceBuy)}</td><td style="font-weight:700;color:${colorM(mg)}">${mg!=null?eur(mg):'—'}</td><td>${p!=null?p.toFixed(1)+' %':'—'}</td><td>${km&&mg!=null?eur(mg/km):'—'}</td><td>${badge(m.status)}</td><td><button class="btn" onclick="openDetail('${esc(m.id)}')">Ouvrir</button></td></tr>`;}).join('')||'<tr><td colspan="10" class="empty">Aucune mission.</td></tr>'}
+    return `<tr><td><strong>${esc(m.ref)}</strong><small>${esc(getClient(m).name||'—')}</small></td><td style="font-size:12px">${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}</td><td>${km?km.toLocaleString('fr-BE'):'—'}</td><td>${eur(m.priceSell)}</td><td>${eur(m.priceBuy)}</td><td style="font-weight:700;color:${colorM(mg)}">${mg!=null?eur(mg):'—'}</td><td>${p!=null?p.toFixed(1)+' %':'—'}</td><td>${km&&m.priceBuy!=null?eur(m.priceBuy/km):'—'}</td><td>${badge(m.status)}</td><td><button class="btn" onclick="openDetail('${esc(m.id)}')">Ouvrir</button></td></tr>`;}).join('')||'<tr><td colspan="10" class="empty">Aucune mission.</td></tr>'}
   </tbody></table></div></div>`;
 }
 
@@ -2025,11 +2296,13 @@ async function geocodeAddr(street,postal,city,country){
 }
 // Itinéraire : Valhalla (profil poids lourd) en premier choix, puis OSRM en secours. Services publics gratuits, sans clé.
 async function routeKm(a,b){
-  try{
-    const q=encodeURIComponent(JSON.stringify({locations:[{lat:a.lat,lon:a.lng},{lat:b.lat,lon:b.lng}],costing:'truck',directions_options:{units:'kilometers'}}));
-    const res=await fetch('https://valhalla1.openstreetmap.de/route?json='+q);
-    if(res.ok){const j=await res.json();const k=j&&j.trip&&j.trip.summary?j.trip.summary.length:null;if(k!=null)return Math.round(k);}
-  }catch(_){}
+  for(const costing of ['truck','auto']){
+    try{
+      const q=encodeURIComponent(JSON.stringify({locations:[{lat:a.lat,lon:a.lng},{lat:b.lat,lon:b.lng}],costing,directions_options:{units:'kilometers'}}));
+      const res=await fetch('https://valhalla1.openstreetmap.de/route?json='+q);
+      if(res.ok){const j=await res.json();const k=j&&j.trip&&j.trip.summary?j.trip.summary.length:null;if(k!=null)return Math.round(k);}
+    }catch(_){}
+  }
   for(const base of ['https://routing.openstreetmap.de/routed-car','https://router.project-osrm.org']){
     try{
       const res=await fetch(`${base}/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=false`);
