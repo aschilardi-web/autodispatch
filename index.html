@@ -1941,7 +1941,7 @@ async function geocodeAddr(street,postal,city,country){
     const res=await fetch('https://nominatim.openstreetmap.org/search?'+p.toString());
     if(!res.ok)throw new Error('Géocodage indisponible ('+res.status+')');
     const j=await res.json();
-    if(j&&j[0]){const r={lat:parseFloat(j[0].lat),lng:parseFloat(j[0].lon)};_geoCache[key]=r;return r;}
+    if(j&&j[0]){const r={lat:parseFloat(j[0].lat),lng:parseFloat(j[0].lon),label:j[0].display_name||''};_geoCache[key]=r;return r;}
   }
   return null;
 }
@@ -1975,15 +1975,53 @@ async function ensureGeo(m,old){
   };
   for(const p of ['pickup','delivery']){
     if(!m[p+'City'])continue;
+    if(m._geoManual&&m._geoManual[p])continue;   // coordonnées vérifiées ou saisies dans le formulaire
     if(!side(p))continue;
     const g=await geocodeAddr(m[p+'Street'],m[p+'Postal'],m[p+'City'],m[p+'Country']);
     m[p+'Lat']=g?g.lat:null;m[p+'Lng']=g?g.lng:null;
   }
 }
+const fmtCoords=(lat,lng)=>(lat!=null&&lng!=null)?`${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`:'';
+function parseCoords(str){
+  const t=String(str||'').trim();if(!t)return null;
+  const mm=t.match(/(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)/);
+  if(!mm)return null;
+  const lat=parseFloat(mm[1]),lng=parseFloat(mm[2]);
+  return(lat>=-90&&lat<=90&&lng>=-180&&lng<=180)?{lat,lng}:null;
+}
+// Bouton « Géolocaliser l'adresse » : montre ce qui a été trouvé pour que tu puisses le vérifier
+async function geoFromForm(k){
+  const st=document.getElementById('geo-'+k+'-status');
+  const pre=k==='pick'?'pick':'deliv';
+  const city=val('f-'+pre+'city');
+  if(!city){st.textContent='Renseigne d\'abord la ville.';return;}
+  st.textContent='⏳ Recherche…';
+  try{
+    const g=await geocodeAddr(val('f-'+pre+'street'),val('f-'+pre+'postal'),city,val('f-'+pre+'country'));
+    if(!g){st.innerHTML='<span style="color:var(--red)">⚠ Adresse introuvable</span> — vérifie la ville, le code postal et le pays, ou saisis les coordonnées (copiées de Google Maps).';return;}
+    document.getElementById('f-'+k+'-coords').value=fmtCoords(g.lat,g.lng);
+    document.getElementById('f-'+k+'-geo').value='1';
+    st.innerHTML=`<span style="color:var(--green)">✓ Trouvé</span> : ${esc((g.label||'').slice(0,90))} · <a href="https://www.openstreetmap.org/?mlat=${g.lat}&mlon=${g.lng}#map=11/${g.lat}/${g.lng}" target="_blank" style="color:var(--blue)">voir sur la carte</a>`;
+  }catch(e){st.textContent='Recherche impossible : '+e.message;}
+}
+// Coordonnées saisies à la main (ex. copiées de Google Maps : 50.6292, 3.0573)
+function geoManual(k){
+  const st=document.getElementById('geo-'+k+'-status');
+  const input=document.getElementById('f-'+k+'-coords');
+  if(!input.value.trim()){document.getElementById('f-'+k+'-geo').value='';st.textContent='automatique à l\'enregistrement';return;}
+  const c=parseCoords(input.value);
+  if(!c){st.innerHTML='<span style="color:var(--red)">⚠ Format attendu : latitude, longitude (ex. 50.6292, 3.0573)</span>';return;}
+  input.value=fmtCoords(c.lat,c.lng);
+  document.getElementById('f-'+k+'-geo').value='1';
+  st.innerHTML=`<span style="color:var(--green)">✓ Coordonnées saisies</span> · <a href="https://www.openstreetmap.org/?mlat=${c.lat}&mlon=${c.lng}#map=11/${c.lat}/${c.lng}" target="_blank" style="color:var(--blue)">voir sur la carte</a>`;
+}
 async function calcKmFromForm(){
   const st=document.getElementById('km-status');
   const m={pickupStreet:val('f-pickstreet'),pickupPostal:val('f-pickpostal'),pickupCity:val('f-pickcity'),pickupCountry:val('f-pickcountry'),
     deliveryStreet:val('f-delivstreet'),deliveryPostal:val('f-delivpostal'),deliveryCity:val('f-delivcity'),deliveryCountry:val('f-delivcountry')};
+  const _pc=parseCoords(val('f-pick-coords')),_dc=parseCoords(val('f-deliv-coords'));
+  if(_pc){m.pickupLat=_pc.lat;m.pickupLng=_pc.lng;}
+  if(_dc){m.deliveryLat=_dc.lat;m.deliveryLng=_dc.lng;}
   if(!m.pickupCity||!m.deliveryCity){st.textContent='Renseigne d\'abord la ville de chargement et de livraison.';return;}
   st.textContent='⏳ Calcul en cours…';
   try{
@@ -2307,7 +2345,7 @@ function openYardDraft(){
 function openMissionForm(id){
   editingMission=id||null;
   const m=id?db.missions.find(x=>x.id===id):null;
-  document.getElementById('modal-content').innerHTML=`<div class="modal-header"><div><h2>${m?'Modifier':'Créer'} une mission</h2><p>Client, adresses et véhicules à transporter.</p></div><button class="x" onclick="closeModal()">×</button></div><div class="form-grid"><div class="field"><label>CLIENT *</label><select id="f-client"><option value="">Choisir…</option>${db.clients.map(x=>`<option value="${esc(x.id)}" ${m?.clientId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div><div class="field"><label>RÉFÉRENCE</label><input id="f-ref" value="${esc(m?.ref||'FL-'+new Date().toISOString().slice(2,10).replaceAll('-',''))}"></div><div class="form-section">ADRESSE D'ENLÈVEMENT</div><div class="field"><label>Site / nom client *</label><input id="f-picksite" value="${esc(m?.pickupSite||'')}" placeholder="GCA · Bouchain"></div><div class="field"><label>Contact</label><input id="f-pickcontact" value="${esc(m?.pickupContact||'')}"></div><div class="field wide"><label>Rue et numéro *</label><input id="f-pickstreet" value="${esc(m?.pickupStreet||'')}"></div><div class="field"><label>Pays *</label>${countrySelectHtml('f-pickcountry',m?.pickupCountry||'BE')}</div><div class="field"><label>Code postal *</label><input id="f-pickpostal" value="${esc(m?.pickupPostal||'')}"></div><div class="field"><label>Ville *</label><input id="f-pickcity" value="${esc(m?.pickupCity||'')}"></div><div class="field"><label>CLEFS REMISES 🔑</label><select id="f-keys"><option value="">—</option><option value="1" ${m?.keys==='1'?'selected':''}>1 clef</option><option value="2" ${m?.keys==='2'?'selected':''}>2 clefs</option></select></div><div class="form-section">ADRESSE DE LIVRAISON</div><div class="field"><label>Site / nom client *</label><input id="f-delivsite" value="${esc(m?.deliverySite||'')}" placeholder="Online Car · Graz"></div><div class="field"><label>Contact</label><input id="f-delivcontact" value="${esc(m?.deliveryContact||'')}"></div><div class="field"><label>E-mail site de livraison</label><input id="f-delivEmail" type="email" value="${esc(m?.deliveryEmail||'')}" placeholder="reception@client.com"></div><div class="field wide"><label>Rue et numéro *</label><input id="f-delivstreet" value="${esc(m?.deliveryStreet||'')}"></div><div class="field"><label>Pays *</label>${countrySelectHtml('f-delivcountry',m?.deliveryCountry||'BE')}</div><div class="field"><label>Code postal *</label><input id="f-delivpostal" value="${esc(m?.deliveryPostal||'')}"></div><div class="field"><label>Ville *</label><input id="f-delivcity" value="${esc(m?.deliveryCity||'')}"></div><div class="form-section">DATES</div><div class="field"><label>Date de chargement</label><input id="f-load-date" type="date" value="${esc(m?.pickupDate||'')}"></div><div class="field"><label>Date prévue de livraison</label><input id="f-deliv-date" type="date" value="${esc(m?.deliveryDate||'')}"></div><div class="form-section">TARIFS ET DISTANCE</div><div class="field"><label>Prix de vente (€)</label><input id="f-price-sell" type="number" step="0.01" min="0" value="${esc(m?.priceSell??'')}" placeholder="0.00"></div><div class="field"><label>Prix d'achat transporteur (€)</label><input id="f-price-buy" type="number" step="0.01" min="0" value="${esc(m?.priceBuy??'')}" placeholder="0.00"></div><div class="field"><label>Distance (km)</label><input id="f-km" type="number" step="1" min="0" value="${esc(m?.distanceKm??'')}" placeholder="calcul auto"></div><div class="field"><label>&nbsp;</label><button class="btn" type="button" onclick="calcKmFromForm()">📍 Calculer les km</button></div><div id="km-status" class="field wide" style="font-size:11px;color:var(--muted)"></div><div class="form-section">VÉHICULE</div><div class="car-form"><div class="field"><label>Marque *</label><input id="f-make" value="${esc(m?.cars?.[0]?.make||'')}" placeholder="BMW"></div><div class="field"><label>Modèle *</label><input id="f-model" value="${esc(m?.cars?.[0]?.model||'')}" placeholder="X5"></div><div class="field"><label>VIN</label><input id="f-vin" value="${esc(m?.cars?.[0]?.vin||'')}" placeholder="17 caractères"></div><div class="field"><label>Plaque</label><input id="f-plate" value="${esc(m?.cars?.[0]?.plate||'')}"></div><div class="field"><label>Type</label><select id="f-cat">${catOptions(m?.cars?.[0]?.category)}</select></div><button class="btn" onclick="addVehicleField()">＋ véhicule</button></div><div id="extra-cars" class="field wide"></div></div><div id="form-error"></div><div class="modal-footer"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn primary" onclick="saveMission()">${m?'Enregistrer':'Créer la mission'}</button></div>`;
+  document.getElementById('modal-content').innerHTML=`<div class="modal-header"><div><h2>${m?'Modifier':'Créer'} une mission</h2><p>Client, adresses et véhicules à transporter.</p></div><button class="x" onclick="closeModal()">×</button></div><div class="form-grid"><div class="field"><label>CLIENT *</label><select id="f-client"><option value="">Choisir…</option>${db.clients.map(x=>`<option value="${esc(x.id)}" ${m?.clientId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div><div class="field"><label>RÉFÉRENCE</label><input id="f-ref" value="${esc(m?.ref||'FL-'+new Date().toISOString().slice(2,10).replaceAll('-',''))}"></div><div class="form-section">ADRESSE D'ENLÈVEMENT</div><div class="field"><label>Site / nom client *</label><input id="f-picksite" value="${esc(m?.pickupSite||'')}" placeholder="GCA · Bouchain"></div><div class="field"><label>Contact</label><input id="f-pickcontact" value="${esc(m?.pickupContact||'')}"></div><div class="field wide"><label>Rue et numéro *</label><input id="f-pickstreet" value="${esc(m?.pickupStreet||'')}"></div><div class="field"><label>Pays *</label>${countrySelectHtml('f-pickcountry',m?.pickupCountry||'BE')}</div><div class="field"><label>Code postal *</label><input id="f-pickpostal" value="${esc(m?.pickupPostal||'')}"></div><div class="field"><label>Ville *</label><input id="f-pickcity" value="${esc(m?.pickupCity||'')}"></div><div class="field wide"><label>GÉOLOCALISATION</label><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn" type="button" onclick="geoFromForm('pick')">📍 Géolocaliser l'adresse</button><input id="f-pick-coords" value="${esc(fmtCoords(m?.pickupLat,m?.pickupLng))}" placeholder="latitude, longitude" style="max-width:200px" onchange="geoManual('pick')"><span id="geo-pick-status" style="font-size:11px;color:var(--muted)">${m&&m.pickupLat!=null?'✓ coordonnées enregistrées':'automatique à l\'enregistrement'}</span></div><input type="hidden" id="f-pick-geo" value=""></div><div class="field"><label>CLEFS REMISES 🔑</label><select id="f-keys"><option value="">—</option><option value="1" ${m?.keys==='1'?'selected':''}>1 clef</option><option value="2" ${m?.keys==='2'?'selected':''}>2 clefs</option></select></div><div class="form-section">ADRESSE DE LIVRAISON</div><div class="field"><label>Site / nom client *</label><input id="f-delivsite" value="${esc(m?.deliverySite||'')}" placeholder="Online Car · Graz"></div><div class="field"><label>Contact</label><input id="f-delivcontact" value="${esc(m?.deliveryContact||'')}"></div><div class="field"><label>E-mail site de livraison</label><input id="f-delivEmail" type="email" value="${esc(m?.deliveryEmail||'')}" placeholder="reception@client.com"></div><div class="field wide"><label>Rue et numéro *</label><input id="f-delivstreet" value="${esc(m?.deliveryStreet||'')}"></div><div class="field"><label>Pays *</label>${countrySelectHtml('f-delivcountry',m?.deliveryCountry||'BE')}</div><div class="field"><label>Code postal *</label><input id="f-delivpostal" value="${esc(m?.deliveryPostal||'')}"></div><div class="field"><label>Ville *</label><input id="f-delivcity" value="${esc(m?.deliveryCity||'')}"></div><div class="field wide"><label>GÉOLOCALISATION</label><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn" type="button" onclick="geoFromForm('deliv')">📍 Géolocaliser l'adresse</button><input id="f-deliv-coords" value="${esc(fmtCoords(m?.deliveryLat,m?.deliveryLng))}" placeholder="latitude, longitude" style="max-width:200px" onchange="geoManual('deliv')"><span id="geo-deliv-status" style="font-size:11px;color:var(--muted)">${m&&m.deliveryLat!=null?'✓ coordonnées enregistrées':'automatique à l\'enregistrement'}</span></div><input type="hidden" id="f-deliv-geo" value=""></div><div class="form-section">DATES</div><div class="field"><label>Date de chargement</label><input id="f-load-date" type="date" value="${esc(m?.pickupDate||'')}"></div><div class="field"><label>Date prévue de livraison</label><input id="f-deliv-date" type="date" value="${esc(m?.deliveryDate||'')}"></div><div class="form-section">TARIFS ET DISTANCE</div><div class="field"><label>Prix de vente (€)</label><input id="f-price-sell" type="number" step="0.01" min="0" value="${esc(m?.priceSell??'')}" placeholder="0.00"></div><div class="field"><label>Prix d'achat transporteur (€)</label><input id="f-price-buy" type="number" step="0.01" min="0" value="${esc(m?.priceBuy??'')}" placeholder="0.00"></div><div class="field"><label>Distance (km)</label><input id="f-km" type="number" step="1" min="0" value="${esc(m?.distanceKm??'')}" placeholder="calcul auto"></div><div class="field"><label>&nbsp;</label><button class="btn" type="button" onclick="calcKmFromForm()">📍 Calculer les km</button></div><div id="km-status" class="field wide" style="font-size:11px;color:var(--muted)"></div><div class="form-section">VÉHICULE</div><div class="car-form"><div class="field"><label>Marque *</label><input id="f-make" value="${esc(m?.cars?.[0]?.make||'')}" placeholder="BMW"></div><div class="field"><label>Modèle *</label><input id="f-model" value="${esc(m?.cars?.[0]?.model||'')}" placeholder="X5"></div><div class="field"><label>VIN</label><input id="f-vin" value="${esc(m?.cars?.[0]?.vin||'')}" placeholder="17 caractères"></div><div class="field"><label>Plaque</label><input id="f-plate" value="${esc(m?.cars?.[0]?.plate||'')}"></div><div class="field"><label>Type</label><select id="f-cat">${catOptions(m?.cars?.[0]?.category)}</select></div><button class="btn" onclick="addVehicleField()">＋ véhicule</button></div><div id="extra-cars" class="field wide"></div></div><div id="form-error"></div><div class="modal-footer"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn primary" onclick="saveMission()">${m?'Enregistrer':'Créer la mission'}</button></div>`;
   document.getElementById('modal').classList.add('open');
 }
 
@@ -2339,6 +2377,9 @@ async function saveMission(){
     pickupDate:val('f-load-date'),deliveryDate:val('f-deliv-date'),keys:val('f-keys'),
     priceSell:parseNum(val('f-price-sell')),priceBuy:parseNum(val('f-price-buy')),distanceKm:parseNum(val('f-km')),
     orderDate:old?.orderDate||todayIso(),   // date de commande = date d'encodage
+    pickupLat:(parseCoords(val('f-pick-coords'))||{}).lat??null,pickupLng:(parseCoords(val('f-pick-coords'))||{}).lng??null,
+    deliveryLat:(parseCoords(val('f-deliv-coords'))||{}).lat??null,deliveryLng:(parseCoords(val('f-deliv-coords'))||{}).lng??null,
+    _geoManual:{pickup:val('f-pick-geo')==='1',delivery:val('f-deliv-geo')==='1'},
     status:old?.status||'à planifier',cars,notifications:old?.notifications||[]};
   if(old&&(old.pickupDate!==m.pickupDate||old.deliveryDate!==m.deliveryDate)&&(m.pickupDate||m.deliveryDate))
     m.notifications.push({id:crypto.randomUUID(),kind:'planned',pickupDate:m.pickupDate,deliveryDate:m.deliveryDate,status:'pending',createdAt:new Date().toISOString()});
@@ -2346,6 +2387,7 @@ async function saveMission(){
     m.notifications.push({id:crypto.randomUUID(),kind:'planned',pickupDate:m.pickupDate,deliveryDate:m.deliveryDate,status:'pending',createdAt:new Date().toISOString()});
   setLoading(true);
   try{await ensureGeo(m,old);}catch(e){console.warn('Géolocalisation impossible :',e.message);}
+  delete m._geoManual;
   // Distance : si les adresses ont changé, on repart de zéro ; si elle est vide, on tente le calcul automatique
   if(old&&m.distanceKm===old.distanceKm&&['pickupStreet','pickupPostal','pickupCity','pickupCountry','deliveryStreet','deliveryPostal','deliveryCity','deliveryCountry'].some(k=>(old[k]||'')!==(m[k]||'')))m.distanceKm=null;
   if(m.distanceKm==null){try{m.distanceKm=await computeDistanceKm(m);}catch(e){console.warn('Calcul km impossible:',e.message);}}
@@ -2356,6 +2398,8 @@ async function saveMission(){
   setLoading(false);
   if(old)db.missions=db.missions.map(x=>x.id===old.id?m:x);else db.missions.push(m);
   closeModal();render();
+  const _noGeo=[m.pickupCity&&m.pickupLat==null?'chargement':'',m.deliveryCity&&m.deliveryLat==null?'livraison':''].filter(Boolean);
+  if(_noGeo.length)setTimeout(()=>alert('Mission enregistrée, mais l\'adresse de '+_noGeo.join(' et ')+' n\'a pas pu être géolocalisée : elle n\'apparaîtra pas sur la carte.\nOuvre « Modifier la mission » : bouton « Géolocaliser l\'adresse », ou saisis les coordonnées à la main.'),300);
   // Auto-email client si une notification 'planned' vient d'être créée
   const newPlanned=m.notifications.filter(n=>n.kind==='planned'&&n.status==='pending');
   if(newPlanned.length){
