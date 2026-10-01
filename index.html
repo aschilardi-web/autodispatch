@@ -398,6 +398,13 @@ function getPhotoCatsDelivery(lang){
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const getClient=m=>db.clients.find(x=>x.id===m.clientId)||{};
 const getCarrier=m=>db.carriers.find(x=>x.id===m.carrierId)||{};
+// Lieux : le PAYS toujours AVANT la ville
+const ccLabel=c=>{if(!c)return'';const u=String(c).toUpperCase().trim();return /^[A-Z]{2}$/.test(u)?u:countryLabel(c);};
+const place=(country,city)=>[ccLabel(country),city].filter(Boolean).join(' · ')||'—';
+// Argent / rentabilité
+const eur=n=>(n==null||isNaN(n))?'—':Number(n).toLocaleString('fr-BE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+const parseNum=v=>{if(v==null||v==='')return null;const x=parseFloat(String(v).replace(/[^\d,.\-]/g,'').replace(',','.'));return isNaN(x)?null:x;};
+const marginOf=m=>(m.priceSell!=null&&m.priceBuy!=null)?m.priceSell-m.priceBuy:null;
 // Inspection terminée = tous les véhicules inspectés (nouveau mode) ou ancienne inspection au niveau mission
 const inspectionComplete=m=>!!m.inspectionSubmittedAt||(m.cars.length>0&&m.cars.every(c=>c.inspectionSubmittedAt));
 const pretty=d=>d?new Date(d+'T12:00:00').toLocaleDateString('fr-BE',{day:'numeric',month:'short',year:'numeric'}):'To be confirmed';
@@ -511,6 +518,9 @@ async function loadData(){
       deliveryEmail:m.delivery_email||'',
       pickupDate:m.pickup_date||'',deliveryDate:m.delivery_date||'',
       status:m.status||'à planifier',
+      priceSell:m.price_sell!=null?Number(m.price_sell):null,
+      priceBuy:m.price_buy!=null?Number(m.price_buy):null,
+      distanceKm:m.distance_km!=null?Number(m.distance_km):null,
       cars:cars.filter(c=>c.mission_id===m.id).map(c=>({
         id:c.id,make:c.make||'',model:c.model||'',vin:c.vin||'',plate:c.plate||'',
         status:c.status||'à charger',
@@ -664,7 +674,7 @@ function handleInspectionDone(row){
 
 // ─── DB WRITE ────────────────────────────────────────────────────
 async function dbUpsertMission(m){
-  const{error}=await sb.from('missions').upsert({
+  const row={
     id:m.id,ref:m.ref,client_id:m.clientId||null,carrier_id:m.carrierId||null,
     pickup_site:m.pickupSite,pickup_street:m.pickupStreet,pickup_postal:m.pickupPostal,
     pickup_city:m.pickupCity,pickup_country:m.pickupCountry,pickup_contact:m.pickupContact,
@@ -672,9 +682,18 @@ async function dbUpsertMission(m){
     delivery_city:m.deliveryCity,delivery_country:m.deliveryCountry,delivery_contact:m.deliveryContact,
     delivery_email:m.deliveryEmail||null,
     pickup_date:m.pickupDate||null,delivery_date:m.deliveryDate||null,status:m.status,
-    delivery_token:m.deliveryToken||null
-  });
+    delivery_token:m.deliveryToken||null,
+    price_sell:m.priceSell??null,price_buy:m.priceBuy??null,distance_km:m.distanceKm??null
+  };
+  let{error}=await sb.from('missions').upsert(row);
+  // Sécurité de transition : si la colonne distance_km n'existe pas encore en base, on réessaie sans elle
+  if(error&&/distance_km/i.test(error.message||'')){
+    console.warn('distance_km absente en base — enregistrement sans distance');
+    delete row.distance_km;
+    ({error}=await sb.from('missions').upsert(row));
+  }
   if(error)console.error('mission',error);
+  return error||null;
 }
 
 async function dbUpsertCar(c,missionId){
@@ -772,12 +791,12 @@ function dashboard(){
   </div>
   ${lateMissions.length?`<div class="panel" style="border-color:#fcd4d4;background:#fff8f8;margin-bottom:16px">
     <div class="panel-title" style="margin-bottom:10px"><h2 style="color:var(--red)">⚠ Missions en retard (${lateMissions.length})</h2><button class="btn" onclick="filterStatus='à charger';setView('Missions')">Voir toutes</button></div>
-    <div class="recent-list">${lateMissions.map(m=>`<div class="recent-row"><strong>${esc(m.ref)}<small>${esc(getClient(m).name||'—')}</small></strong><span>${esc(m.pickupCity||'—')} → ${esc(m.deliveryCity||'—')}</span><span>Livraison prévue le ${pretty(m.deliveryDate)}<small>${esc(getCarrier(m).name||'Transporteur non attribué')}</small></span>${badge(m.status)}<button class="btn" onclick="openDetail('${esc(m.id)}')">Ouvrir</button></div>`).join('')}</div>
+    <div class="recent-list">${lateMissions.map(m=>`<div class="recent-row"><strong>${esc(m.ref)}<small>${esc(getClient(m).name||'—')}</small></strong><span>${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}</span><span>Livraison prévue le ${pretty(m.deliveryDate)}<small>${esc(getCarrier(m).name||'Transporteur non attribué')}</small></span>${badge(m.status)}<button class="btn" onclick="openDetail('${esc(m.id)}')">Ouvrir</button></div>`).join('')}</div>
   </div>`:''}
   <div class="panel"><div class="panel-title"><h2>Missions récentes <small>· ${db.missions.length}</small></h2><button class="btn" onclick="setView('Missions')">Toutes les missions</button></div>
   <div class="recent-list">${db.missions.length?db.missions.slice().reverse().slice(0,6).map(m=>{
     const isLate=lateMissions.includes(m);
-    return `<div class="recent-row"><strong>${esc(m.ref)}${isLate?'<span style="background:#fce8e8;color:var(--red);font-size:9px;border-radius:4px;padding:1px 5px;margin-left:5px;font-weight:700">RETARD</span>':''}<small>${esc(getClient(m).name||'—')}</small></strong><span>${esc(m.pickupCity||'—')} → ${esc(m.deliveryCity||'—')}</span><span>Chargement ${pretty(m.pickupDate)}<small>Livraison ${pretty(m.deliveryDate)}</small></span>${badge(m.status)}</div>`;
+    return `<div class="recent-row"><strong>${esc(m.ref)}${isLate?'<span style="background:#fce8e8;color:var(--red);font-size:9px;border-radius:4px;padding:1px 5px;margin-left:5px;font-weight:700">RETARD</span>':''}<small>${esc(getClient(m).name||'—')}</small></strong><span>${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}</span><span>Chargement ${pretty(m.pickupDate)}<small>Livraison ${pretty(m.deliveryDate)}</small></span>${badge(m.status)}</div>`;
   }).join(''):'<div class="empty">Aucune mission. Crée une mission pour commencer.</div>'}</div></div>
   <div class="panel"><div class="panel-title"><h2>Actions rapides</h2></div><div class="toolbar"><button class="btn soft" onclick="setView('Planning')">Ouvrir le planning</button><button class="btn soft" onclick="openNewMission()">Nouvelle mission</button><button class="btn soft" onclick="setView('Clients')">Gérer les clients</button><button class="btn soft" onclick="setView('Transporteurs')">Gérer les transporteurs</button></div></div>`;
 }
@@ -799,10 +818,10 @@ function filteredMissions(){
 function tableRows(selectable=false,rows=filteredMissions()){
   let entries=rows.flatMap(m=>m.cars.map(c=>({m,c})));
   entries.sort((a,b)=>String(a.m[db.sort]||a.c[db.sort]||'').localeCompare(String(b.m[db.sort]||b.c[db.sort]||''),'fr',{numeric:true})*db.direction);
-  return entries.map(({m,c})=>`<tr>${selectable?`<td class="check-cell"><input type="checkbox" ${db.selectedIds.includes(c.id)?'checked':''} onchange="toggleSelected('${esc(c.id)}',this.checked)"></td>`:''}<td><strong>${esc(m.ref)}</strong><small>${esc(getClient(m).name||'—')}</small></td><td><strong>${esc(c.make)} ${esc(c.model)}</strong><small>${esc(c.vin||'VIN à ajouter')}</small></td><td>${esc(c.plate||'—')}</td><td>${esc(m.pickupCity||'—')}</td><td>${esc(m.deliveryCity||'—')}</td><td style="font-size:11px">${esc(countryLabel(m.pickupCountry))}</td><td style="font-size:11px">${esc(countryLabel(m.deliveryCountry))}</td><td>${pretty(m.pickupDate)}</td><td>${pretty(m.deliveryDate)}</td><td>${badge(c.status)}</td><td><button class="btn" onclick="openDetail('${esc(m.id)}')">Ouvrir</button></td></tr>`).join('')||`<tr><td colspan="${selectable?13:12}" class="empty">Aucun véhicule à afficher.</td></tr>`;
+  return entries.map(({m,c})=>`<tr>${selectable?`<td class="check-cell"><input type="checkbox" ${db.selectedIds.includes(c.id)?'checked':''} onchange="toggleSelected('${esc(c.id)}',this.checked)"></td>`:''}<td><strong>${esc(m.ref)}</strong><small>${esc(getClient(m).name||'—')}</small></td><td><strong>${esc(c.make)} ${esc(c.model)}</strong><small>${esc(c.vin||'VIN à ajouter')}</small></td><td>${esc(c.plate||'—')}</td><td style="font-size:11px">${esc(countryLabel(m.pickupCountry))}</td><td>${esc(m.pickupCity||'—')}</td><td style="font-size:11px">${esc(countryLabel(m.deliveryCountry))}</td><td>${esc(m.deliveryCity||'—')}</td><td>${pretty(m.pickupDate)}</td><td>${pretty(m.deliveryDate)}</td><td>${badge(c.status)}</td><td><button class="btn" onclick="openDetail('${esc(m.id)}')">Ouvrir</button></td></tr>`).join('')||`<tr><td colspan="${selectable?13:12}" class="empty">Aucun véhicule à afficher.</td></tr>`;
 }
 
-function dataTable(selectable=false){return `<div class="table-wrap"><table><thead><tr>${selectable?'<th class="check-cell">✓</th>':''}${[['ref','Mission / client'],['make','Véhicule / VIN'],['plate','Plaque'],['pickupCity','Ville chargement'],['deliveryCity','Ville déchargement'],['pickupCountry','Pays charg.'],['deliveryCountry','Pays livr.'],['pickupDate','Date chargement'],['deliveryDate','Date livraison'],['status','Statut']].map(([k,l])=>`<th><button onclick="sortBy('${k}')">${l}　↕</button></th>`).join('')}<th></th></tr></thead><tbody>${tableRows(selectable)}</tbody></table></div>`}
+function dataTable(selectable=false){return `<div class="table-wrap"><table><thead><tr>${selectable?'<th class="check-cell">✓</th>':''}${[['ref','Mission / client'],['make','Véhicule / VIN'],['plate','Plaque'],['pickupCountry','Pays chargement'],['pickupCity','Ville chargement'],['deliveryCountry','Pays déchargement'],['deliveryCity','Ville déchargement'],['pickupDate','Date chargement'],['deliveryDate','Date livraison'],['status','Statut']].map(([k,l])=>`<th><button onclick="sortBy('${k}')">${l}　↕</button></th>`).join('')}<th></th></tr></thead><tbody>${tableRows(selectable)}</tbody></table></div>`}
 
 function sortBy(k){if(db.sort===k)db.direction*=-1;else{db.sort=k;db.direction=1}render();}
 
@@ -826,13 +845,13 @@ function weekCalendar(){
       ...loads.map(m=>`<div onclick="openDetail('${esc(m.id)}')" style="border:1px solid #d0e6f8;border-left:3px solid #2675a9;border-radius:7px;padding:9px;margin-bottom:6px;cursor:pointer;background:white;transition:box-shadow .15s" onmouseenter="this.style.boxShadow='0 2px 8px #2675a920'" onmouseleave="this.style.boxShadow=''">
         <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="width:7px;height:7px;border-radius:50%;background:#2675a9;flex-shrink:0"></span><strong style="font-size:11px">${esc(m.ref)}</strong></div>
         <div style="font-size:10.5px;color:#536a7d">Chargement · ${m.cars.length} véh.</div>
-        <div style="font-size:10.5px;color:#536a7d">${esc(m.pickupCity||'—')}${m.deliveryCity?' · '+esc(m.deliveryCity):''}</div>
+        <div style="font-size:10.5px;color:#536a7d">${esc(place(m.pickupCountry,m.pickupCity))}${m.deliveryCity?' → '+esc(place(m.deliveryCountry,m.deliveryCity)):''}</div>
         <div style="font-size:10px;color:#8094a6;margin-top:2px">${esc(getClient(m).name||'—')} · ${esc(getCarrier(m).name||'À attribuer')}</div>
       </div>`),
       ...delivs.map(m=>`<div onclick="openDetail('${esc(m.id)}')" style="border:1px solid #c3e6cb;border-left:3px solid #24784d;border-radius:7px;padding:9px;margin-bottom:6px;cursor:pointer;background:white;transition:box-shadow .15s" onmouseenter="this.style.boxShadow='0 2px 8px #24784d20'" onmouseleave="this.style.boxShadow=''">
         <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="width:7px;height:7px;border-radius:50%;background:#24784d;flex-shrink:0"></span><strong style="font-size:11px">${esc(m.ref)}</strong></div>
         <div style="font-size:10.5px;color:#536a7d">Livraison · ${m.cars.length} véh.</div>
-        <div style="font-size:10.5px;color:#536a7d">${esc(m.deliveryCity||'—')}</div>
+        <div style="font-size:10.5px;color:#536a7d">${esc(place(m.deliveryCountry,m.deliveryCity))}</div>
         <div style="font-size:10px;color:#8094a6;margin-top:2px">${esc(getClient(m).name||'—')} · ${esc(getCarrier(m).name||'À attribuer')}</div>
       </div>`)
     ];
@@ -881,14 +900,14 @@ function missionTableFull(selectable=false){
   });
   entries.sort((a,b)=>String(a.m[db.sort]||a.c[db.sort]||'').localeCompare(String(b.m[db.sort]||b.c[db.sort]||''),'fr',{numeric:true})*db.direction);
   const total=entries.length;
-  const cols=[['ref','Mission / client'],['make','Véhicules'],['vin','VIN'],['plate','Plaque'],['pickupCity','Ville charg.'],['deliveryCity','Ville livr.'],['pickupCountry','Pays charg.'],['deliveryCountry','Pays livr.'],['pickupDate','Date charg.'],['deliveryDate','Date livr.']];
+  const cols=[['ref','Mission / client'],['make','Véhicules'],['vin','VIN'],['plate','Plaque'],['pickupCountry','Pays charg.'],['pickupCity','Ville charg.'],['deliveryCountry','Pays livr.'],['deliveryCity','Ville livr.'],['pickupDate','Date charg.'],['deliveryDate','Date livr.']];
   const fPlaceholders={ref:'Mission / client',make:'Véhicule',vin:'VIN',plate:'Plaque',pickupCity:'Ville',deliveryCity:'Ville',pickupCountry:'ex: BE',deliveryCountry:'ex: FR',pickupDate:pretty(new Date().toISOString().split('T')[0]),deliveryDate:''};
   const ck=(v)=>selectable?`<td class="check-cell">${v}</td>`:'';
   const thead=`<tr>${ck('<input type="checkbox" onchange="selectAll(this.checked)">')}${cols.map(([k,l])=>`<th><button onclick="sortBy('${k}')">${l}　↕</button></th>`).join('')}<th>Statut</th><th></th></tr>
   <tr style="background:#f2f5f8">${ck('')}${cols.map(([k])=>`<td style="padding:5px 8px"><input value="${esc(f[k]||'')}" placeholder="${esc(fPlaceholders[k]||'')}" style="width:100%;border:1px solid #d8e4ec;border-radius:5px;padding:5px 7px;font-size:11px;background:white;color:#20384e" oninput="colF['${k}']=this.value;render()"></td>`).join('')}<td></td><td></td></tr>`;
   const tbody=entries.map(({m,c})=>{
     const chk=selectable?`<td class="check-cell"><input type="checkbox" ${db.selectedIds.includes(c.id)?'checked':''} onchange="toggleSelected('${esc(c.id)}',this.checked)"></td>`:'';
-    return `<tr>${chk}<td><strong>${esc(m.ref)}</strong><small>${esc(getClient(m).name||'—')}</small></td><td><strong>${esc(c.make)} ${esc(c.model)}</strong></td><td style="font-size:11px;color:#536a7d">${esc(c.vin||'—')}</td><td>${esc(c.plate||'—')}</td><td>${esc(m.pickupCity||'—')}</td><td>${esc(m.deliveryCity||'—')}</td><td style="font-size:11px">${esc(countryLabel(m.pickupCountry))}</td><td style="font-size:11px">${esc(countryLabel(m.deliveryCountry))}</td><td>${pretty(m.pickupDate)}</td><td>${pretty(m.deliveryDate)}</td><td>${badge(m.status)}</td><td><button class="btn" onclick="openDetail('${esc(m.id)}')">Ouvrir</button></td></tr>`;
+    return `<tr>${chk}<td><strong>${esc(m.ref)}</strong><small>${esc(getClient(m).name||'—')}</small></td><td><strong>${esc(c.make)} ${esc(c.model)}</strong></td><td style="font-size:11px;color:#536a7d">${esc(c.vin||'—')}</td><td>${esc(c.plate||'—')}</td><td style="font-size:11px">${esc(countryLabel(m.pickupCountry))}</td><td>${esc(m.pickupCity||'—')}</td><td style="font-size:11px">${esc(countryLabel(m.deliveryCountry))}</td><td>${esc(m.deliveryCity||'—')}</td><td>${pretty(m.pickupDate)}</td><td>${pretty(m.deliveryDate)}</td><td>${badge(m.status)}</td><td><button class="btn" onclick="openDetail('${esc(m.id)}')">Ouvrir</button></td></tr>`;
   }).join()||`<tr><td colspan="${selectable?13:12}" class="empty">Aucun véhicule.</td></tr>`;
   return {html:`<div class="table-wrap"><table><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`,total,missions:allMissions.length};
 }
@@ -951,7 +970,7 @@ function openImportExcel(){
     <div style="background:#fff;border-radius:12px;width:min(860px,100%);max-height:90vh;overflow-y:auto;padding:28px;position:relative">
       <button onclick="document.getElementById('modal-import-excel').remove()" style="position:absolute;top:14px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:#888">✕</button>
       <h2 style="margin:0 0 4px;font-size:18px">📥 Importer depuis Excel</h2>
-      <p style="margin:0 0 18px;color:#666;font-size:13px">Importez un fichier Excel (.xlsx / .xls / .csv) avec vos missions. Une ligne = une mission.</p>
+      <p style="margin:0 0 18px;color:#666;font-size:13px">Importez un fichier Excel (.xlsx / .xls / .csv) avec vos missions. Une ligne = un véhicule : les lignes qui ont la même référence forment une seule mission avec plusieurs véhicules.</p>
 
       <div id="xl-dropzone" style="border:2px dashed #b0c4de;border-radius:10px;padding:40px;text-align:center;cursor:pointer;transition:background .2s;margin-bottom:16px"
         ondragover="event.preventDefault();this.style.background='#eef4fb'"
@@ -1003,30 +1022,72 @@ function handleXlsxDrop(file){
   reader.readAsArrayBuffer(file);
 }
 
+const _xlNorm=x=>String(x??'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[_\-]+/g,' ').replace(/\s+/g,' ').trim();
+const _XL_STATUSES=['à planifier','attribué','à charger','en transport','livré','à facturer','facturé','payé'];
+
 function buildXlsxMappingUI(){
   const FIELDS=[
     {key:'ref',label:'Référence mission',required:true},
-    {key:'status',label:'Statut'},
-    {key:'pickupDate',label:'Date chargement (AAAA-MM-JJ)'},
-    {key:'deliveryDate',label:'Date livraison (AAAA-MM-JJ)'},
-    {key:'pickupAddress',label:'Adresse enlèvement'},
-    {key:'deliveryAddress',label:'Adresse livraison'},
     {key:'clientName',label:'Client (nom)'},
     {key:'carrierName',label:'Transporteur (nom)'},
-    {key:'price_sell',label:'Prix vente (€)'},
-    {key:'price_buy',label:'Prix achat (€)'},
-    {key:'carVin',label:'VIN véhicule 1'},
-    {key:'carMake',label:'Marque véhicule 1'},
-    {key:'carModel',label:'Modèle véhicule 1'},
-    {key:'notes',label:'Notes'},
+    {key:'status',label:'Statut'},
+    {key:'pickupDate',label:'Date chargement'},
+    {key:'deliveryDate',label:'Date livraison'},
+    {key:'pickupSite',label:'Chargement — site / nom'},
+    {key:'pickupContact',label:'Chargement — contact'},
+    {key:'pickupStreet',label:'Chargement — rue et numéro'},
+    {key:'pickupCountry',label:'Chargement — pays'},
+    {key:'pickupPostal',label:'Chargement — code postal'},
+    {key:'pickupCity',label:'Chargement — ville'},
+    {key:'deliverySite',label:'Livraison — site / nom'},
+    {key:'deliveryContact',label:'Livraison — contact'},
+    {key:'deliveryEmail',label:'Livraison — e-mail'},
+    {key:'deliveryStreet',label:'Livraison — rue et numéro'},
+    {key:'deliveryCountry',label:'Livraison — pays'},
+    {key:'deliveryPostal',label:'Livraison — code postal'},
+    {key:'deliveryCity',label:'Livraison — ville'},
+    {key:'price_sell',label:'Prix de vente (€)'},
+    {key:'price_buy',label:'Prix d\'achat transporteur (€)'},
+    {key:'carMake',label:'Véhicule — marque'},
+    {key:'carModel',label:'Véhicule — modèle'},
+    {key:'carVin',label:'Véhicule — VIN'},
+    {key:'carPlate',label:'Véhicule — plaque'},
   ];
 
-  // Auto-detect best match for each field
+  // Détection automatique : correspondance exacte d'abord, puis mot contenu (colonnes déjà prises exclues)
+  const SYN={
+    ref:['ref','reference','mission','n mission','numero','num','n'],
+    clientName:['client','acheteur','buyer','societe'],
+    carrierName:['transporteur','carrier'],
+    status:['statut','status','etat'],
+    pickupDate:['date chargement','date enlevement','date charg','pickup date','chargement','enlevement'],
+    deliveryDate:['date livraison','date livr','delivery date','date dechargement','livraison'],
+    pickupSite:['site chargement','site enlevement','nom chargement','pickup site','site charg'],
+    pickupContact:['contact chargement','contact charg','contact enlevement'],
+    pickupStreet:['rue chargement','adresse chargement','adresse enlevement','pickup street','rue charg','adresse charg'],
+    pickupCountry:['pays chargement','pays charg','pays enlevement','pickup country'],
+    pickupPostal:['cp chargement','code postal chargement','cp charg','pickup postal','postal chargement'],
+    pickupCity:['ville chargement','ville charg','ville enlevement','pickup city'],
+    deliverySite:['site livraison','site dechargement','nom livraison','delivery site','site livr'],
+    deliveryContact:['contact livraison','contact livr','contact dechargement'],
+    deliveryEmail:['email livraison','mail livraison','e mail livraison','delivery email'],
+    deliveryStreet:['rue livraison','adresse livraison','adresse dechargement','delivery street','rue livr','adresse livr'],
+    deliveryCountry:['pays livraison','pays livr','pays dechargement','delivery country'],
+    deliveryPostal:['cp livraison','code postal livraison','cp livr','delivery postal','postal livraison'],
+    deliveryCity:['ville livraison','ville livr','ville dechargement','delivery city'],
+    price_sell:['prix vente','prix v','price sell','vente','sell'],
+    price_buy:['prix achat','prix a','price buy','achat','buy','cout'],
+    carMake:['marque','make','brand'],carModel:['modele','model'],
+    carVin:['vin','chassis'],carPlate:['plaque','immatriculation','plate'],
+  };
+  const _taken=new Set();
   const autoMatch=field=>{
-    const kw=field.toLowerCase();
-    const synonyms={ref:['ref','reference','mission','id','num','n°'],status:['statut','status','état','etat'],pickupDate:['pickup','chargement','enlèvement','enlevement','date_ch','datechar'],deliveryDate:['delivery','livraison','date_liv','datelivr'],pickupAddress:['depart','départ','from','origine','adresse_enl'],deliveryAddress:['destination','livraison','to','adresse_liv'],clientName:['client','acheteur','buyer'],carrierName:['transporteur','carrier','chauffeur'],price_sell:['prix_v','price_sell','vente','sell'],price_buy:['prix_a','price_buy','achat','buy','cout','coût'],carVin:['vin','chassis'],carMake:['marque','make','brand'],carModel:['modele','modèle','model'],notes:['notes','remarque','commentaire','comment']};
-    const words=synonyms[field]||[kw];
-    return _xlsxHeaders.find(h=>words.some(w=>h.toLowerCase().includes(w)))||'';
+    const words=SYN[field]||[];
+    const hs=_xlsxHeaders.map(h=>({h,n:_xlNorm(h)})).filter(x=>!_taken.has(x.h));
+    let f=hs.find(x=>words.includes(x.n));
+    if(!f)f=hs.find(x=>words.some(w=>w.length>=5&&x.n.includes(w)));
+    if(f){_taken.add(f.h);return f.h;}
+    return '';
   };
 
   _xlsxMapping={};
@@ -1068,71 +1129,100 @@ function buildXlsxMappingUI(){
   document.getElementById('xl-dropzone').style.display='none';
 }
 
+function _xlDate(v){
+  if(v==null||v==='')return null;
+  const ok=(y,m,d)=>y>=1990&&y<=2100&&m>=1&&m<=12&&d>=1&&d<=31?`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`:null;
+  if(v instanceof Date&&!isNaN(v))return v.toISOString().slice(0,10);
+  if(typeof v==='number'){
+    const d=(window.XLSX&&XLSX.SSF)?XLSX.SSF.parse_date_code(v):null;
+    return d?ok(d.y,d.m,d.d):null;
+  }
+  const t=String(v).trim();
+  let m=t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m)return ok(+m[1],+m[2],+m[3]);
+  m=t.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/);
+  if(m){let y=+m[3];if(y<100)y+=2000;return ok(y,+m[2],+m[1]);}   // format européen jour/mois/année
+  return null;
+}
+function _xlCountry(v){
+  const t=String(v??'').trim();if(!t)return '';
+  const up=t.toUpperCase();
+  if(COUNTRIES.some(([c])=>c===up))return up;
+  const n=_xlNorm(t);
+  const f=COUNTRIES.find(([,name])=>_xlNorm(name)===n);
+  return f?f[0]:t;
+}
+
 async function runXlsxImport(){
   const btn=document.getElementById('xl-import-btn');
   const status=document.getElementById('xl-status');
   btn.disabled=true;btn.textContent='⏳ Import en cours…';
-  const m=_xlsxMapping;
-  const val=k=>k&&m[k]?r=>String(r[m[k]]??'').trim():'';
-  const getVal=(r,k)=>m[k]?String(r[m[k]]??'').trim():'';
+  const map=_xlsxMapping;
+  const get=(r,k)=>map[k]?String(r[map[k]]??'').trim():'';
+  const rawv=(r,k)=>map[k]?r[map[k]]:'';
+  const existing=new Set(db.missions.map(x=>_xlNorm(x.ref)));
 
-  let imported=0,skipped=0,errors=[];
+  // Regroupe les lignes par référence : une référence = une mission, une ligne = un véhicule
+  const groups=new Map();let skipped=0;
+  _xlsxRows.forEach(r=>{
+    const ref=get(r,'ref');
+    if(!ref){skipped++;return;}
+    const k=_xlNorm(ref);
+    if(!groups.has(k))groups.set(k,{ref,rows:[]});
+    groups.get(k).rows.push(r);
+  });
 
-  for(let i=0;i<_xlsxRows.length;i++){
-    const r=_xlsxRows[i];
-    const ref=getVal(r,'ref');
-    if(!ref){skipped++;continue;}
+  let imported=0,dups=0,nbCars=0,noDate=0;
+  const errors=[],unknownClients=new Set(),unknownCarriers=new Set();
 
-    // Resolve client id
-    let clientId=null;
-    const clientName=getVal(r,'clientName');
-    if(clientName){
-      const found=db.clients.find(c=>c.name.toLowerCase()===clientName.toLowerCase());
-      clientId=found?found.id:null;
-    }
-    // Resolve carrier id
-    let carrierId=null;
-    const carrierName=getVal(r,'carrierName');
-    if(carrierName){
-      const found=db.carriers.find(c=>c.name.toLowerCase()===carrierName.toLowerCase());
-      carrierId=found?found.id:null;
-    }
-
-    const missionPayload={
-      ref:ref,
-      status:getVal(r,'status')||'en attente',
-      pickup_date:getVal(r,'pickupDate')||null,
-      delivery_date:getVal(r,'deliveryDate')||null,
-      pickup_address:getVal(r,'pickupAddress')||null,
-      delivery_address:getVal(r,'deliveryAddress')||null,
-      client_id:clientId,
-      carrier_id:carrierId,
-      price_sell:parseFloat(getVal(r,'price_sell'))||null,
-      price_buy:parseFloat(getVal(r,'price_buy'))||null,
-      notes:getVal(r,'notes')||null,
+  for(const g of groups.values()){
+    if(existing.has(_xlNorm(g.ref))){dups++;continue;}      // jamais de doublon de référence
+    const r=g.rows[0];
+    const clientName=get(r,'clientName'),carrierName=get(r,'carrierName');
+    const client=clientName?db.clients.find(c=>_xlNorm(c.name)===_xlNorm(clientName)):null;
+    const carrier=carrierName?db.carriers.find(c=>_xlNorm(c.name)===_xlNorm(carrierName)):null;
+    if(clientName&&!client)unknownClients.add(clientName);
+    if(carrierName&&!carrier)unknownCarriers.add(carrierName);
+    const stIn=_xlNorm(get(r,'status'));
+    const statut=_XL_STATUSES.find(x=>_xlNorm(x)===stIn)||(carrier?'attribué':'à planifier');
+    const pDate=_xlDate(rawv(r,'pickupDate')),dDate=_xlDate(rawv(r,'deliveryDate'));
+    if((rawv(r,'pickupDate')!==''&&!pDate)||(rawv(r,'deliveryDate')!==''&&!dDate))noDate++;
+    const missionId=crypto.randomUUID();
+    const payload={
+      id:missionId,ref:g.ref,client_id:client?client.id:null,carrier_id:carrier?carrier.id:null,
+      pickup_site:get(r,'pickupSite'),pickup_contact:get(r,'pickupContact'),pickup_street:get(r,'pickupStreet'),
+      pickup_postal:get(r,'pickupPostal'),pickup_city:get(r,'pickupCity'),pickup_country:_xlCountry(rawv(r,'pickupCountry')),
+      delivery_site:get(r,'deliverySite'),delivery_contact:get(r,'deliveryContact'),delivery_email:get(r,'deliveryEmail')||null,
+      delivery_street:get(r,'deliveryStreet'),delivery_postal:get(r,'deliveryPostal'),delivery_city:get(r,'deliveryCity'),
+      delivery_country:_xlCountry(rawv(r,'deliveryCountry')),
+      pickup_date:pDate,delivery_date:dDate,status:statut,
+      price_sell:parseNum(rawv(r,'price_sell')),price_buy:parseNum(rawv(r,'price_buy')),
     };
-
-    try{
-      const{data:ins,error:mErr}=await sb.from('missions').insert(missionPayload).select('id').single();
-      if(mErr){errors.push(`Ligne ${i+2} (${ref}): ${mErr.message}`);continue;}
-
-      // Insert car if VIN or Make provided
-      const vin=getVal(r,'carVin');const make=getVal(r,'carMake');const model=getVal(r,'carModel');
-      if(vin||make){
-        await sb.from('cars').insert({mission_id:ins.id,vin:vin||null,make:make||null,model:model||null,status:'en attente'});
-      }
-      imported++;
-    }catch(err){errors.push(`Ligne ${i+2}: ${err.message}`);}
+    const{error:mErr}=await sb.from('missions').insert(payload);
+    if(mErr){errors.push(`${g.ref} : ${mErr.message}`);continue;}
+    let cars=g.rows.map(x=>({mission_id:missionId,make:get(x,'carMake'),model:get(x,'carModel'),
+      vin:get(x,'carVin').toUpperCase()||null,plate:get(x,'carPlate').toUpperCase()||null,status:'à charger'}))
+      .filter(c=>c.make||c.model||c.vin||c.plate);
+    if(!cars.length)cars=[{mission_id:missionId,make:'À préciser',model:'',vin:null,plate:null,status:'à charger'}];  // sans véhicule, la mission serait invisible
+    const{error:cErr}=await sb.from('cars').insert(cars);
+    if(cErr)errors.push(`${g.ref} (véhicules) : ${cErr.message}`);else nbCars+=cars.length;
+    existing.add(_xlNorm(g.ref));
+    imported++;
   }
 
   await loadData();render();
   btn.textContent='✓ Import terminé';
-  let msg=`✅ ${imported} mission${imported!==1?'s':''} importée${imported!==1?'s':''}.`;
-  if(skipped)msg+=` ${skipped} ligne${skipped!==1?'s':''} ignorée${skipped!==1?'s':''} (ref vide).`;
-  if(errors.length)msg+=`\n⚠ ${errors.length} erreur${errors.length!==1?'s':''} : ${errors.slice(0,3).join(' · ')}${errors.length>3?'…':''}`;
-  status.style.cssText='color:'+(errors.length?'var(--orange)':'var(--green)')+';white-space:pre-wrap;font-size:13px';
-  status.textContent=msg;
-  setTimeout(()=>{if(errors.length===0)document.getElementById('modal-import-excel')?.remove();},2200);
+  const lines=[`✅ ${imported} mission${imported!==1?'s':''} importée${imported!==1?'s':''} (${nbCars} véhicule${nbCars!==1?'s':''}).`];
+  if(dups)lines.push(`ℹ ${dups} mission${dups!==1?'s':''} ignorée${dups!==1?'s':''} : référence déjà existante.`);
+  if(skipped)lines.push(`ℹ ${skipped} ligne${skipped!==1?'s':''} ignorée${skipped!==1?'s':''} (référence vide).`);
+  if(unknownClients.size)lines.push(`⚠ Client introuvable (mission importée sans client) : ${[...unknownClients].slice(0,5).join(', ')}${unknownClients.size>5?'…':''}`);
+  if(unknownCarriers.size)lines.push(`⚠ Transporteur introuvable : ${[...unknownCarriers].slice(0,5).join(', ')}${unknownCarriers.size>5?'…':''}`);
+  if(noDate)lines.push(`⚠ ${noDate} mission${noDate!==1?'s':''} avec une date non reconnue (laissée vide).`);
+  if(errors.length)lines.push(`❌ ${errors.length} erreur${errors.length!==1?'s':''} : ${errors.slice(0,3).join(' · ')}${errors.length>3?'…':''}`);
+  const clean=!errors.length&&!unknownClients.size&&!unknownCarriers.size&&!noDate;
+  status.style.cssText='color:'+(errors.length?'#a54b48':(clean?'#24784d':'#9a6b18'))+';white-space:pre-wrap;font-size:13px';
+  status.textContent=lines.join('\n');
+  if(clean&&imported)setTimeout(()=>document.getElementById('modal-import-excel')?.remove(),2200);
 }
 
 // ─── RAPPORTS ───────────────────────────────────────────────────────────────
@@ -1188,8 +1278,8 @@ function reportsPage(){
   const totalVeh=missions.reduce((n,m)=>n+m.cars.length,0);
 
   // Prix moyen vente (si champ existe)
-  const withPrice=missions.filter(m=>m.price_sell>0);
-  const avgSell=withPrice.length?Math.round(withPrice.reduce((s,m)=>s+m.price_sell,0)/withPrice.length):null;
+  const withPrice=missions.filter(m=>m.priceSell>0);
+  const avgSell=withPrice.length?Math.round(withPrice.reduce((s,m)=>s+m.priceSell,0)/withPrice.length):null;
 
   // ── Activité par mois (12 derniers mois) ──
   const monthlyData={};
@@ -1625,8 +1715,122 @@ function documentsPage(){
   </div>`;
 }
 
+let financeFilter='Toutes';
+function profitBlock(m){
+  const mg=marginOf(m);
+  const pct=(mg!=null&&m.priceSell>0)?mg/m.priceSell*100:null;
+  const km=m.distanceKm>0?m.distanceKm:null;
+  const col=mg==null?'inherit':(mg>=0?'var(--green)':'var(--red)');
+  return `<div class="detail-block"><h3>Distance et rentabilité</h3><div class="info-grid">
+    <span>Distance<strong>${km?km.toLocaleString('fr-BE')+' km':'—'}</strong></span>
+    <span>Prix de vente<strong>${eur(m.priceSell)}</strong></span>
+    <span>Prix d'achat (transporteur)<strong>${eur(m.priceBuy)}</strong></span>
+    <span>Marge<strong style="color:${col}">${mg!=null?eur(mg)+(pct!=null?' ('+pct.toFixed(1)+' %)':''):'—'}</strong></span>
+    <span>Vente / km<strong>${km&&m.priceSell!=null?eur(m.priceSell/km):'—'}</strong></span>
+    <span>Marge / km<strong style="color:${col}">${km&&mg!=null?eur(mg/km):'—'}</strong></span>
+  </div>
+  <p>${km?'':`<button class="btn soft" onclick="calcKmForMission('${esc(m.id)}')">📍 Calculer les km</button> `}<button class="btn" onclick="openMissionForm('${esc(m.id)}')">Modifier les prix</button></p></div>`;
+}
+
 function financePage(){
-  return heading('Finance','Suivi des missions prêtes à facturer.')+`<div class="panel">${db.missions.map(m=>`<div class="recent-row"><strong>${esc(m.ref)}<small>${esc(getClient(m).name||'—')}</small></strong><span>${esc(m.pickupCity||'—')} → ${esc(m.deliveryCity||'—')}</span><span>${m.cars.length} véhicule(s)<small>Chargement ${pretty(m.pickupDate)} · Livraison ${pretty(m.deliveryDate)}</small></span>${badge(m.status)}<button class="btn" onclick="openDetail('${esc(m.id)}')">Ouvrir</button></div>`).join('')||'<div class="empty">Aucune mission.</div>'}</div>`;
+  const kpiStyle=(color)=>`color:${color};font-size:26px;margin-top:9px;display:block`;
+  const groups={'Toutes':()=>true,'À facturer':m=>m.status==='à facturer','Facturées':m=>m.status==='facturé','Payées':m=>m.status==='payé','Livrées / à facturer':m=>['livré','à facturer'].includes(m.status)};
+  const rows=db.missions.filter(groups[financeFilter]||groups['Toutes']).sort((a,b)=>String(b.pickupDate||'').localeCompare(String(a.pickupDate||'')));
+  const withBoth=rows.filter(m=>marginOf(m)!==null);
+  const ca=rows.reduce((s,m)=>s+(m.priceSell||0),0);
+  const caBoth=withBoth.reduce((s,m)=>s+m.priceSell,0);
+  const cost=withBoth.reduce((s,m)=>s+m.priceBuy,0);
+  const marge=caBoth-cost;
+  const pct=caBoth>0?marge/caBoth*100:null;
+  const kmRows=withBoth.filter(m=>m.distanceKm>0);
+  const kmTot=kmRows.reduce((s,m)=>s+m.distanceKm,0);
+  const margeKm=kmTot>0?kmRows.reduce((s,m)=>s+marginOf(m),0)/kmTot:null;
+  const missing=rows.filter(m=>m.priceSell==null||m.priceBuy==null).length;
+  const colorM=v=>v==null?'inherit':(v>=0?'var(--green)':'var(--red)');
+  return heading('Finance','Chiffre d\'affaires, marges et rentabilité par mission.',
+    `<select onchange="financeFilter=this.value;render()">${Object.keys(groups).map(k=>`<option ${financeFilter===k?'selected':''}>${esc(k)}</option>`).join('')}</select>`)+
+  `<div class="grid stats" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:8px">
+    <div class="stat"><small>Chiffre d'affaires</small><strong style="${kpiStyle('var(--blue)')}">${eur(ca)}</strong><em>${rows.length} mission(s)</em></div>
+    <div class="stat"><small>Coût transporteurs</small><strong style="${kpiStyle('#8094a6')}">${eur(cost)}</strong><em>${withBoth.length} mission(s) avec vente et achat</em></div>
+    <div class="stat"><small>Marge</small><strong style="${kpiStyle(colorM(withBoth.length?marge:null))}">${withBoth.length?eur(marge):'—'}</strong><em>${pct!=null?pct.toFixed(1)+' % du CA':'—'}</em></div>
+    <div class="stat"><small>Marge / km</small><strong style="${kpiStyle(colorM(margeKm))}">${margeKm!=null?eur(margeKm):'—'}</strong><em>${kmTot>0?kmTot.toLocaleString('fr-BE')+' km':'km non calculés'}</em></div>
+  </div>
+  ${missing?`<div class="notice" style="margin:8px 0">${missing} mission(s) sans prix de vente ou d'achat : la marge n'est calculée que sur les missions complètes.</div>`:''}
+  <div class="panel"><div class="table-wrap"><table><thead><tr><th>Mission / client</th><th>Trajet</th><th>Km</th><th>Vente</th><th>Achat</th><th>Marge</th><th>%</th><th>Marge / km</th><th>Statut</th><th></th></tr></thead><tbody>
+  ${rows.map(m=>{const mg=marginOf(m);const p=(mg!=null&&m.priceSell>0)?mg/m.priceSell*100:null;const km=m.distanceKm>0?m.distanceKm:null;
+    return `<tr><td><strong>${esc(m.ref)}</strong><small>${esc(getClient(m).name||'—')}</small></td><td style="font-size:12px">${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}</td><td>${km?km.toLocaleString('fr-BE'):'—'}</td><td>${eur(m.priceSell)}</td><td>${eur(m.priceBuy)}</td><td style="font-weight:700;color:${colorM(mg)}">${mg!=null?eur(mg):'—'}</td><td>${p!=null?p.toFixed(1)+' %':'—'}</td><td>${km&&mg!=null?eur(mg/km):'—'}</td><td>${badge(m.status)}</td><td><button class="btn" onclick="openDetail('${esc(m.id)}')">Ouvrir</button></td></tr>`;}).join('')||'<tr><td colspan="10" class="empty">Aucune mission.</td></tr>'}
+  </tbody></table></div></div>`;
+}
+
+// ─── DISTANCE (km) : géocodage Nominatim + itinéraire OSRM (services publics gratuits, sans clé) ───
+const _geoCache={};
+let _lastGeo=0;
+const _sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function geocodeAddr(street,postal,city,country){
+  const iso=/^[A-Za-z]{2}$/.test(country||'')?String(country).toLowerCase():'';
+  const attempts=[{street,postalcode:postal,city},{postalcode:postal,city},{city}].filter(a=>a.city||a.postalcode);
+  for(const a of attempts){
+    const key=JSON.stringify([a,iso||country||'']);
+    if(_geoCache[key])return _geoCache[key];
+    const wait=1100-(Date.now()-_lastGeo);if(wait>0)await _sleep(wait);   // Nominatim : 1 requête / seconde maximum
+    _lastGeo=Date.now();
+    const p=new URLSearchParams({format:'jsonv2',limit:'1'});
+    Object.entries(a).forEach(([k,v])=>{if(v)p.set(k,v);});
+    if(iso)p.set('countrycodes',iso);else if(country)p.set('country',country);
+    const res=await fetch('https://nominatim.openstreetmap.org/search?'+p.toString());
+    if(!res.ok)throw new Error('Géocodage indisponible ('+res.status+')');
+    const j=await res.json();
+    if(j&&j[0]){const r={lat:parseFloat(j[0].lat),lng:parseFloat(j[0].lon)};_geoCache[key]=r;return r;}
+  }
+  return null;
+}
+// Itinéraire : Valhalla (profil poids lourd) en premier choix, puis OSRM en secours. Services publics gratuits, sans clé.
+async function routeKm(a,b){
+  try{
+    const q=encodeURIComponent(JSON.stringify({locations:[{lat:a.lat,lon:a.lng},{lat:b.lat,lon:b.lng}],costing:'truck',directions_options:{units:'kilometers'}}));
+    const res=await fetch('https://valhalla1.openstreetmap.de/route?json='+q);
+    if(res.ok){const j=await res.json();const k=j&&j.trip&&j.trip.summary?j.trip.summary.length:null;if(k!=null)return Math.round(k);}
+  }catch(_){}
+  for(const base of ['https://routing.openstreetmap.de/routed-car','https://router.project-osrm.org']){
+    try{
+      const res=await fetch(`${base}/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=false`);
+      if(res.ok){const j=await res.json();const d=j&&j.routes&&j.routes[0]?j.routes[0].distance:null;if(d!=null)return Math.round(d/1000);}
+    }catch(_){}
+  }
+  throw new Error('service d\'itinéraire indisponible pour le moment');
+}
+async function computeDistanceKm(m){
+  if(!m.pickupCity||!m.deliveryCity)return null;
+  const a=await geocodeAddr(m.pickupStreet,m.pickupPostal,m.pickupCity,m.pickupCountry);
+  const b=await geocodeAddr(m.deliveryStreet,m.deliveryPostal,m.deliveryCity,m.deliveryCountry);
+  if(!a||!b)return null;
+  return await routeKm(a,b);
+}
+async function calcKmFromForm(){
+  const st=document.getElementById('km-status');
+  const m={pickupStreet:val('f-pickstreet'),pickupPostal:val('f-pickpostal'),pickupCity:val('f-pickcity'),pickupCountry:val('f-pickcountry'),
+    deliveryStreet:val('f-delivstreet'),deliveryPostal:val('f-delivpostal'),deliveryCity:val('f-delivcity'),deliveryCountry:val('f-delivcountry')};
+  if(!m.pickupCity||!m.deliveryCity){st.textContent='Renseigne d\'abord la ville de chargement et de livraison.';return;}
+  st.textContent='⏳ Calcul en cours…';
+  try{
+    const km=await computeDistanceKm(m);
+    if(km==null){st.textContent='Adresse introuvable : vérifie la ville, le code postal et le pays, ou saisis les km à la main.';return;}
+    document.getElementById('f-km').value=km;
+    st.textContent='✓ '+km+' km (itinéraire poids lourd — indicatif)';
+  }catch(e){st.textContent='Calcul impossible : '+e.message+'. Tu peux saisir les km à la main.';}
+}
+async function calcKmForMission(id){
+  const m=db.missions.find(x=>x.id===id);if(!m)return;
+  setLoading(true);
+  try{
+    const km=await computeDistanceKm(m);
+    if(km==null){alert('Adresse introuvable : modifie la mission pour corriger l\'adresse ou saisir les km à la main.');}
+    else{
+      const{error}=await sb.from('missions').update({distance_km:km}).eq('id',id);
+      if(error)alert('Km non enregistrés : '+error.message);else{m.distanceKm=km;}
+    }
+  }catch(e){alert('Calcul impossible : '+e.message);}
+  setLoading(false);refreshDetail();
 }
 
 function summary(){
@@ -1866,7 +2070,7 @@ function openYardDraft(){
 function openMissionForm(id){
   editingMission=id||null;
   const m=id?db.missions.find(x=>x.id===id):null;
-  document.getElementById('modal-content').innerHTML=`<div class="modal-header"><div><h2>${m?'Modifier':'Créer'} une mission</h2><p>Client, adresses et véhicules à transporter.</p></div><button class="x" onclick="closeModal()">×</button></div><div class="form-grid"><div class="field"><label>CLIENT *</label><select id="f-client"><option value="">Choisir…</option>${db.clients.map(x=>`<option value="${esc(x.id)}" ${m?.clientId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div><div class="field"><label>RÉFÉRENCE</label><input id="f-ref" value="${esc(m?.ref||'FL-'+new Date().toISOString().slice(2,10).replaceAll('-',''))}"></div><div class="form-section">ADRESSE D'ENLÈVEMENT</div><div class="field"><label>Site / nom client *</label><input id="f-picksite" value="${esc(m?.pickupSite||'')}" placeholder="GCA · Bouchain"></div><div class="field"><label>Contact</label><input id="f-pickcontact" value="${esc(m?.pickupContact||'')}"></div><div class="field wide"><label>Rue et numéro *</label><input id="f-pickstreet" value="${esc(m?.pickupStreet||'')}"></div><div class="field"><label>Code postal *</label><input id="f-pickpostal" value="${esc(m?.pickupPostal||'')}"></div><div class="field"><label>Ville *</label><input id="f-pickcity" value="${esc(m?.pickupCity||'')}"></div><div class="field"><label>Pays *</label>${countrySelectHtml('f-pickcountry',m?.pickupCountry||'BE')}</div><div class="field"><label>CLEFS REMISES 🔑</label><select id="f-keys"><option value="">—</option><option value="1" ${m?.keys==='1'?'selected':''}>1 clef</option><option value="2" ${m?.keys==='2'?'selected':''}>2 clefs</option></select></div><div class="form-section">ADRESSE DE LIVRAISON</div><div class="field"><label>Site / nom client *</label><input id="f-delivsite" value="${esc(m?.deliverySite||'')}" placeholder="Online Car · Graz"></div><div class="field"><label>Contact</label><input id="f-delivcontact" value="${esc(m?.deliveryContact||'')}"></div><div class="field"><label>E-mail site de livraison</label><input id="f-delivEmail" type="email" value="${esc(m?.deliveryEmail||'')}" placeholder="reception@client.com"></div><div class="field wide"><label>Rue et numéro *</label><input id="f-delivstreet" value="${esc(m?.deliveryStreet||'')}"></div><div class="field"><label>Code postal *</label><input id="f-delivpostal" value="${esc(m?.deliveryPostal||'')}"></div><div class="field"><label>Ville *</label><input id="f-delivcity" value="${esc(m?.deliveryCity||'')}"></div><div class="field"><label>Pays *</label>${countrySelectHtml('f-delivcountry',m?.deliveryCountry||'BE')}</div><div class="form-section">DATES</div><div class="field"><label>Date de chargement</label><input id="f-load-date" type="date" value="${esc(m?.pickupDate||'')}"></div><div class="field"><label>Date prévue de livraison</label><input id="f-deliv-date" type="date" value="${esc(m?.deliveryDate||'')}"></div><div class="form-section">VÉHICULE</div><div class="car-form"><div class="field"><label>Marque *</label><input id="f-make" value="${esc(m?.cars?.[0]?.make||'')}" placeholder="BMW"></div><div class="field"><label>Modèle *</label><input id="f-model" value="${esc(m?.cars?.[0]?.model||'')}" placeholder="X5"></div><div class="field"><label>VIN</label><input id="f-vin" value="${esc(m?.cars?.[0]?.vin||'')}" placeholder="17 caractères"></div><div class="field"><label>Plaque</label><input id="f-plate" value="${esc(m?.cars?.[0]?.plate||'')}"></div><button class="btn" onclick="addVehicleField()">＋ véhicule</button></div><div id="extra-cars" class="field wide"></div></div><div id="form-error"></div><div class="modal-footer"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn primary" onclick="saveMission()">${m?'Enregistrer':'Créer la mission'}</button></div>`;
+  document.getElementById('modal-content').innerHTML=`<div class="modal-header"><div><h2>${m?'Modifier':'Créer'} une mission</h2><p>Client, adresses et véhicules à transporter.</p></div><button class="x" onclick="closeModal()">×</button></div><div class="form-grid"><div class="field"><label>CLIENT *</label><select id="f-client"><option value="">Choisir…</option>${db.clients.map(x=>`<option value="${esc(x.id)}" ${m?.clientId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div><div class="field"><label>RÉFÉRENCE</label><input id="f-ref" value="${esc(m?.ref||'FL-'+new Date().toISOString().slice(2,10).replaceAll('-',''))}"></div><div class="form-section">ADRESSE D'ENLÈVEMENT</div><div class="field"><label>Site / nom client *</label><input id="f-picksite" value="${esc(m?.pickupSite||'')}" placeholder="GCA · Bouchain"></div><div class="field"><label>Contact</label><input id="f-pickcontact" value="${esc(m?.pickupContact||'')}"></div><div class="field wide"><label>Rue et numéro *</label><input id="f-pickstreet" value="${esc(m?.pickupStreet||'')}"></div><div class="field"><label>Pays *</label>${countrySelectHtml('f-pickcountry',m?.pickupCountry||'BE')}</div><div class="field"><label>Code postal *</label><input id="f-pickpostal" value="${esc(m?.pickupPostal||'')}"></div><div class="field"><label>Ville *</label><input id="f-pickcity" value="${esc(m?.pickupCity||'')}"></div><div class="field"><label>CLEFS REMISES 🔑</label><select id="f-keys"><option value="">—</option><option value="1" ${m?.keys==='1'?'selected':''}>1 clef</option><option value="2" ${m?.keys==='2'?'selected':''}>2 clefs</option></select></div><div class="form-section">ADRESSE DE LIVRAISON</div><div class="field"><label>Site / nom client *</label><input id="f-delivsite" value="${esc(m?.deliverySite||'')}" placeholder="Online Car · Graz"></div><div class="field"><label>Contact</label><input id="f-delivcontact" value="${esc(m?.deliveryContact||'')}"></div><div class="field"><label>E-mail site de livraison</label><input id="f-delivEmail" type="email" value="${esc(m?.deliveryEmail||'')}" placeholder="reception@client.com"></div><div class="field wide"><label>Rue et numéro *</label><input id="f-delivstreet" value="${esc(m?.deliveryStreet||'')}"></div><div class="field"><label>Pays *</label>${countrySelectHtml('f-delivcountry',m?.deliveryCountry||'BE')}</div><div class="field"><label>Code postal *</label><input id="f-delivpostal" value="${esc(m?.deliveryPostal||'')}"></div><div class="field"><label>Ville *</label><input id="f-delivcity" value="${esc(m?.deliveryCity||'')}"></div><div class="form-section">DATES</div><div class="field"><label>Date de chargement</label><input id="f-load-date" type="date" value="${esc(m?.pickupDate||'')}"></div><div class="field"><label>Date prévue de livraison</label><input id="f-deliv-date" type="date" value="${esc(m?.deliveryDate||'')}"></div><div class="form-section">TARIFS ET DISTANCE</div><div class="field"><label>Prix de vente (€)</label><input id="f-price-sell" type="number" step="0.01" min="0" value="${esc(m?.priceSell??'')}" placeholder="0.00"></div><div class="field"><label>Prix d'achat transporteur (€)</label><input id="f-price-buy" type="number" step="0.01" min="0" value="${esc(m?.priceBuy??'')}" placeholder="0.00"></div><div class="field"><label>Distance (km)</label><input id="f-km" type="number" step="1" min="0" value="${esc(m?.distanceKm??'')}" placeholder="calcul auto"></div><div class="field"><label>&nbsp;</label><button class="btn" type="button" onclick="calcKmFromForm()">📍 Calculer les km</button></div><div id="km-status" class="field wide" style="font-size:11px;color:var(--muted)"></div><div class="form-section">VÉHICULE</div><div class="car-form"><div class="field"><label>Marque *</label><input id="f-make" value="${esc(m?.cars?.[0]?.make||'')}" placeholder="BMW"></div><div class="field"><label>Modèle *</label><input id="f-model" value="${esc(m?.cars?.[0]?.model||'')}" placeholder="X5"></div><div class="field"><label>VIN</label><input id="f-vin" value="${esc(m?.cars?.[0]?.vin||'')}" placeholder="17 caractères"></div><div class="field"><label>Plaque</label><input id="f-plate" value="${esc(m?.cars?.[0]?.plate||'')}"></div><button class="btn" onclick="addVehicleField()">＋ véhicule</button></div><div id="extra-cars" class="field wide"></div></div><div id="form-error"></div><div class="modal-footer"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn primary" onclick="saveMission()">${m?'Enregistrer':'Créer la mission'}</button></div>`;
   document.getElementById('modal').classList.add('open');
 }
 
@@ -1896,13 +2100,18 @@ async function saveMission(){
     deliverySite:val('f-delivsite'),deliveryContact:val('f-delivcontact'),deliveryEmail:val('f-delivEmail'),deliveryStreet:val('f-delivstreet'),
     deliveryPostal:val('f-delivpostal'),deliveryCity:val('f-delivcity'),deliveryCountry:val('f-delivcountry'),
     pickupDate:val('f-load-date'),deliveryDate:val('f-deliv-date'),keys:val('f-keys'),
+    priceSell:parseNum(val('f-price-sell')),priceBuy:parseNum(val('f-price-buy')),distanceKm:parseNum(val('f-km')),
     status:old?.status||'à planifier',cars,notifications:old?.notifications||[]};
   if(old&&(old.pickupDate!==m.pickupDate||old.deliveryDate!==m.deliveryDate)&&(m.pickupDate||m.deliveryDate))
     m.notifications.push({id:crypto.randomUUID(),kind:'planned',pickupDate:m.pickupDate,deliveryDate:m.deliveryDate,status:'pending',createdAt:new Date().toISOString()});
   if(!old&&(m.pickupDate||m.deliveryDate))
     m.notifications.push({id:crypto.randomUUID(),kind:'planned',pickupDate:m.pickupDate,deliveryDate:m.deliveryDate,status:'pending',createdAt:new Date().toISOString()});
   setLoading(true);
-  await dbUpsertMission(m);
+  // Distance : si les adresses ont changé, on repart de zéro ; si elle est vide, on tente le calcul automatique
+  if(old&&m.distanceKm===old.distanceKm&&['pickupStreet','pickupPostal','pickupCity','pickupCountry','deliveryStreet','deliveryPostal','deliveryCity','deliveryCountry'].some(k=>(old[k]||'')!==(m[k]||'')))m.distanceKm=null;
+  if(m.distanceKm==null){try{m.distanceKm=await computeDistanceKm(m);}catch(e){console.warn('Calcul km impossible:',e.message);}}
+  const saveErr=await dbUpsertMission(m);
+  if(saveErr){setLoading(false);alert('⚠ Mission NON enregistrée : '+saveErr.message);return;}
   for(const c of m.cars)await dbUpsertCar(c,m.id);
   for(const n of m.notifications)await dbUpsertNotif(n,m.id);
   setLoading(false);
@@ -1950,7 +2159,8 @@ function openDetail(id){
   const portalLink=m.carrierToken?`${window.location.origin}${window.location.pathname}?t=${m.carrierToken}`:'';
   const d=document.getElementById('detail');
   d.innerHTML=`<div class="detail-head"><div><div class="eyebrow">FICHE MISSION</div><h2>${esc(m.ref)}</h2><p>${esc(getClient(m).name||'—')} · ${badge(m.status)}</p></div><button class="x" onclick="closeDetail()">×</button></div>
-  <div class="detail-block"><h3>Dates et adresses</h3><div class="route"><div class="routebox"><small>ENLÈVEMENT · ${pretty(m.pickupDate)}</small><strong>${esc(m.pickupSite)}</strong><p>${esc([m.pickupStreet,m.pickupPostal,m.pickupCity,m.pickupCountry].filter(Boolean).join(', '))}<br>Contact : ${esc(m.pickupContact||'—')}${m.keys?`<br><span style="font-weight:700;color:${m.keys==='1'?'#9a6b18':'#286d99'}">🔑 ${m.keys} clef${m.keys==='2'?'s':''} remise${m.keys==='2'?'s':''} au chargement</span>`:''}</p></div><div class="routebox"><small>LIVRAISON · ${pretty(m.deliveryDate)}</small><strong>${esc(m.deliverySite)}</strong><p>${esc([m.deliveryStreet,m.deliveryPostal,m.deliveryCity,m.deliveryCountry].filter(Boolean).join(', '))}<br>Contact : ${esc(m.deliveryContact||'—')}${m.deliveryEmail?`<br>E-mail : <a href="mailto:${esc(m.deliveryEmail)}" style="color:var(--blue)">${esc(m.deliveryEmail)}</a>`:''}</p>${m.deliveryEmail?`<button class="btn soft" style="margin-top:7px;font-size:11px" onclick="draftDeliverySite('${esc(m.id)}')">📧 Notifier site de livraison (${detectLang(m.deliveryCountry).toUpperCase()})</button>`:`<div style="font-size:10px;color:var(--muted);margin-top:6px">Pas d'e-mail livraison — modifier la mission pour en ajouter un.</div>`}</div></div><p><button class="btn" onclick="openMissionForm('${esc(m.id)}')">Modifier la mission / dates</button></p></div>
+  <div class="detail-block"><h3>Dates et adresses</h3><div class="route"><div class="routebox"><small>ENLÈVEMENT · ${pretty(m.pickupDate)}</small><strong>${esc(m.pickupSite)}</strong><p>${esc([ccLabel(m.pickupCountry),[m.pickupPostal,m.pickupCity].filter(Boolean).join(' '),m.pickupStreet].filter(Boolean).join(' · '))}<br>Contact : ${esc(m.pickupContact||'—')}${m.keys?`<br><span style="font-weight:700;color:${m.keys==='1'?'#9a6b18':'#286d99'}">🔑 ${m.keys} clef${m.keys==='2'?'s':''} remise${m.keys==='2'?'s':''} au chargement</span>`:''}</p></div><div class="routebox"><small>LIVRAISON · ${pretty(m.deliveryDate)}</small><strong>${esc(m.deliverySite)}</strong><p>${esc([ccLabel(m.deliveryCountry),[m.deliveryPostal,m.deliveryCity].filter(Boolean).join(' '),m.deliveryStreet].filter(Boolean).join(' · '))}<br>Contact : ${esc(m.deliveryContact||'—')}${m.deliveryEmail?`<br>E-mail : <a href="mailto:${esc(m.deliveryEmail)}" style="color:var(--blue)">${esc(m.deliveryEmail)}</a>`:''}</p>${m.deliveryEmail?`<button class="btn soft" style="margin-top:7px;font-size:11px" onclick="draftDeliverySite('${esc(m.id)}')">📧 Notifier site de livraison (${detectLang(m.deliveryCountry).toUpperCase()})</button>`:`<div style="font-size:10px;color:var(--muted);margin-top:6px">Pas d'e-mail livraison — modifier la mission pour en ajouter un.</div>`}</div></div><p><button class="btn" onclick="openMissionForm('${esc(m.id)}')">Modifier la mission / dates</button></p></div>
+  ${profitBlock(m)}
   <div class="detail-block"><h3>Transporteur</h3><div class="info-grid"><span>Société<strong>${esc(getCarrier(m).name||'À attribuer')}</strong></span><span>E-mail<strong>${esc(getCarrier(m).email||'—')}</strong></span></div>${portalLink?`<div style="margin-top:12px;padding:11px;background:#edf6fc;border:1px solid #d0e8f5;border-radius:7px;font-size:11px"><div style="font-size:10px;font-weight:800;letter-spacing:1px;color:var(--blue);margin-bottom:6px">🔗 LIEN PORTAIL TRANSPORTEUR</div><div style="word-break:break-all;color:#1e6592;margin-bottom:8px">${esc(portalLink)}</div><button class="btn soft" style="font-size:11px" onclick="copyPortalLink('${esc(m.id)}')">Copier le lien</button> <a href="${esc(portalLink)}" target="_blank" class="btn" style="font-size:11px;text-decoration:none">Ouvrir le portail ↗</a></div>`:'<p style="font-size:12px;color:var(--muted)">Aucun lien portail — affecte un transporteur depuis le Planning.</p>'}</div>
   <div class="detail-block"><h3>Notifications client</h3>
   ${(()=>{
