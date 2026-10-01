@@ -399,7 +399,14 @@ const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const getClient=m=>db.clients.find(x=>x.id===m.clientId)||{};
 const getCarrier=m=>db.carriers.find(x=>x.id===m.carrierId)||{};
 // Lieux : le PAYS toujours AVANT la ville
-const ccLabel=c=>{if(!c)return'';const u=String(c).toUpperCase().trim();return /^[A-Z]{2}$/.test(u)?u:countryLabel(c);};
+const ccLabel=c=>{
+  if(!c)return'';
+  const u=String(c).toUpperCase().trim();
+  if(/^[A-Z]{2}$/.test(u))return u;
+  const n=String(c).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  const f=COUNTRIES.find(([,name])=>name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')===n);   // ancienne valeur texte : France → FR
+  return f?f[0]:String(c);
+};
 const place=(country,city)=>[ccLabel(country),city].filter(Boolean).join(' · ')||'—';
 // Argent / rentabilité
 const eur=n=>(n==null||isNaN(n))?'—':Number(n).toLocaleString('fr-BE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
@@ -818,7 +825,7 @@ function filteredMissions(){
 function tableRows(selectable=false,rows=filteredMissions()){
   let entries=rows.flatMap(m=>m.cars.map(c=>({m,c})));
   entries.sort((a,b)=>String(a.m[db.sort]||a.c[db.sort]||'').localeCompare(String(b.m[db.sort]||b.c[db.sort]||''),'fr',{numeric:true})*db.direction);
-  return entries.map(({m,c})=>`<tr>${selectable?`<td class="check-cell"><input type="checkbox" ${db.selectedIds.includes(c.id)?'checked':''} onchange="toggleSelected('${esc(c.id)}',this.checked)"></td>`:''}<td><strong>${esc(m.ref)}</strong><small>${esc(getClient(m).name||'—')}</small></td><td><strong>${esc(c.make)} ${esc(c.model)}</strong><small>${esc(c.vin||'VIN à ajouter')}</small></td><td>${esc(c.plate||'—')}</td><td style="font-size:11px">${esc(countryLabel(m.pickupCountry))}</td><td>${esc(m.pickupCity||'—')}</td><td style="font-size:11px">${esc(countryLabel(m.deliveryCountry))}</td><td>${esc(m.deliveryCity||'—')}</td><td>${pretty(m.pickupDate)}</td><td>${pretty(m.deliveryDate)}</td><td>${badge(c.status)}</td><td><button class="btn" onclick="openDetail('${esc(m.id)}')">Ouvrir</button></td></tr>`).join('')||`<tr><td colspan="${selectable?13:12}" class="empty">Aucun véhicule à afficher.</td></tr>`;
+  return entries.map(({m,c})=>`<tr>${selectable?`<td class="check-cell"><input type="checkbox" ${db.selectedIds.includes(c.id)?'checked':''} onchange="toggleSelected('${esc(c.id)}',this.checked)"></td>`:''}<td><strong>${esc(m.ref)}</strong><small>${esc(getClient(m).name||'—')}</small></td><td><strong>${esc(c.make)} ${esc(c.model)}</strong><small>${esc(c.vin||'VIN à ajouter')}</small></td><td>${esc(c.plate||'—')}</td><td style="font-size:11px;font-weight:700">${esc(ccLabel(m.pickupCountry)||'—')}</td><td>${esc(m.pickupCity||'—')}</td><td style="font-size:11px;font-weight:700">${esc(ccLabel(m.deliveryCountry)||'—')}</td><td>${esc(m.deliveryCity||'—')}</td><td>${pretty(m.pickupDate)}</td><td>${pretty(m.deliveryDate)}</td><td>${badge(c.status)}</td><td><button class="btn" onclick="openDetail('${esc(m.id)}')">Ouvrir</button></td></tr>`).join('')||`<tr><td colspan="${selectable?13:12}" class="empty">Aucun véhicule à afficher.</td></tr>`;
 }
 
 function dataTable(selectable=false){return `<div class="table-wrap"><table><thead><tr>${selectable?'<th class="check-cell">✓</th>':''}${[['ref','Mission / client'],['make','Véhicule / VIN'],['plate','Plaque'],['pickupCountry','Pays chargement'],['pickupCity','Ville chargement'],['deliveryCountry','Pays déchargement'],['deliveryCity','Ville déchargement'],['pickupDate','Date chargement'],['deliveryDate','Date livraison'],['status','Statut']].map(([k,l])=>`<th><button onclick="sortBy('${k}')">${l}　↕</button></th>`).join('')}<th></th></tr></thead><tbody>${tableRows(selectable)}</tbody></table></div>`}
@@ -894,8 +901,8 @@ function missionTableFull(selectable=false){
     if(f.deliveryCity&&!(m.deliveryCity||'').toLowerCase().includes(f.deliveryCity.toLowerCase()))return false;
     if(f.pickupDate&&!pretty(m.pickupDate).includes(f.pickupDate))return false;
     if(f.deliveryDate&&!pretty(m.deliveryDate).includes(f.deliveryDate))return false;
-    if(f.pickupCountry&&!countryLabel(m.pickupCountry).toLowerCase().includes(f.pickupCountry.toLowerCase()))return false;
-    if(f.deliveryCountry&&!countryLabel(m.deliveryCountry).toLowerCase().includes(f.deliveryCountry.toLowerCase()))return false;
+    if(f.pickupCountry&&!(ccLabel(m.pickupCountry)+' '+countryLabel(m.pickupCountry)).toLowerCase().includes(f.pickupCountry.toLowerCase()))return false;
+    if(f.deliveryCountry&&!(ccLabel(m.deliveryCountry)+' '+countryLabel(m.deliveryCountry)).toLowerCase().includes(f.deliveryCountry.toLowerCase()))return false;
     return true;
   });
   entries.sort((a,b)=>String(a.m[db.sort]||a.c[db.sort]||'').localeCompare(String(b.m[db.sort]||b.c[db.sort]||''),'fr',{numeric:true})*db.direction);
@@ -907,7 +914,7 @@ function missionTableFull(selectable=false){
   <tr style="background:#f2f5f8">${ck('')}${cols.map(([k])=>`<td style="padding:5px 8px"><input value="${esc(f[k]||'')}" placeholder="${esc(fPlaceholders[k]||'')}" style="width:100%;border:1px solid #d8e4ec;border-radius:5px;padding:5px 7px;font-size:11px;background:white;color:#20384e" oninput="colF['${k}']=this.value;render()"></td>`).join('')}<td></td><td></td></tr>`;
   const tbody=entries.map(({m,c})=>{
     const chk=selectable?`<td class="check-cell"><input type="checkbox" ${db.selectedIds.includes(c.id)?'checked':''} onchange="toggleSelected('${esc(c.id)}',this.checked)"></td>`:'';
-    return `<tr>${chk}<td><strong>${esc(m.ref)}</strong><small>${esc(getClient(m).name||'—')}</small></td><td><strong>${esc(c.make)} ${esc(c.model)}</strong></td><td style="font-size:11px;color:#536a7d">${esc(c.vin||'—')}</td><td>${esc(c.plate||'—')}</td><td style="font-size:11px">${esc(countryLabel(m.pickupCountry))}</td><td>${esc(m.pickupCity||'—')}</td><td style="font-size:11px">${esc(countryLabel(m.deliveryCountry))}</td><td>${esc(m.deliveryCity||'—')}</td><td>${pretty(m.pickupDate)}</td><td>${pretty(m.deliveryDate)}</td><td>${badge(m.status)}</td><td><button class="btn" onclick="openDetail('${esc(m.id)}')">Ouvrir</button></td></tr>`;
+    return `<tr>${chk}<td><strong>${esc(m.ref)}</strong><small>${esc(getClient(m).name||'—')}</small></td><td><strong>${esc(c.make)} ${esc(c.model)}</strong></td><td style="font-size:11px;color:#536a7d">${esc(c.vin||'—')}</td><td>${esc(c.plate||'—')}</td><td style="font-size:11px;font-weight:700">${esc(ccLabel(m.pickupCountry)||'—')}</td><td>${esc(m.pickupCity||'—')}</td><td style="font-size:11px;font-weight:700">${esc(ccLabel(m.deliveryCountry)||'—')}</td><td>${esc(m.deliveryCity||'—')}</td><td>${pretty(m.pickupDate)}</td><td>${pretty(m.deliveryDate)}</td><td>${badge(m.status)}</td><td><button class="btn" onclick="openDetail('${esc(m.id)}')">Ouvrir</button></td></tr>`;
   }).join()||`<tr><td colspan="${selectable?13:12}" class="empty">Aucun véhicule.</td></tr>`;
   return {html:`<div class="table-wrap"><table><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`,total,missions:allMissions.length};
 }
@@ -954,7 +961,7 @@ function missionsPage(){
   const tbl=missionTableFull(false);
   const totalM=db.missions.length;const totalV=db.missions.reduce((n,m)=>n+m.cars.length,0);
   return heading('Missions',`${totalM} mission${totalM!==1?'s':''} · ${totalV} véhicule${totalV!==1?'s':''} · filtre sous chaque titre, tri en touchant un titre`,
-    `<button class="btn primary" onclick="openMissionForm()">＋ Nouvelle mission</button> <button class="btn" style="margin-left:6px" onclick="openImportExcel()">📥 Importer Excel</button>`)+
+    `<button class="btn primary" onclick="openMissionForm()">＋ Nouvelle mission</button> <button class="btn" style="margin-left:6px" onclick="openImportExcel()">📥 Importer Excel</button> <button class="btn" style="margin-left:6px" onclick="calcKmBatch()">📍 Calculer les km</button>`)+
   `<div class="panel"><div style="border-bottom:1px solid var(--line);padding-bottom:13px;margin-bottom:13px">${advancedFilterBar(tbl.missions,tbl.total)}</div>${tbl.html}</div>`;
 }
 // ─── IMPORT EXCEL ───────────────────────────────────────────────────────────
@@ -970,6 +977,7 @@ function openImportExcel(){
     <div style="background:#fff;border-radius:12px;width:min(860px,100%);max-height:90vh;overflow-y:auto;padding:28px;position:relative">
       <button onclick="document.getElementById('modal-import-excel').remove()" style="position:absolute;top:14px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:#888">✕</button>
       <h2 style="margin:0 0 4px;font-size:18px">📥 Importer depuis Excel</h2>
+      <p style="margin:0 0 10px"><button class="btn primary" onclick="downloadXlsxTemplate()">⬇ Télécharger le modèle Excel</button></p>
       <p style="margin:0 0 18px;color:#666;font-size:13px">Importez un fichier Excel (.xlsx / .xls / .csv) avec vos missions. Une ligne = un véhicule : les lignes qui ont la même référence forment une seule mission avec plusieurs véhicules.</p>
 
       <div id="xl-dropzone" style="border:2px dashed #b0c4de;border-radius:10px;padding:40px;text-align:center;cursor:pointer;transition:background .2s;margin-bottom:16px"
@@ -1001,6 +1009,48 @@ function openImportExcel(){
       <div id="xl-status" style="margin-top:12px;font-size:13px;text-align:center"></div>
     </div>`;
   document.body.appendChild(modal);
+}
+
+// Modèle Excel à remplir puis à réimporter : les en-têtes sont reconnus automatiquement à l'import
+function downloadXlsxTemplate(){
+  const xl=window.XLSX;
+  if(!xl){alert('SheetJS non chargé, vérifiez votre connexion.');return;}
+  const head=['Référence','Client','Transporteur','Statut','Date chargement','Date livraison',
+    'Site chargement','Contact chargement','Rue chargement','Pays chargement','CP chargement','Ville chargement',
+    'Site livraison','Contact livraison','E-mail livraison','Rue livraison','Pays livraison','CP livraison','Ville livraison',
+    'Prix vente','Prix achat','Marque','Modèle','VIN','Plaque'];
+  const ex1=['EXEMPLE-001','Nom exact du client','Nom exact du transporteur','à planifier','15/10/2026','17/10/2026',
+    'GCA Bouchain','Jean Dupont','12 rue des Ateliers','FR','59111','Bouchain',
+    'Online Car Graz','Anna Müller','reception@client.com','Hauptstrasse 5','AT','8010','Graz',
+    1250.5,900,'Volkswagen','Golf','WVWZZZCD4RW195045','1-ABC-123'];
+  const ex2=['EXEMPLE-001','','','','','','','','','','','','','','','','','','','','','Skoda','Kamiq','TMBGR9NW0N3119422','2-DEF-456'];
+  const ws=xl.utils.aoa_to_sheet([head,ex1,ex2]);
+  ws['!cols']=head.map(h=>({wch:Math.max(14,h.length+2)}));
+  const help=[
+    ['MODE D\'EMPLOI — Import de missions AutoDispatch'],
+    [''],
+    ['1. Remplis la feuille « Missions » : une ligne par VÉHICULE.'],
+    ['2. Plusieurs véhicules dans la même mission : répète la même Référence sur plusieurs lignes (les infos de la mission sont lues sur la 1re ligne).'],
+    ['3. Supprime les lignes d\'exemple (référence « EXEMPLE-… ») : elles sont de toute façon ignorées à l\'import.'],
+    ['4. Enregistre le fichier, puis dans AutoDispatch : Missions → Importer Excel → choisis le fichier.'],
+    [''],
+    ['CHAMP','RÈGLE'],
+    ['Référence','Obligatoire. Une référence déjà existante dans AutoDispatch est ignorée (jamais de doublon).'],
+    ['Client / Transporteur','Nom exact tel qu\'enregistré dans AutoDispatch. Un nom inconnu : la mission est importée sans client / transporteur (avertissement affiché).'],
+    ['Statut','Facultatif : '+_XL_STATUSES.join(' · ')+'. Vide = « à planifier » (« attribué » si un transporteur est indiqué).'],
+    ['Dates','JJ/MM/AAAA (ex. 15/10/2026), ou AAAA-MM-JJ, ou une vraie date Excel.'],
+    ['Pays','Initiales sur 2 lettres : FR, BE, DE, AT, NL, ES, IT… (le nom complet est aussi reconnu). Voir la feuille « Pays ».'],
+    ['Prix vente / Prix achat','Nombres en euros (ex. 1250,50). Le prix d\'achat est celui payé au transporteur.'],
+    ['VIN','17 caractères. Plaque, marque et modèle : texte libre.'],
+    ['Kilomètres','Non demandés : calculés ensuite dans AutoDispatch (bouton « Calculer les km »).'],
+  ];
+  const wh=xl.utils.aoa_to_sheet(help);wh['!cols']=[{wch:26},{wch:110}];
+  const wc=xl.utils.aoa_to_sheet([['Code','Pays'],...COUNTRIES.map(([c,n])=>[c,n])]);wc['!cols']=[{wch:8},{wch:26}];
+  const wb=xl.utils.book_new();
+  xl.utils.book_append_sheet(wb,ws,'Missions');
+  xl.utils.book_append_sheet(wb,wh,'Mode d\'emploi');
+  xl.utils.book_append_sheet(wb,wc,'Pays');
+  xl.writeFile(wb,'modele_import_missions.xlsx');
 }
 
 function handleXlsxDrop(file){
@@ -1163,10 +1213,11 @@ async function runXlsxImport(){
   const existing=new Set(db.missions.map(x=>_xlNorm(x.ref)));
 
   // Regroupe les lignes par référence : une référence = une mission, une ligne = un véhicule
-  const groups=new Map();let skipped=0;
+  const groups=new Map();let skipped=0,examples=0;
   _xlsxRows.forEach(r=>{
     const ref=get(r,'ref');
     if(!ref){skipped++;return;}
+    if(/^exemple/i.test(ref)){examples++;return;}      // lignes d'exemple du modèle
     const k=_xlNorm(ref);
     if(!groups.has(k))groups.set(k,{ref,rows:[]});
     groups.get(k).rows.push(r);
@@ -1214,6 +1265,7 @@ async function runXlsxImport(){
   btn.textContent='✓ Import terminé';
   const lines=[`✅ ${imported} mission${imported!==1?'s':''} importée${imported!==1?'s':''} (${nbCars} véhicule${nbCars!==1?'s':''}).`];
   if(dups)lines.push(`ℹ ${dups} mission${dups!==1?'s':''} ignorée${dups!==1?'s':''} : référence déjà existante.`);
+  if(examples)lines.push(`ℹ ${examples} ligne${examples!==1?'s':''} d'exemple du modèle ignorée${examples!==1?'s':''}.`);
   if(skipped)lines.push(`ℹ ${skipped} ligne${skipped!==1?'s':''} ignorée${skipped!==1?'s':''} (référence vide).`);
   if(unknownClients.size)lines.push(`⚠ Client introuvable (mission importée sans client) : ${[...unknownClients].slice(0,5).join(', ')}${unknownClients.size>5?'…':''}`);
   if(unknownCarriers.size)lines.push(`⚠ Transporteur introuvable : ${[...unknownCarriers].slice(0,5).join(', ')}${unknownCarriers.size>5?'…':''}`);
@@ -1819,6 +1871,48 @@ async function calcKmFromForm(){
     st.textContent='✓ '+km+' km (itinéraire poids lourd — indicatif)';
   }catch(e){st.textContent='Calcul impossible : '+e.message+'. Tu peux saisir les km à la main.';}
 }
+// Calcule les km de toutes les missions EN COURS (non livrées) qui n'en ont pas encore, une par une
+let _kmBatchStop=false;
+async function calcKmBatch(){
+  const DONE=['livré','à facturer','facturé','payé'];
+  const todo=db.missions.filter(m=>m.distanceKm==null&&!DONE.includes(m.status)&&m.pickupCity&&m.deliveryCity);
+  if(!todo.length){alert('Toutes les missions en cours ont déjà leurs km (ou n\'ont pas de ville de chargement / livraison).');return;}
+  if(!confirm(`Calculer les km de ${todo.length} mission${todo.length>1?'s':''} en cours ?\nCela prend environ ${Math.max(1,Math.round(todo.length*4/60))} minute(s) — garde la page ouverte.`))return;
+  _kmBatchStop=false;
+  const box=document.createElement('div');
+  box.id='km-batch-modal';
+  box.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  box.innerHTML=`<div style="background:#fff;border-radius:12px;width:min(480px,100%);padding:24px">
+    <h3 style="margin:0 0 6px">📍 Calcul des kilomètres</h3>
+    <div id="kmb-text" style="font-size:13px;color:#555;margin-bottom:10px">Démarrage…</div>
+    <div style="background:#e6edf3;border-radius:6px;height:10px;overflow:hidden"><div id="kmb-bar" style="height:100%;width:0;background:var(--blue)"></div></div>
+    <div id="kmb-log" style="font-size:12px;color:#777;margin-top:10px;max-height:140px;overflow:auto;white-space:pre-wrap"></div>
+    <div style="margin-top:14px;text-align:right"><button class="btn" id="kmb-btn" onclick="_kmBatchStop=true;this.disabled=true;this.textContent='Arrêt…'">Arrêter</button></div>
+  </div>`;
+  document.body.appendChild(box);
+  const t=document.getElementById('kmb-text'),bar=document.getElementById('kmb-bar'),log=document.getElementById('kmb-log');
+  let ok=0;const fail=[];
+  for(let i=0;i<todo.length&&!_kmBatchStop;i++){
+    const m=todo[i];
+    t.textContent=`Mission ${i+1} / ${todo.length} — ${m.ref}`;
+    try{
+      const km=await computeDistanceKm(m);
+      if(km==null){fail.push(m.ref+' (adresse introuvable)');}
+      else{
+        const{error}=await sb.from('missions').update({distance_km:km}).eq('id',m.id);
+        if(error){fail.push(m.ref+' ('+error.message+')');}
+        else{m.distanceKm=km;ok++;log.textContent+=`${m.ref} : ${km} km\n`;}
+      }
+    }catch(e){fail.push(m.ref+' ('+e.message+')');}
+    bar.style.width=Math.round((i+1)/todo.length*100)+'%';
+    log.scrollTop=log.scrollHeight;
+  }
+  t.textContent=`Terminé : ${ok} mission${ok!==1?'s':''} calculée${ok!==1?'s':''}`+(fail.length?`, ${fail.length} à vérifier`:'')+(_kmBatchStop?' (arrêté)':'')+'.';
+  if(fail.length)log.textContent+='\n⚠ À vérifier (corrige l\'adresse ou saisis les km à la main) :\n'+fail.join('\n');
+  const b=document.getElementById('kmb-btn');b.disabled=false;b.textContent='Fermer';b.onclick=()=>box.remove();
+  render();
+}
+
 async function calcKmForMission(id){
   const m=db.missions.find(x=>x.id===id);if(!m)return;
   setLoading(true);
