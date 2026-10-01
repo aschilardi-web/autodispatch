@@ -398,6 +398,8 @@ function getPhotoCatsDelivery(lang){
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const getClient=m=>db.clients.find(x=>x.id===m.clientId)||{};
 const getCarrier=m=>db.carriers.find(x=>x.id===m.carrierId)||{};
+// Inspection terminée = tous les véhicules inspectés (nouveau mode) ou ancienne inspection au niveau mission
+const inspectionComplete=m=>!!m.inspectionSubmittedAt||(m.cars.length>0&&m.cars.every(c=>c.inspectionSubmittedAt));
 const pretty=d=>d?new Date(d+'T12:00:00').toLocaleDateString('fr-BE',{day:'numeric',month:'short',year:'numeric'}):'To be confirmed';
 const val=id=>document.getElementById(id)?.value.trim()||'';
 const setLoading=on=>document.getElementById('loading-bar').classList.toggle('on',on);
@@ -512,6 +514,9 @@ async function loadData(){
       cars:cars.filter(c=>c.mission_id===m.id).map(c=>({
         id:c.id,make:c.make||'',model:c.model||'',vin:c.vin||'',plate:c.plate||'',
         status:c.status||'à charger',
+        inspectionSubmittedAt:c.inspection_submitted_at||'',
+        inspectionSigner:c.inspection_signer||'',
+        inspectionPdfUrl:c.inspection_pdf_url||'',
         docs:docs.filter(d=>d.car_id===c.id).map(d=>({id:d.id,name:d.name||'',phase:d.phase||'',date:d.date||'',url:d.url||''}))
       })),
       notifications:notifs.filter(n=>n.mission_id===m.id).map(n=>({
@@ -1385,9 +1390,9 @@ function documentsPage(){
         missionRef:mission.ref||'—',clientName:getClient(mission).name||'—',
         carrierName:carrier?carrier.name||'—':'—',
         missionId:mission.id,carId:car.id,
-        inspectionSubmittedAt:mission.inspectionSubmittedAt||'',
-        inspectionSigner:mission.inspectionSigner||'',
-        inspectionPdfUrl:mission.inspectionPdfUrl||'',
+        carInspSubmittedAt:car.inspectionSubmittedAt||'',carInspSigner:car.inspectionSigner||'',carInspPdfUrl:car.inspectionPdfUrl||'',
+        missInspSubmittedAt:mission.inspectionSubmittedAt||'',missInspSigner:mission.inspectionSigner||'',missInspPdfUrl:mission.inspectionPdfUrl||'',
+        inspectionSubmittedAt:'',inspectionSigner:'',inspectionPdfUrl:'',
         docs:[],photos:[],videos:[],inspDamages:[],
       });
     }
@@ -1429,6 +1434,13 @@ function documentsPage(){
   });
 
   const allGroups=[...groups.values()].sort((a,b)=>a.missionRef.localeCompare(b.missionRef,'fr'));
+  // Inspection par véhicule ; repli sur l'ancienne inspection de mission seulement si ce véhicule a des dommages enregistrés
+  allGroups.forEach(g=>{
+    const legacy=g.inspDamages.length>0;
+    g.inspectionSubmittedAt=g.carInspSubmittedAt||(legacy?g.missInspSubmittedAt:'');
+    g.inspectionSigner=g.carInspSigner||(legacy?g.missInspSigner:'');
+    g.inspectionPdfUrl=g.carInspPdfUrl||(legacy?g.missInspPdfUrl:'');
+  });
   const totalPhotos=allGroups.reduce((s,g)=>s+g.photos.length,0);
   const totalVideos=allGroups.reduce((s,g)=>s+g.videos.length,0);
   const totalDocs=allGroups.reduce((s,g)=>s+g.docs.length,0);
@@ -2201,7 +2213,7 @@ function buildClientEmail(m,n){
     ``,
     `${C.contact_us}`,
     ``,
-    ...((kind==='loaded'||kind==='delivered')&&m.deliveryToken&&!m.inspectionSubmittedAt?[
+    ...((kind==='loaded'||kind==='delivered')&&m.deliveryToken&&!inspectionComplete(m)?[
       ``,
       `─────────────────────────────`,
       ``,
@@ -2282,7 +2294,7 @@ function draftDeliverySite(mid){
     ``,
     T.contact,``,T.regards,
     // Bloc inspection : inclus si un token existe et que l'état des lieux n'est pas encore soumis
-    ...(m.deliveryToken&&!m.inspectionSubmittedAt?[
+    ...(m.deliveryToken&&!inspectionComplete(m)?[
       ``,sep,``,
       T.insp_title||'📋 VEHICLE CONDITION REPORT',
       T.insp_text||'Please use the link below upon vehicle arrival to report any damage and sign the delivery receipt:',
@@ -2928,13 +2940,73 @@ async function initInspectionPage(token){
       </div></div>`;
     return;
   }
+  inspShowHome();
+}
+
+// ── Inspection PAR VÉHICULE : accueil = liste des véhicules de la mission ─────────
+function inspShell(inner){
+  const m=inspState.mission;
+  document.getElementById('inspection-portal').innerHTML=`
+  <div class="insp-header">
+    <div style="font-size:11px;opacity:.7;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">État des lieux de livraison</div>
+    <div style="font-size:20px;font-weight:800">${esc(m.ref||'Mission')}</div>
+    <div style="font-size:12px;opacity:.8;margin-top:4px">${m.delivery_site?esc(m.delivery_site)+' — ':''} ${esc(m.delivery_city||'')} ${esc(m.delivery_country||'')}</div>
+  </div>
+  <div style="padding:14px;max-width:640px;margin:0 auto;padding-bottom:40px">${inner}</div>`;
+  window.scrollTo(0,0);
+}
+
+function inspCarCardHtml(c,i,done){
+  const label=esc(`${c.make||''} ${c.model||''}`.trim()||`Véhicule ${i+1}`);
+  const meta=[c.vin?`VIN ${esc(c.vin)}`:'',c.plate?esc(c.plate):''].filter(Boolean).join(' · ');
+  return `<div class="insp-card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <div style="flex:1;min-width:180px">
+      <div style="font-weight:800;font-size:15px;color:#1a2e4a">${label}</div>
+      ${meta?`<div style="font-size:11px;color:#6b7a8d;font-family:monospace;margin-top:3px">${meta}</div>`:''}
+    </div>
+    ${done
+      ?`<div style="text-align:right"><div style="color:#38a169;font-weight:800;font-size:13px">✅ Terminé</div>
+         ${c.inspection_pdf_url?`<a href="${esc(c.inspection_pdf_url)}" target="_blank" rel="noopener" style="font-size:12px;color:#2675a9;font-weight:700">📄 Rapport PDF</a>`:''}</div>`
+      :`<button onclick="inspSelectCar(${i})" style="background:#102d4c;color:white;border:none;border-radius:10px;padding:12px 18px;font-size:14px;font-weight:700;cursor:pointer">Inspecter →</button>`}
+  </div>`;
+}
+
+function inspShowHome(){
+  const m=inspState.mission;
+  const cars=m.cars||[];
+  if(!cars.length){renderInspectionPage();return;}
+  const todo=cars.filter(c=>!c.inspection_submitted_at);
+  if(!todo.length){
+    inspShell(`<div style="text-align:center;margin:10px 0 18px"><div style="font-size:44px">✅</div>
+      <div style="font-size:18px;font-weight:800;color:#1a2e4a">État des lieux complété</div>
+      <div style="font-size:12px;color:#6b7a8d;margin-top:4px">Tous les véhicules ont été inspectés.</div></div>`
+      +cars.map((c,i)=>inspCarCardHtml(c,i,true)).join(''));
+    return;
+  }
+  if(cars.length===1){inspSelectCar(0);return;}
+  inspShell(`<div style="font-size:13px;color:#1a2e4a;font-weight:600;margin:4px 0 12px">Une inspection est réalisée <strong>pour chaque véhicule</strong>.
+    Sélectionnez le véhicule à inspecter (${cars.length-todo.length}/${cars.length} terminé${cars.length-todo.length>1?'s':''}).</div>`
+    +cars.map((c,i)=>inspCarCardHtml(c,i,!!c.inspection_submitted_at)).join(''));
+}
+
+function inspSelectCar(i){
+  inspState.carIdx=i;
+  inspState.damages=[];inspState.pendingDamage=null;
+  inspState.sigClientDataUrl=null;inspState.signatureDataUrl=null;inspState.sigDriverDataUrl=null;
   renderInspectionPage();
+  window.scrollTo(0,0);
+}
+
+function inspBackToList(){
+  if(inspState.damages.length&&!confirm('Les dommages saisis pour ce véhicule seront perdus. Revenir à la liste ?'))return;
+  inspShowHome();
 }
 
 function renderInspectionPage(){
   const m=inspState.mission;
   if(!m)return;
-  _currentCarIdx=0; // reset à la première voiture
+  _currentCarIdx=inspState.carIdx||0; // véhicule en cours d'inspection (une inspection par véhicule)
+  const curCar=(m.cars&&m.cars[_currentCarIdx])||{};
 
   // Langue selon le pays de livraison
   const _inspLangCode=detectLang(m.delivery_country||'');
@@ -2942,27 +3014,15 @@ function renderInspectionPage(){
 
   const multiCar=m.cars&&m.cars.length>1;
 
-  // Onglets voitures (si plusieurs)
-  const carTabsHtml=multiCar?`
-  <div class="insp-card" style="padding:12px 14px">
-    <div style="font-size:11px;font-weight:700;color:#6b7a8d;text-transform:uppercase;margin-bottom:8px">Sélectionner la voiture à inspecter</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      ${m.cars.map((c,i)=>`
-      <button class="car-tab-btn" onclick="switchCar(${i})"
-        style="padding:8px 14px;border:1.5px solid #2675a9;border-radius:8px;font-size:13px;cursor:pointer;transition:all .2s;
-               background:${i===0?'#102d4c':'white'};color:${i===0?'white':'#1a2e4a'};font-weight:${i===0?'700':'500'};line-height:1.3">
-        ${esc(`${c.make||''} ${c.model||''}`.trim()||`Voiture ${i+1}`)}
-        ${c.vin?`<div style="font-size:10px;opacity:.65;margin-top:3px;font-weight:400;font-family:monospace;letter-spacing:.3px">${esc(c.vin)}</div>`:''}
-      </button>`).join('')}
-    </div>
-  </div>`:
-  `<div class="insp-card">
-    <div style="font-size:12px;font-weight:700;color:#6b7a8d;text-transform:uppercase;margin-bottom:8px">Véhicule</div>
-    ${m.cars.map(c=>`<span style="display:inline-block;background:#e8edf3;border-radius:6px;padding:3px 10px;font-size:13px;margin:2px;font-weight:600">${esc(c.make||'')} ${esc(c.model||'')}${c.vin?` <span style="color:#6b7a8d;font-weight:400">VIN: ${esc(c.vin)}</span>`:''}</span>`).join('')||'—'}
+  // Véhicule inspecté (une inspection par véhicule) + retour à la liste si plusieurs véhicules
+  const carTabsHtml=`<div class="insp-card">
+    ${multiCar?`<button onclick="inspBackToList()" style="background:none;border:none;color:#2675a9;font-size:13px;font-weight:700;cursor:pointer;padding:0 0 10px">← Retour à la liste des véhicules</button>`:''}
+    <div style="font-size:12px;font-weight:700;color:#6b7a8d;text-transform:uppercase;margin-bottom:8px">Véhicule inspecté</div>
+    ${curCar.id?`<span style="display:inline-block;background:#e8edf3;border-radius:6px;padding:3px 10px;font-size:13px;margin:2px;font-weight:600">${esc(curCar.make||'')} ${esc(curCar.model||'')}${curCar.vin?` <span style="color:#6b7a8d;font-weight:400">VIN: ${esc(curCar.vin)}</span>`:''}${curCar.plate?` <span style="color:#6b7a8d;font-weight:400">· ${esc(curCar.plate)}</span>`:''}</span>`:'—'}
   </div>`;
 
   // Titre du SVG (nom de la voiture courante)
-  const firstCar=m.cars&&m.cars[0];
+  const firstCar=m.cars&&m.cars[_currentCarIdx];
   const firstCarName=firstCar?`${firstCar.make||''} ${firstCar.model||''}`.trim()||'Voiture 1':'Véhicule';
 
   const portal=document.getElementById('inspection-portal');
@@ -2978,17 +3038,17 @@ function renderInspectionPage(){
 
     <!-- Photos + Vidéos de chargement -->
     ${((inspState.loadingPhotos||[]).length||(inspState.loadingVideos||[]).length)?`
-    <div class="insp-card" id="insp-loading-photos-card" style="${([...(inspState.loadingPhotos||[]),...(inspState.loadingVideos||[])]).filter(p=>p.car_id===(m.cars[0]||{}).id).length?'':'display:none'}">
+    <div class="insp-card" id="insp-loading-photos-card" style="${([...(inspState.loadingPhotos||[]),...(inspState.loadingVideos||[])]).filter(p=>p.car_id===curCar.id).length?'':'display:none'}">
       <div style="font-size:12px;font-weight:700;color:#6b7a8d;text-transform:uppercase;margin-bottom:10px">${_inspL.loading_photos_title||'📷 Photos au chargement'}</div>
       <p style="font-size:12px;color:#6b7a8d;margin:0 0 10px">${_inspL.loading_photos_text||'Ces photos ont été prises par le transporteur lors du chargement du véhicule.'}</p>
       <div id="insp-loading-photos" style="display:flex;flex-wrap:wrap;gap:8px">
-        ${(inspState.loadingPhotos||[]).filter(p=>p.car_id===(m.cars[0]||{}).id).map(p=>`<img src="${esc(p.photo_url)}" onclick="inspOpenPhoto('${esc(p.photo_url)}')"
+        ${(inspState.loadingPhotos||[]).filter(p=>p.car_id===curCar.id).map(p=>`<img src="${esc(p.photo_url)}" onclick="inspOpenPhoto('${esc(p.photo_url)}')"
           style="width:90px;height:70px;object-fit:cover;border-radius:8px;border:1px solid #d8e4ec;cursor:pointer">`).join('')}
       </div>
-      ${(inspState.loadingVideos||[]).filter(v=>v.car_id===(m.cars[0]||{}).id).length?`
+      ${(inspState.loadingVideos||[]).filter(v=>v.car_id===curCar.id).length?`
       <div id="insp-loading-videos" style="margin-top:10px">
         <div style="font-size:11px;font-weight:700;color:#6b7a8d;margin-bottom:6px">🎬 Vidéo au chargement</div>
-        ${(inspState.loadingVideos||[]).filter(v=>v.car_id===(m.cars[0]||{}).id).map(v=>`<video src="${esc(v.video_url)}" controls playsinline style="width:100%;border-radius:8px;max-height:220px;background:#000;border:1px solid #d8e4ec"></video>`).join('')}
+        ${(inspState.loadingVideos||[]).filter(v=>v.car_id===curCar.id).map(v=>`<video src="${esc(v.video_url)}" controls playsinline style="width:100%;border-radius:8px;max-height:220px;background:#000;border:1px solid #d8e4ec"></video>`).join('')}
       </div>`:''}
     </div>`:''}
 
@@ -3468,6 +3528,8 @@ async function submitInspection(){
 
   try{
     const missionId=m.id;
+    const car=(m.cars||[])[inspState.carIdx||0];   // une inspection = un véhicule
+    const carId=car?car.id:null;
     const ts=new Date().toISOString();
 
     // Accessoires + commentaires
@@ -3509,7 +3571,7 @@ async function submitInspection(){
     {
       const res=await fetch(inspState.sigClientDataUrl);
       const blob=await res.blob();
-      const fname=`inspections/${missionId}/sig_client.png`;
+      const fname=`inspections/${missionId}/sig_client_${carId||'x'}_${Date.now()}.png`;
       const{error:sigErr}=await sb.storage.from('carrier-photos').upload(fname,blob,{contentType:'image/png',upsert:true});
       if(!sigErr){const{data:u}=sb.storage.from('carrier-photos').getPublicUrl(fname);sigClientUrl=u?.publicUrl||null;}
     }
@@ -3519,7 +3581,7 @@ async function submitInspection(){
     {
       const res=await fetch(inspState.sigDriverDataUrl);
       const blob=await res.blob();
-      const fname=`inspections/${missionId}/sig_driver.png`;
+      const fname=`inspections/${missionId}/sig_driver_${carId||'x'}_${Date.now()}.png`;
       const{error:sigErr}=await sb.storage.from('carrier-photos').upload(fname,blob,{contentType:'image/png',upsert:true});
       if(!sigErr){const{data:u}=sb.storage.from('carrier-photos').getPublicUrl(fname);sigDriverUrl=u?.publicUrl||null;}
     }
@@ -3535,6 +3597,7 @@ async function submitInspection(){
     {
       const{data:finOk,error:finErr}=await sb.rpc('finalize_inspection',{
         p_token:m.delivery_token||INSPECTION_TOKEN,
+        p_car_id:carId,
         p_signer:signerPayload,
         p_signature_url:sigClientUrl,
       });
@@ -3543,22 +3606,28 @@ async function submitInspection(){
 
     // 4. Générer le PDF
     const accessories={keysReceived,manuelChecked,kitChecked,cableChecked,keysDeclared:m.keys||null,comments};
-    const pdfDataUrl=await generateInspectionPDF(m,{clientName,driverName},ts,{sigClientUrl,sigDriverUrl},accessories);
+    const pdfDataUrl=await generateInspectionPDF({...m,cars:car?[car]:(m.cars||[])},{clientName,driverName},ts,{sigClientUrl,sigDriverUrl},accessories);
 
     // 4b. Upload du PDF
     let inspectionPdfUrl=null;
     try{
       const pdfRes=await fetch(pdfDataUrl);
       const pdfBlob=await pdfRes.blob();
-      const pdfFname=`inspections/${missionId}/rapport_${Date.now()}.pdf`;
+      const pdfFname=`inspections/${missionId}/rapport_${carId||'x'}_${Date.now()}.pdf`;
       const{error:pdfUpErr}=await sb.storage.from('carrier-photos').upload(pdfFname,pdfBlob,{contentType:'application/pdf',upsert:true});
       if(!pdfUpErr){
         const{data:pdfUrlData}=sb.storage.from('carrier-photos').getPublicUrl(pdfFname);
         inspectionPdfUrl=pdfUrlData?.publicUrl||null;
-        const{error:attErr}=await sb.rpc('attach_inspection_pdf',{p_token:m.delivery_token||INSPECTION_TOKEN,p_pdf_url:inspectionPdfUrl});
+        const{error:attErr}=await sb.rpc('attach_inspection_pdf',{p_token:m.delivery_token||INSPECTION_TOKEN,p_car_id:carId,p_pdf_url:inspectionPdfUrl});
         if(attErr)console.warn('[submitInspection] attach_inspection_pdf:',attErr.message);
       }
     }catch(pdfErr){console.warn('[submitInspection] PDF upload:',pdfErr.message);}
+
+    // Mémorise l'état de ce véhicule pour la liste (retour à l'accueil)
+    if(car){car.inspection_submitted_at=ts;car.inspection_pdf_url=inspectionPdfUrl;car.inspection_signer=signerPayload;}
+    const remaining=(m.cars||[]).filter(c=>!c.inspection_submitted_at).length;
+    const carName=car?`${car.make||''} ${car.model||''}`.trim():'';
+    const carTag=car?(car.plate||car.vin||'').replace(/\s/g,''):'';
 
     // 5. Page de confirmation
     const portal=document.getElementById('inspection-portal');
@@ -3567,12 +3636,16 @@ async function submitInspection(){
         <div style="font-size:54px;margin-bottom:14px">✅</div>
         <div style="font-size:20px;font-weight:800;color:#1a2e4a;margin-bottom:8px">Contrôle terminé ✅</div>
         <p style="color:#1a2e4a;font-size:14px;font-weight:600;margin-bottom:6px">Le contrôle véhicule est terminé et enregistré dans le système.</p>
+        ${carName?`<p style="color:#1a2e4a;font-size:13px;margin-bottom:6px">🚗 <strong>${esc(carName)}</strong>${car&&car.vin?` — VIN ${esc(car.vin)}`:''}</p>`:''}
         <p style="color:#6b7a8d;font-size:13px;margin-bottom:16px">Signé par <strong>${esc(clientName)}</strong> (client) et <strong>${esc(driverName)}</strong> (chauffeur)<br>le ${new Date(ts).toLocaleDateString('fr-BE')} à ${new Date(ts).toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})}.</p>
         ${inspState.damages.length?`<p style="font-size:13px;color:#e57c00;margin-bottom:16px">📋 ${inspState.damages.length} dommage(s) signalé(s) et enregistré(s)</p>`:`<p style="font-size:13px;color:#38a169;margin-bottom:16px">✔ Aucun dommage constaté</p>`}
-        <a href="${pdfDataUrl}" download="etat_des_lieux_${(m.ref||'inspection').replace(/\s/g,'_')}.pdf"
+        <a href="${pdfDataUrl}" download="etat_des_lieux_${(m.ref||'inspection').replace(/\s/g,'_')}${carTag?'_'+carTag:''}.pdf"
           style="display:block;background:var(--navy);color:white;border-radius:10px;padding:14px;font-size:15px;font-weight:700;text-decoration:none;margin-bottom:12px">
           📄 Télécharger le PDF
         </a>
+        ${remaining
+          ?`<button onclick="inspShowHome()" style="width:100%;background:white;color:#102d4c;border:2px solid #102d4c;border-radius:10px;padding:13px;font-size:15px;font-weight:700;cursor:pointer">Inspecter le véhicule suivant (${remaining} restant${remaining>1?'s':''}) →</button>`
+          :`<p style="font-size:13px;color:#38a169;font-weight:700;margin:0">✔ Tous les véhicules de la mission ont été inspectés.</p>`}
       </div></div>`;
   }catch(e){
     console.error(e);
