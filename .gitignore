@@ -1,0 +1,29 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Secrets / environnement
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+service_role*
+*.secret
+
+# Dépendances et builds (futurs)
+node_modules/
+dist/
+build/
+.cache/
+
+# Éditeurs / logs
+.vscode/
+.idea/
+*.log
+*.swp
