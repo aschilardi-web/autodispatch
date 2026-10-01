@@ -3530,11 +3530,16 @@ async function submitInspection(){
       keysReceived,manuelChecked,kitChecked,cableChecked,
       comments,
     });
-    await sb.from('missions').update({
-      inspection_submitted_at:ts,
-      inspection_signer:signerPayload,
-      inspection_signature_url:sigClientUrl,
-    }).eq('id',missionId);
+    // Via la fonction serveur finalize_inspection : le visiteur du lien (anon) n'a pas le droit
+    // de modifier directement la table missions (RLS), l'update direct échouait silencieusement.
+    {
+      const{data:finOk,error:finErr}=await sb.rpc('finalize_inspection',{
+        p_token:m.delivery_token||INSPECTION_TOKEN,
+        p_signer:signerPayload,
+        p_signature_url:sigClientUrl,
+      });
+      if(finErr||finOk===false)console.warn('[submitInspection] finalize_inspection:',finErr?finErr.message:'non enregistrée (déjà soumise ?)');
+    }
 
     // 4. Générer le PDF
     const accessories={keysReceived,manuelChecked,kitChecked,cableChecked,keysDeclared:m.keys||null,comments};
@@ -3550,7 +3555,8 @@ async function submitInspection(){
       if(!pdfUpErr){
         const{data:pdfUrlData}=sb.storage.from('carrier-photos').getPublicUrl(pdfFname);
         inspectionPdfUrl=pdfUrlData?.publicUrl||null;
-        await sb.from('missions').update({inspection_pdf_url:inspectionPdfUrl}).eq('id',missionId);
+        const{error:attErr}=await sb.rpc('attach_inspection_pdf',{p_token:m.delivery_token||INSPECTION_TOKEN,p_pdf_url:inspectionPdfUrl});
+        if(attErr)console.warn('[submitInspection] attach_inspection_pdf:',attErr.message);
       }
     }catch(pdfErr){console.warn('[submitInspection] PDF upload:',pdfErr.message);}
 
