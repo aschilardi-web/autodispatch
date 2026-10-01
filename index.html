@@ -128,6 +128,8 @@
 <!-- Leaflet (carte) -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
 <!-- Supabase JS -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <!-- jsPDF for inspection PDF generation -->
@@ -1843,53 +1845,129 @@ function deadlineBlock(m){
     ${txt?`<p style="font-weight:700;color:${col};margin:8px 0 0">${txt}</p>`:''}</div>`;
 }
 
-// ─── CARTE : chargements (bleu) et déchargements (vert) reliés par mission ───
+// ─── CARTE : une couleur par mission ; rond ⬆ = chargement, carré ⬇ = déchargement, flèche = sens du trajet ───
 let mapFilter={group:'En cours',urgent:false,lines:true};
-let _map=null,_mapView=null;
+let _map=null,_mapView=null,_mapItems={},mapSel=null;
+const MAP_PALETTE=['#e6194b','#4363d8','#f58231','#911eb4','#008080','#9a6324','#d2308f','#3a7d00','#0b3d91','#b8860b','#c0392b','#17a2b8'];
+const mapColor=id=>{let h=0;for(const ch of String(id))h=(h*31+ch.charCodeAt(0))>>>0;return MAP_PALETTE[h%MAP_PALETTE.length];};
 const hasGeo=m=>m.pickupLat!=null&&m.deliveryLat!=null;
 function mapMissions(){
   return db.missions.filter(m=>mapFilter.group==='Toutes'?true:(mapFilter.group==='Terminées'?DONE_STATUSES.includes(m.status):!DONE_STATUSES.includes(m.status)))
     .filter(m=>{if(!mapFilter.urgent)return true;const dl=deadlineOf(m);return dl&&!DONE_STATUSES.includes(m.status)&&daysLeft(dl)<=2;});
 }
+function mapUrgency(m){
+  if(DONE_STATUSES.includes(m.status))return{ring:null,left:null};
+  const dl=deadlineOf(m),left=dl?daysLeft(dl):null;
+  return{ring:left!=null&&left<0?'#c0392b':(left!=null&&left<=2?'#e0850c':null),left,dl};
+}
+function mapItemHtml(m){
+  const u=mapUrgency(m),geo=hasGeo(m);
+  const chip=u.dl?`<span style="color:${u.ring||'var(--muted)'};font-weight:${u.ring?800:400}">${u.left<0?'⚠ '+(-u.left)+' j de retard':u.left+' j'}</span>`:'';
+  return `<div class="map-item${mapSel===m.id?' sel':''}" data-id="${esc(m.id)}" data-q="${esc((m.ref+' '+(getClient(m).name||'')+' '+(m.pickupCity||'')+' '+(m.deliveryCity||'')).toLowerCase())}" style="--c:${mapColor(m.id)}" onmouseenter="mapHover('${esc(m.id)}')" onmouseleave="mapHover(null)" onclick="mapSelect('${esc(m.id)}')">
+    <div style="flex:1;min-width:0"><strong style="font-size:12px">${esc(m.ref)}</strong> <span style="font-size:11px;color:var(--muted)">${esc(getClient(m).name||'')}</span>
+    <div style="font-size:11px;color:#536a7d">${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}</div>
+    <div style="font-size:10.5px;color:var(--muted)">${m.cars.length} véh. · ${fmtPts(missionPoints(m))} pts${m.distanceKm?' · '+m.distanceKm+' km':''} ${chip}${geo?'':' <b style="color:var(--amber)">· à géolocaliser</b>'}</div></div></div>`;
+}
 function mapPage(){
   const list=mapMissions();
   const geo=list.filter(hasGeo),missing=list.filter(m=>!hasGeo(m)&&(m.pickupCity||m.deliveryCity));
   const pts=geo.reduce((s,m)=>s+missionPoints(m),0);
+  const sorted=[...geo].sort((a,b)=>{const x=deadlineOf(a)||'9',y=deadlineOf(b)||'9';return x.localeCompare(y);}).concat(missing);
   return heading('Carte','Chargements et déchargements des missions en Europe.',
     `<button class="btn" onclick="geocodeBatch()">📍 Géolocaliser les missions</button>`)+
-  `<div class="panel">
+  `<style>
+    .map-layout{display:flex;gap:12px;align-items:stretch}
+    #map-canvas{flex:1;min-width:0;min-height:420px;height:70vh;border-radius:8px;border:1px solid var(--line)}
+    .map-side{width:310px;display:flex;flex-direction:column;height:70vh;min-height:420px}
+    #map-list{overflow:auto;flex:1;border:1px solid var(--line);border-radius:8px;margin-top:6px;background:#fff}
+    .map-item{display:flex;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);cursor:pointer;border-left:6px solid var(--c)}
+    .map-item:hover,.map-item.sel{background:var(--pale)}
+    @media(max-width:900px){.map-layout{flex-direction:column}.map-side{width:auto;height:320px;min-height:0}}
+    .mk{width:24px;height:24px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.55)}
+    .mk.r{border-radius:50%}.mk.q{border-radius:6px}
+    .mk-label{background:rgba(255,255,255,.93);border:0;box-shadow:0 1px 3px rgba(0,0,0,.3);font-size:10px;font-weight:700;padding:1px 5px}
+    .nolabels .mk-label{display:none}
+    .mk-cl{width:30px;height:30px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:12px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.55)}
+    .mk-cl.p{background:#2f4858;border-radius:50%}.mk-cl.d{background:#2f4858;border-radius:7px}
+    .leaflet-tile-pane{filter:grayscale(.9) contrast(.85) brightness(1.08)}
+  </style>
+  <div class="panel">
     <div class="toolbar" style="margin-bottom:10px;gap:12px;flex-wrap:wrap;align-items:center">
       <select onchange="mapFilter.group=this.value;render()">${['En cours','Toutes','Terminées'].map(g=>`<option ${mapFilter.group===g?'selected':''}>${g}</option>`).join('')}</select>
       <label style="font-size:12px"><input type="checkbox" ${mapFilter.urgent?'checked':''} onchange="mapFilter.urgent=this.checked;render()"> Urgentes (≤ 2 jours)</label>
       <label style="font-size:12px"><input type="checkbox" ${mapFilter.lines?'checked':''} onchange="mapFilter.lines=this.checked;render()"> Afficher les liaisons</label>
-      <span style="font-size:12px;color:var(--muted)"><b style="color:#2675a9">●</b> chargement · <b style="color:#24784d">●</b> déchargement · <b style="color:#c0392b">◌</b> en retard · <b style="color:#e0850c">◌</b> urgent</span>
+      <span style="font-size:12px;color:var(--muted)">● rond ⬆ chargement · ■ carré ⬇ déchargement · ▶ sens du trajet · une couleur par mission · anneau <b style="color:#c0392b">rouge</b> en retard, <b style="color:#e0850c">orange</b> urgent</span>
     </div>
-    <div id="map-canvas" style="height:68vh;min-height:420px;border-radius:8px;border:1px solid var(--line)"></div>
+    <div class="map-layout">
+      <div id="map-canvas"></div>
+      <div class="map-side">
+        <input type="search" placeholder="Rechercher mission, client, ville…" oninput="mapListFilter(this.value)">
+        <div id="map-list">${sorted.map(mapItemHtml).join('')||'<div style="padding:16px;color:var(--muted);font-size:12px">Aucune mission à afficher.</div>'}</div>
+      </div>
+    </div>
     <div style="font-size:12px;color:var(--muted);margin-top:8px">${geo.length} mission${geo.length!==1?'s':''} sur la carte · ${fmtPts(pts)} points de chargement${missing.length?` · <b style="color:var(--amber)">${missing.length} sans coordonnées</b> (bouton « Géolocaliser »)`:''}</div>
   </div>`;
+}
+function mapListFilter(q){
+  const t=String(q||'').toLowerCase().trim();
+  document.querySelectorAll('#map-list .map-item').forEach(el=>{el.style.display=(!t||el.dataset.q.includes(t))?'':'none';});
+}
+// Survol : la mission ressort, le reste s'estompe
+function mapHover(id){
+  Object.entries(_mapItems).forEach(([k,it])=>{
+    const on=!id||k===id;
+    if(it.line)it.line.setStyle({opacity:on?.9:.1,weight:(id&&k===id)?6:3.5});
+    [it.a,it.b].forEach(mk=>mk&&mk.setOpacity(on?1:.2));
+    if(it.arrow)it.arrow.setOpacity(on?1:.15);
+  });
+}
+function mapSelect(id){
+  mapSel=id;
+  document.querySelectorAll('#map-list .map-item').forEach(el=>el.classList.toggle('sel',el.dataset.id===id));
+  const it=_mapItems[id];if(!it||!_map)return;
+  _map.fitBounds([it.pa,it.pb],{padding:[70,70],maxZoom:8});
+  setTimeout(()=>{try{it.ga.zoomToShowLayer(it.a,()=>it.a.openPopup());}catch(_){it.a.openPopup();}},350);
 }
 function initMapView(){
   const el=document.getElementById('map-canvas');if(!el)return;
   if(_map){try{_map.remove();}catch(_){}_map=null;}
+  _mapItems={};
   if(typeof L==='undefined'){el.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted)">La carte n\'a pas pu être chargée (connexion ?).</div>';return;}
-  _map=L.map(el,{worldCopyJump:true}).setView(_mapView?_mapView.c:[49,8],_mapView?_mapView.z:5);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenStreetMap'}).addTo(_map);
+  _map=L.map(el,{worldCopyJump:true,maxZoom:11}).setView(_mapView?_mapView.c:[49,8],_mapView?_mapView.z:5);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:11,attribution:'© OpenStreetMap'}).addTo(_map);
+  const mkCluster=kind=>L.markerClusterGroup({maxClusterRadius:32,showCoverageOnHover:false,spiderfyOnMaxZoom:true,
+    iconCreateFunction:c=>L.divIcon({html:`<div class="mk-cl ${kind}">${c.getChildCount()}</div>`,className:'',iconSize:[30,30]})});
+  const gA=mkCluster('p'),gB=mkCluster('d');
+  const mer=l=>Math.log(Math.tan(Math.PI/4+l*Math.PI/360));
   const bounds=[];
   mapMissions().filter(hasGeo).forEach(m=>{
-    const dl=deadlineOf(m),left=dl?daysLeft(dl):null,done=DONE_STATUSES.includes(m.status);
-    const ring=done?null:(left!=null&&left<0?'#c0392b':(left!=null&&left<=2?'#e0850c':null));
-    const a=[m.pickupLat,m.pickupLng],b=[m.deliveryLat,m.deliveryLng];
-    const pop=`<div style="min-width:190px"><strong>${esc(m.ref)}</strong> — ${esc(getClient(m).name||'—')}<br>
+    const color=mapColor(m.id),u=mapUrgency(m);
+    const pa=[m.pickupLat,m.pickupLng],pb=[m.deliveryLat,m.deliveryLng];
+    const pop=`<div style="min-width:200px"><strong>${esc(m.ref)}</strong> — ${esc(getClient(m).name||'—')}<br>
       ${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}<br>
       ${m.cars.length} véhicule(s) · ${fmtPts(missionPoints(m))} pts${m.distanceKm?' · '+m.distanceKm+' km':''}<br>
-      ${dl?`Date limite : <b style="color:${ring||'inherit'}">${pretty(dl)}</b>${done?'':(left<0?' (dépassée)':` (${left} j)`)}<br>`:''}
+      ${u.dl?`Date limite : <b style="color:${u.ring||'inherit'}">${pretty(u.dl)}</b>${u.left==null?'':(u.left<0?' (dépassée)':` (${u.left} j)`)}<br>`:''}
       <button class="btn" style="margin-top:6px;font-size:11px" onclick="openDetail('${esc(m.id)}')">Ouvrir la mission</button></div>`;
-    if(mapFilter.lines)L.polyline([a,b],{color:ring||'#7d93a8',weight:1.5,opacity:.6,dashArray:'5 6'}).addTo(_map);
-    L.circleMarker(a,{radius:7,fillColor:'#2675a9',fillOpacity:.9,color:ring||'#fff',weight:ring?3:1.5}).bindPopup(pop).bindTooltip('⬆ '+m.ref).addTo(_map);
-    L.circleMarker(b,{radius:7,fillColor:'#24784d',fillOpacity:.9,color:ring||'#fff',weight:ring?3:1.5}).bindPopup(pop).bindTooltip('⬇ '+m.ref).addTo(_map);
-    bounds.push(a,b);
+    const icon=(shape,glyph)=>L.divIcon({className:'',iconSize:[24,24],iconAnchor:[12,12],
+      html:`<div class="mk ${shape}" style="background:${color};${u.ring?`border-color:${u.ring};border-width:3px`:''}">${glyph}</div>`});
+    const a=L.marker(pa,{icon:icon('r','⬆')}).bindPopup(pop).bindTooltip(`${m.ref} · ${m.pickupCity||''}`,{permanent:true,direction:'right',offset:[12,0],className:'mk-label'});
+    const b=L.marker(pb,{icon:icon('q','⬇')}).bindPopup(pop).bindTooltip(`${m.ref} · ${m.deliveryCity||''}`,{permanent:true,direction:'right',offset:[12,0],className:'mk-label'});
+    [a,b].forEach(mk=>{mk.on('mouseover',()=>mapHover(m.id));mk.on('mouseout',()=>mapHover(null));mk.on('click',()=>{mapSel=m.id;document.querySelectorAll('#map-list .map-item').forEach(e=>e.classList.toggle('sel',e.dataset.id===m.id));});});
+    gA.addLayer(a);gB.addLayer(b);
+    const it={a,b,pa,pb,ga:gA};
+    if(mapFilter.lines){
+      it.line=L.polyline([pa,pb],{color,weight:3.5,opacity:.8}).addTo(_map);
+      const ang=Math.atan2(mer(pb[0])-mer(pa[0]),(pb[1]-pa[1])*Math.PI/180)*180/Math.PI;
+      it.arrow=L.marker([(pa[0]+pb[0])/2,(pa[1]+pb[1])/2],{interactive:false,keyboard:false,
+        icon:L.divIcon({className:'',iconSize:[16,16],iconAnchor:[8,8],html:`<div style="transform:rotate(${-ang}deg);color:${color};font-size:15px;line-height:16px;text-shadow:0 0 3px #fff,0 0 3px #fff">▶</div>`})}).addTo(_map);
+    }
+    _mapItems[m.id]=it;
+    bounds.push(pa,pb);
   });
-  if(!_mapView&&bounds.length)_map.fitBounds(bounds,{padding:[30,30],maxZoom:7});
+  _map.addLayer(gA);_map.addLayer(gB);
+  const labels=()=>el.classList.toggle('nolabels',_map.getZoom()<6);
+  labels();_map.on('zoomend',labels);
+  if(!_mapView&&bounds.length)_map.fitBounds(bounds,{padding:[40,40],maxZoom:7});
   _map.on('moveend',()=>{_mapView={c:[_map.getCenter().lat,_map.getCenter().lng],z:_map.getZoom()};});
 }
 
