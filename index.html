@@ -3050,7 +3050,8 @@ function openTourForm(){
   if(t.ms.some(m=>m.tourId)){alert('Certaines missions sont déjà dans une tournée.');return;}
   const today=todayIso(),firstPick=t.ms.map(m=>m.pickupDate).filter(Boolean).sort()[0]||today;
   const start=firstPick<today?today:firstPick;
-  const km=Math.round(t.realKm??t.kmEst),days=Math.max(1,Math.ceil(km/550));   // ≈ 550 km par jour
+  const km=Math.round(t.realKm??t.kmEst),days=Math.max(1,Math.ceil(km/550));   // ≈ 550 km par jour (sans simulation)
+  const simEnd=t.sim?t.sim.endDate:null;
   const trucks=db.trucks.filter(x=>x.active);
   document.getElementById('modal-content').innerHTML=`<div class="modal-header"><div><h2>Créer la tournée</h2><p>${t.ms.length} mission${t.ms.length>1?'s':''} · ${t.veh} véhicule${t.veh>1?'s':''} · ${fmtPts(t.pts)} pts · ≈ ${km} km</p></div><button class="x" onclick="closeModal()">×</button></div>
   <div class="form-grid">
@@ -3058,7 +3059,7 @@ function openTourForm(){
     <div class="field" id="tf-truck-f"><label>Camion</label><select id="tf-truck">${trucks.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}${x.plate?' · '+esc(x.plate):''}</option>`).join('')||'<option value="">— aucun camion : crée-en un dans « Planning camions » —</option>'}</select></div>
     <div class="field" id="tf-carrier-f" style="display:none"><label>Transporteur</label><select id="tf-carrier"><option value="">Choisir…</option>${db.carriers.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></div>
     <div class="field"><label>Départ</label><input id="tf-start" type="date" value="${start}"></div>
-    <div class="field"><label>Fin prévue</label><input id="tf-end" type="date" value="${addWorkdays(start,days-1)}"></div>
+    <div class="field"><label>Fin prévue</label><input id="tf-end" type="date" value="${simEnd||addWorkdays(start,days-1)}"></div>
     <div class="field" id="tf-return-f"><label>Retour du camion</label><select id="tf-return"><option value="">Pas de retour (le dernier point est le départ suivant)</option><option value="friday">Rentre le vendredi</option><option value="saturday">Rentre le samedi</option></select></div>
     <div class="field wide"><label>Note</label><input id="tf-notes" placeholder="facultatif"></div>
   </div><div id="form-error"></div>
@@ -3397,6 +3398,176 @@ function setupDrawing(){
 }
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&mapSelMode){mapSelMode=null;applyDrawMode();}});
 
+// ─── MOTEUR D'ITINÉRAIRE : pays traversés, ferries, temps de conduite, calendrier et coûts ───
+const ISO_NUM={'040':'AT','056':'BE','100':'BG','191':'HR','196':'CY','203':'CZ','208':'DK','233':'EE','246':'FI','250':'FR','276':'DE','300':'GR','348':'HU','372':'IE','380':'IT','428':'LV','440':'LT','442':'LU','470':'MT','528':'NL','616':'PL','620':'PT','642':'RO','703':'SK','705':'SI','724':'ES','752':'SE','756':'CH','826':'GB','578':'NO','352':'IS','438':'LI','688':'RS','070':'BA','499':'ME','807':'MK','008':'AL','792':'TR','804':'UA','498':'MD','020':'AD','492':'MC','674':'SM','643':'RU','112':'BY','804':'UA'};
+const ISO_NAME={'France':'FR','Norway':'NO','Kosovo':'XK','Germany':'DE','Italy':'IT','Spain':'ES','Switzerland':'CH','Netherlands':'NL','Belgium':'BE','Luxembourg':'LU','Austria':'AT','Poland':'PL','Denmark':'DK','Sweden':'SE','United Kingdom':'GB','Ireland':'IE','Portugal':'PT','Czechia':'CZ','Slovakia':'SK','Hungary':'HU','Slovenia':'SI','Croatia':'HR'};
+let _geoPolys=null,_geoLoading=null;
+function loadScriptOnce(src){return new Promise((ok,ko)=>{const el=document.createElement('script');el.src=src;el.onload=ok;el.onerror=()=>ko(new Error('script indisponible'));document.head.appendChild(el);});}
+async function loadCountryShapes(){
+  if(_geoPolys)return _geoPolys;
+  if(_geoLoading)return _geoLoading;
+  _geoLoading=(async()=>{
+    try{
+      if(typeof topojson==='undefined')await loadScriptOnce('https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js');
+      const topo=await (await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json')).json();
+      const feats=topojson.feature(topo,topo.objects.countries).features;
+      const polys=[];
+      feats.forEach(f=>{
+        const cc=ISO_NUM[String(f.id).padStart(3,'0')]||ISO_NAME[f.properties&&f.properties.name];
+        if(!cc||!f.geometry)return;
+        const geoms=f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.type==='MultiPolygon'?f.geometry.coordinates:[];
+        geoms.forEach(rings=>{
+          let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+          rings[0].forEach(([x,y])=>{if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;});
+          polys.push({cc,rings,b:[x0,y0,x1,y1]});
+        });
+      });
+      _geoPolys=polys;return polys;
+    }catch(e){console.warn('Frontières indisponibles :',e.message);_geoPolys=[];return _geoPolys;}
+  })();
+  return _geoLoading;
+}
+function inRing(x,y,r){let c=false;for(let i=0,j=r.length-1;i<r.length;j=i++){const xi=r[i][0],yi=r[i][1],xj=r[j][0],yj=r[j][1];if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)c=!c;}return c;}
+function polyHas(p,x,y){if(x<p.b[0]||x>p.b[2]||y<p.b[1]||y>p.b[3])return false;if(!inRing(x,y,p.rings[0]))return false;for(let k=1;k<p.rings.length;k++)if(inRing(x,y,p.rings[k]))return false;return true;}
+let _lastCc=null;
+function countryAt(lat,lng){
+  const P=_geoPolys;if(!P||!P.length)return null;
+  if(_lastCc){for(const p of P)if(p.cc===_lastCc&&polyHas(p,lng,lat))return _lastCc;}
+  for(const p of P)if(polyHas(p,lng,lat)){_lastCc=p.cc;return p.cc;}
+  return null;
+}
+function decodePoly6(s){let i=0,lat=0,lng=0;const out=[];while(i<s.length){let b,sh=0,r=0;do{b=s.charCodeAt(i++)-63;r|=(b&31)<<sh;sh+=5;}while(b>=32);lat+=(r&1)?~(r>>1):(r>>1);sh=0;r=0;do{b=s.charCodeAt(i++)-63;r|=(b&31)<<sh;sh+=5;}while(b>=32);lng+=(r&1)?~(r>>1):(r>>1);out.push([lat/1e6,lng/1e6]);}return out;}
+// Transforme la réponse Valhalla en : segments par pays (km, secondes), ferries, pays de chaque arrêt
+async function buildTourPlan(trip,stops){
+  await loadCountryShapes();
+  const hasShapes=_geoPolys&&_geoPolys.length>0;
+  const k4=x=>x.lat.toFixed(4)+','+x.lng.toFixed(4);
+  const idx=[];let pn=-1,prev=null;
+  stops.forEach(x=>{if(prev===null||k4(prev)!==k4(x)){pn++;prev=x;}idx.push(pn);});
+  const stopCc=x=>{const c=String(x.t==='P'?x.m.pickupCountry:x.m.deliveryCountry||'').toUpperCase();return /^[A-Z]{2}$/.test(c)?c:null;};
+  const legs=[];let last=null,pendingFerry=null;
+  (trip.legs||[]).forEach((leg,li)=>{
+    const pts=decodePoly6(leg.shape),segs=[],ferries=[];
+    (leg.maneuvers||[]).forEach(mn=>{
+      const b=mn.begin_shape_index,e=Math.max(mn.end_shape_index,b);
+      const lenKm=mn.length||0,sec=mn.time||0;
+      const cAt=i=>{const p=pts[Math.min(Math.max(i,0),pts.length-1)];return hasShapes?countryAt(p[0],p[1]):null;};
+      if(mn.type===28||mn.travel_mode==='ferry'){
+        const fo={from:cAt(b-1)||last,to:null,km:lenKm,sec};
+        ferries.push(fo);pendingFerry=fo;return;
+      }
+      const n=e-b;if(n<=0||lenKm<=0)return;
+      const step=Math.max(1,Math.ceil(n/120)),samples=[];
+      for(let i=b;i<=e;i+=step)samples.push(i);
+      if(samples[samples.length-1]!==e)samples.push(e);
+      const d=[];let tot=0;
+      for(let k=1;k<samples.length;k++){const a=pts[samples[k-1]],c=pts[samples[k]];const h=hav({lat:a[0],lng:a[1]},{lat:c[0],lng:c[1]});d.push(h);tot+=h;}
+      for(let k=1;k<samples.length;k++){
+        const p=pts[samples[k-1]],det=hasShapes?countryAt(p[0],p[1]):null,cc=(pendingFerry&&!det)?null:(det||last);
+        const f=tot>0?d[k-1]/tot:1/(samples.length-1);
+        if(pendingFerry&&det){pendingFerry.to=det;pendingFerry=null;}
+        if(cc)last=cc;
+        segs.push({cc:cc||last,km:lenKm*f,sec:sec*f});
+      }
+    });
+    legs.push({segs,ferries,endCc:last});
+  });
+  legs.forEach(l=>l.ferries.forEach(f=>{if(!f.to)f.to=f.from;}));
+  // arrêts : pays de chaque arrêt (fiche mission si dispo, sinon pays détecté en fin de tronçon)
+  const stopCcs=stops.map((x,i)=>{
+    const li=idx[i]-1;
+    return stopCc(x)||(li>=0&&legs[li]?legs[li].endCc:(legs[0]&&legs[0].segs[0]?legs[0].segs[0].cc:null));
+  });
+  // sans frontières : répartition simple entre pays de départ et d'arrivée de chaque tronçon
+  if(!hasShapes)legs.forEach((lg,li)=>{
+    const a=stopCcs[idx.indexOf(li)]||null,b=stopCcs[idx.lastIndexOf(li+1)]||a;
+    lg.segs.forEach((sg,k)=>{sg.cc=k<lg.segs.length/2?a:b;});
+  });
+  return{legs,idx,stopCcs,hasShapes,km:legs.reduce((s,l)=>s+l.segs.reduce((q,g)=>q+g.km,0),0)};
+}
+const isBizCC=(cc,iso)=>{const d=new Date(iso+'T12:00:00Z').getUTCDay();return d!==0&&d!==6&&!isHolidayCC(cc||'BE',iso);};
+function ferryFor(f){
+  const cand=settings.ferries.filter(x=>(x.a===f.from&&x.b===f.to)||(x.a===f.to&&x.b===f.from));
+  const h=f.sec/3600;
+  if(cand.length){cand.sort((a,b)=>Math.abs(a.hours-h)-Math.abs(b.hours-h));const c=cand[0];return{name:c.name,cost:Number(c.cost)||0,hours:h||c.hours,q:c.q};}
+  return{name:`Ferry ${f.from||'?'} → ${f.to||'?'}`,cost:Math.max(150,Math.round(h*100)),hours:h,q:'est'};
+}
+// Simulation du calendrier d'un camion : règles 561/2006 simplifiées, interdictions, jours fériés, horaires de chargement
+function simulateTour(t,plan,startIso){
+  const C=settings.cost,maxDrive=Number(C.maxDrive)||9,margin=1+(Number(C.speedMargin)||0)/100,handling=(Number(C.handlingMin)||0)/60,START=7;
+  let date=startIso,clk=START,dayDrive=0,weekDrive=0;
+  const waits=[],perCc={},ferries=[],stopsOut=[],worked=new Set();
+  let driveH=0,breakH=0,handlingH=0;
+  const dow=()=>new Date(date+'T12:00:00Z').getUTCDay();
+  const nextDay=(why)=>{date=addDays(date,1);clk=START;dayDrive=0;if(dow()===1)weekDrive=0;if(why&&waits.length<12)waits.push(why);};
+  const nameD=d=>pretty(d);
+  const doStop=i=>{
+    const x=t.stops[i],cc=plan.stopCcs[i];
+    let guard=0;
+    while((!isBizCC(cc,date)||clk>16.5)&&guard++<14){
+      const why=clk>16.5&&isBizCC(cc,date)?`Arrivée tardive à ${ccName(cc||'')}: le site rouvre le lendemain`:`${nameD(date)} : ${new Date(date+'T12:00:00Z').getUTCDay()%6===0?'week-end':'jour férié'} en ${ccName(cc||'')||'?'} — attente`;
+      nextDay(why);
+    }
+    const arr={i,date,hour:clk,t:x.t,m:x.m,cc};
+    clk+=handling;handlingH+=handling;worked.add(date);
+    stopsOut.push(arr);
+  };
+  doStop(0);
+  const stopAtLegEnd={};plan.idx.forEach((pi,i)=>{if(i>0&&pi>plan.idx[i-1])stopAtLegEnd[pi-1]=i;});
+  // les arrêts fusionnés (même lieu) sont traités à la suite
+  const sameSpot={};plan.idx.forEach((pi,i)=>{(sameSpot[pi]=sameSpot[pi]||[]).push(i);});
+  (sameSpot[0]||[]).slice(1).forEach(i=>doStop(i));
+  plan.legs.forEach((lg,li)=>{
+    lg.segs.forEach(sg=>{
+      let h=sg.sec/3600*margin;const cc=sg.cc||'BE';
+      const rec=perCc[cc]=perCc[cc]||{km:0,h:0};rec.km+=sg.km;rec.h+=h;
+      let guard=0;
+      while(h>0.0001&&guard++<400){
+        const wd=dow();
+        if(wd===0){nextDay(`${nameD(date)} : dimanche, repos hebdomadaire`);continue;}
+        if(banBlocksDay(cc,date)){nextDay(`${nameD(date)} : interdiction de rouler en ${ccName(cc)}`);continue;}
+        const avail=Math.min(maxDrive-dayDrive,56-weekDrive);
+        if(avail<=0.01){
+          if(weekDrive>=56-0.01)nextDay(`${nameD(date)} : limite de 56 h de conduite par semaine`);else nextDay();
+          continue;
+        }
+        const take=Math.min(h,avail);
+        dayDrive+=take;weekDrive+=take;h-=take;driveH+=take;clk+=take;worked.add(date);
+        const br=Math.floor(take/4.5)*0.75;clk+=br;breakH+=br;
+      }
+    });
+    (lg.ferries||[]).forEach(f=>{
+      const fe=ferryFor(f);ferries.push({...fe,from:f.from,to:f.to});
+      clk+=fe.hours;worked.add(date);
+      let g=0;while(clk>=24&&g++<5){clk-=24;date=addDays(date,1);dayDrive=0;if(dow()===1)weekDrive=0;worked.add(date);}
+    });
+    (sameSpot[li+1]||[]).forEach(i=>doStop(i));
+  });
+  const endDate=date,span=Math.max(1,Math.round((new Date(endDate+'T12:00:00Z')-new Date(startIso+'T12:00:00Z'))/86400000)+1);
+  const cost={fuel:0,toll:0,maint:0,ferry:ferries.reduce((q,f)=>q+f.cost,0)};
+  Object.entries(perCc).forEach(([cc,v])=>{const c=costPerKm(cc);cost.fuel+=v.km*c.fuel;cost.toll+=v.km*c.toll;cost.maint+=v.km*c.maint;});
+  const workH=driveH+breakH+handlingH;
+  cost.driver=workH*(Number(C.driverHour)||0);
+  cost.fixed=span*(Number(C.fixedDay)||0);
+  cost.total=cost.fuel+cost.toll+cost.maint+cost.ferry+cost.driver+cost.fixed;
+  return{startDate:startIso,endDate,days:span,driveH,workH,perCc,ferries,waits,stops:stopsOut,cost,km:plan.km};
+}
+function tourStart(t){
+  const today=todayIso(),firstPick=t.ms.map(m=>m.pickupDate).filter(Boolean).sort()[0]||today;
+  return firstPick<today?today:firstPick;
+}
+const fmtH=h=>{const m=Math.round(h*60);return Math.floor(m/60)+' h '+String(m%60).padStart(2,'0');};
+function simHtml(t){
+  const s=t.sim;if(!s)return '';
+  const rows=Object.entries(s.perCc).sort((a,b)=>b[1].km-a[1].km).map(([cc,v])=>`<tr><td>${esc(cc)} · ${esc(ccName(cc))}</td><td style="text-align:right">${Math.round(v.km)} km</td><td style="text-align:right">${fmtH(v.h)}</td></tr>`).join('');
+  const fer=s.ferries.map(f=>`<div style="font-size:11.5px">⛴ ${esc(f.name)} · ${fmtH(f.hours)} · ${eur(f.cost)}${f.q==='est'?' <span style="color:var(--amber)">(estimé)</span>':''}</div>`).join('');
+  return `<div class="tp-h" style="margin-top:10px">Planning simulé (règles de conduite, interdictions, jours fériés)</div>
+    <div style="font-size:12.5px;line-height:1.6">Départ <b>${pretty(s.startDate)}</b> → arrivée <b>${pretty(s.endDate)}</b> · ${s.days} jour${s.days>1?'s':''} · conduite ${fmtH(s.driveH)}</div>
+    <table style="min-width:0;width:auto;margin:4px 0;font-size:11.5px"><tbody>${rows}</tbody></table>${fer}
+    ${s.waits.length?`<div style="font-size:11px;color:var(--amber);margin-top:4px">${s.waits.map(w=>'• '+esc(w)).join('<br>')}</div>`:''}
+    ${t.plan&&!t.plan.hasShapes?'<div style="font-size:10.5px;color:var(--amber)">Frontières indisponibles : répartition par pays approximative.</div>':''}`;
+}
+
 // ─── CALCULS DE TOURNÉE (sans enregistrement) ───
 const hav=(a,b)=>{const R=6371,r=x=>x*Math.PI/180,dl=r(b.lat-a.lat),dn=r(b.lng-a.lng),q=Math.sin(dl/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(q));};
 // Ordre des arrêts : tous les chargements (du plus éloigné vers le plus proche), puis tous les déchargements
@@ -3434,7 +3605,9 @@ function tourMetrics(ms){
   const deadlines=ms.map(m=>deadlineOf(m)).filter(Boolean).sort();
   const key=stops.map(x=>x.lat.toFixed(3)+','+x.lng.toFixed(3)).join('|');
   const real=_tourKmCache[key]||null;
-  return{ms,pts,veh,counts,trucksMin:bins.length,maxMission:Math.max(0,...ms.map(missionPoints)),stops,kmEst,directKm,longest,pSpread,dSpread,late,urgent,firstDeadline:deadlines[0]||null,key,realKm:real?real.km:null,realMode:real?real.mode:null};
+  const plan=real&&real.plan?real.plan:null;
+  let sim=null;if(plan){try{sim=simulateTour({ms,stops},plan,tourStart({ms}));}catch(e){console.warn('Simulation :',e);}}
+  return{plan,sim,ms,pts,veh,counts,trucksMin:bins.length,maxMission:Math.max(0,...ms.map(missionPoints)),stops,kmEst,directKm,longest,pSpread,dSpread,late,urgent,firstDeadline:deadlines[0]||null,key,realKm:real?real.km:null,realMode:real?real.mode:null};
 }
 async function tourRealKm(){
   const t=_lastTour;if(!t||t.stops.length<2)return;
@@ -3442,21 +3615,30 @@ async function tourRealKm(){
   const k4=x=>x.lat.toFixed(4)+','+x.lng.toFixed(4);
   const pts=[];t.stops.forEach(x=>{if(!pts.length||k4(pts[pts.length-1])!==k4(x))pts.push(x);});
   if(pts.length>20){alert('Trop d\'arrêts pour le calcul routier (20 maximum).');return;}
-  const btn=document.getElementById('tp-real-btn');if(btn){btn.disabled=true;btn.textContent='⏳ Calcul…';}
+  const btn=document.getElementById('tp-real-btn');if(btn){btn.disabled=true;btn.textContent='⏳ Calcul (pays, ferries, calendrier)…';}
   try{
-    let km=0,mode='camion';
+    let km=0,mode='camion',trip=null;
     if(pts.length>=2){
       km=null;
       for(const costing of ['truck','auto']){
         const q=encodeURIComponent(JSON.stringify({locations:pts.map(x=>({lat:x.lat,lon:x.lng,type:'break'})),costing,directions_options:{units:'kilometers'}}));
         const res=await fetch('https://valhalla1.openstreetmap.de/route?json='+q);
-        if(res.ok){const j=await res.json();if(j&&j.trip&&j.trip.summary){km=Math.round(j.trip.summary.length);mode=costing==='truck'?'camion':'voiture';break;}}
+        if(res.ok){const j=await res.json();if(j&&j.trip&&j.trip.summary){km=Math.round(j.trip.summary.length);mode=costing==='truck'?'camion':'voiture';trip=j.trip;break;}}
       }
       if(km==null)throw new Error('itinéraire introuvable');
     }
-    _tourKmCache[t.key]={km,mode};
+    let plan=null;
+    if(trip){
+      try{
+        plan=await buildTourPlan(trip,t.stops);
+        const ccs=new Set();plan.legs.forEach(l=>l.segs.forEach(g=>g.cc&&ccs.add(g.cc)));plan.stopCcs.forEach(c=>c&&ccs.add(c));
+        const y=new Date().getFullYear();
+        for(const cc of ccs)for(const yy of [y,y+1])await holLoad(cc,yy);
+      }catch(e){console.warn('Plan de tournée :',e);}
+    }
+    _tourKmCache[t.key]={km,mode,plan};
     refreshSelectionUI();
-  }catch(e){alert('Km routiers impossibles : '+e.message);if(btn){btn.disabled=false;btn.textContent='📏 Calculer les km routiers';}}
+  }catch(e){alert('Km routiers impossibles : '+e.message);if(btn){btn.disabled=false;btn.textContent='📏 Calculer itinéraire, durée et coûts';}}
 }
 function setTruckCost(v){
   truckCostKm=String(v);
@@ -3468,16 +3650,18 @@ function renderTruckProfit(){
   const t=_lastTour,ms=t.ms;
   const sell=ms.filter(m=>m.priceSell!=null),buy=ms.filter(m=>m.priceBuy!=null);
   const rev=sell.reduce((s,m)=>s+m.priceSell,0),charter=buy.reduce((s,m)=>s+m.priceBuy,0);
-  const km=t.realKm??t.kmEst,cost=parseNum(truckCostKm);
+  const km=t.realKm??t.kmEst,cost=parseNum(truckCostKm),sim=t.sim,manual=(cost!=null&&cost>0);
   const allSell=sell.length===ms.length,allBuy=buy.length===ms.length;
-  const own=(cost!=null&&cost>0)?km*cost:null;
+  const own=manual?km*cost:(sim?sim.cost.total:null);
   const perKm=v=>(v!=null&&km>0)?eur(v/km)+' / km':'';
   let reco='';
   if(own!=null&&allBuy)reco=own<=charter?`<div class="tp-al grn">✔ Camion propre moins cher de ${eur(charter-own)}</div>`:`<div class="tp-al amb">→ Affréter : ${eur(own-charter)} de moins qu'avec un camion propre</div>`;
   el.innerHTML=`<div style="font-size:12.5px;line-height:1.75">
     <b>Coût réel du transport</b> (${Math.round(km)} km)<br>
     Affrètement : <b>${allBuy?eur(charter):(buy.length?eur(charter)+' (partiel)':'—')}</b> ${allBuy?`<span style="color:var(--muted)">· ${perKm(charter)}</span>`:`<span style="color:var(--amber)">· ${ms.length-buy.length} prix d'achat manquant(s)</span>`}<br>
-    Camion propre : <input type="number" step="0.01" min="0" value="${esc(truckCostKm)}" placeholder="€/km" oninput="setTruckCost(this.value)" style="width:74px;padding:3px 6px"> €/km → <b>${own!=null?eur(own):'—'}</b><br>
+    Camion propre : <b>${own!=null?eur(own):'—'}</b> ${manual?'<span style="color:var(--muted)">(saisie manuelle)</span>':(sim?`<span style="color:var(--muted)">· ${perKm(own)} (modèle de coût)</span>`:'<span style="color:var(--muted)">— calcule l\'itinéraire</span>')}<br>
+    ${(!manual&&sim)?`<div style="font-size:11.5px;color:var(--muted);line-height:1.5">Carburant ${eur(sim.cost.fuel)} · péages ${eur(sim.cost.toll)} · entretien ${eur(sim.cost.maint)}${sim.cost.ferry?' · ferries '+eur(sim.cost.ferry):''}<br>Chauffeur ${eur(sim.cost.driver)} · coûts fixes (${sim.days} j) ${eur(sim.cost.fixed)}</div>`:''}
+    <span style="font-size:11.5px;color:var(--muted)">Forcer un coût manuel : <input type="number" step="0.01" min="0" value="${esc(truckCostKm)}" placeholder="€/km" oninput="setTruckCost(this.value)" style="width:64px;padding:2px 5px"> €/km (vide = modèle)</span><br>
     <span style="color:var(--muted)">Chiffre d'affaires : ${sell.length?eur(rev):'—'}${allSell?'':' (partiel)'}</span>
   </div>${reco}`;
 }
@@ -3490,6 +3674,7 @@ function truckPanelHtml(t){
   if(t.maxMission>TRUCK_CAPACITY+1e-6)al.push(['red','Une mission dépasse à elle seule la capacité d\'un camion.']);
   if(t.late)al.push(['red',`${t.late} mission${t.late>1?'s':''} en retard (date limite dépassée).`]);
   if(t.urgent)al.push(['amb',`${t.urgent} mission${t.urgent>1?'s':''} urgente${t.urgent>1?'s':''} (≤ 2 jours).`]);
+  if(t.sim){t.sim.stops.filter(x=>x.t==='D').forEach(x=>{const dl=deadlineOf(x.m);if(dl&&x.date>dl)al.push(['red',`${x.m.ref} : livraison simulée le ${pretty(x.date)}, après la date limite (${pretty(dl)}).`]);});}
   if(t.pSpread>TOUR_RULES.pickupSpreadKm)al.push(['amb',`Chargements très éloignés (${Math.round(t.pSpread)} km entre les plus distants).`]);
   if(t.dSpread>TOUR_RULES.deliverySpreadKm)al.push(['amb',`Déchargements très éloignés (${Math.round(t.dSpread)} km entre les plus distants) : tournée peu cohérente ?`]);
   const km=t.realKm??t.kmEst;
@@ -3526,8 +3711,9 @@ function truckPanelHtml(t){
         <ol style="margin:0;padding-left:20px;font-size:12px;line-height:1.6">${t.stops.map(x=>`<li>${x.t==='P'?'⬆ chargement':'⬇ déchargement'} <b>${esc(x.m.ref)}</b> — ${esc(place(x.t==='P'?x.m.pickupCountry:x.m.deliveryCountry,x.t==='P'?x.m.pickupCity:x.m.deliveryCity))}</li>`).join('')}</ol>
         <div style="font-size:12.5px;margin-top:8px">${t.realKm!=null?`<b>${t.realKm} km</b> routiers (${t.realMode==='camion'?'itinéraire poids lourd':'itinéraire voiture : poids lourd indisponible ici'})`:`≈ <b>${Math.round(t.kmEst)} km</b> estimés`} · missions séparées : ${Math.round(t.directKm)} km<br>
           ${saving>=0?`<span style="color:var(--green)">économie de ${Math.round(saving)} km grâce au regroupement</span>`:`<span style="color:var(--red)">${Math.round(-saving)} km de plus qu'en missions séparées</span>`}</div>
-        ${t.realKm==null?'<button class="btn" id="tp-real-btn" style="margin-top:6px;font-size:11px" onclick="tourRealKm()">📏 Calculer les km routiers</button>':''}
-        <div style="font-size:10.5px;color:var(--muted);margin-top:4px">Sans retour à vide ni temps de conduite (à venir).</div></div>
+        ${t.realKm==null?'<button class="btn" id="tp-real-btn" style="margin-top:6px;font-size:11px" onclick="tourRealKm()">📏 Calculer itinéraire, durée et coûts</button>':''}
+        ${simHtml(t)}
+        <div style="font-size:10.5px;color:var(--muted);margin-top:4px">Sans retour à vide.</div></div>
       <div><div class="tp-h">Coût du transport</div><div id="tp-profit"></div></div>
     </div>`:''}
   </div>`;
