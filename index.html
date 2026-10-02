@@ -1384,7 +1384,100 @@ async function runXlsxImport(){
 }
 
 // ─── RAPPORTS ───────────────────────────────────────────────────────────────
-function reportsPage(){
+// ─── RAPPORTS : choix du rapport, filtres communs, tableau et export Excel ───
+let reportKind='overview',_lastReport=null;
+const REPORT_LIST=[['overview','📊 Vue d\'ensemble'],['margin','💶 Marge par mission'],['client','🏢 Chiffre d\'affaires par client'],['carrier','🚛 Performance des transporteurs'],['late','⚠ Missions en retard'],['lanes','🛣 Prix par trajet (pays → pays)'],['tours','🗺 Tournées et remplissage'],['docs','📄 Documents des transporteurs'],['vehicles','🚗 Véhicules transportés']];
+function reportPicker(){
+  return `<div class="panel" style="margin-bottom:10px;padding:12px 16px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <span style="font-size:13px;font-weight:600;color:#555">📑 Rapport :</span>
+    <select id="rp-kind" style="padding:6px 10px;border:1px solid #cdd;border-radius:7px;font-size:13px;min-width:280px" onchange="reportKind=this.value;render()">${REPORT_LIST.map(([k,l])=>`<option value="${k}" ${reportKind===k?'selected':''}>${l}</option>`).join('')}</select>
+  </div></div>`;
+}
+function reportsPage(){return reportKind==='overview'?reportOverviewPage():reportOtherPage();}
+function reportFilters(){
+  const per=parseInt((document.getElementById('rp-period')||{value:'30'}).value||'30',10);
+  const cl=(document.getElementById('rp-client')||{value:''}).value||'',ca=(document.getElementById('rp-carrier')||{value:''}).value||'';
+  const cutoff=new Date();cutoff.setDate(cutoff.getDate()-per);
+  let ms=db.missions.filter(m=>{const d=m.deliveryDate||m.pickupDate;return d&&new Date(d+'T12:00:00')>=cutoff;});
+  if(cl)ms=ms.filter(m=>m.clientId===cl);
+  if(ca)ms=ms.filter(m=>m.carrierId===ca);
+  const sel='padding:5px 10px;border:1px solid #cdd;border-radius:7px;font-size:13px';
+  const html=`<div class="panel" style="margin-bottom:10px;padding:12px 16px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <span style="font-size:13px;font-weight:600;color:#555">📅 Période :</span>
+    <select id="rp-period" style="${sel}" onchange="render()">${[[7,'7 derniers jours'],[30,'30 derniers jours'],[90,'3 derniers mois'],[180,'6 derniers mois'],[365,'12 derniers mois'],[3650,'Tout']].map(([v,l])=>`<option value="${v}" ${per===v?'selected':''}>${l}</option>`).join('')}</select>
+    <select id="rp-client" style="${sel}" onchange="render()"><option value="">Tous les clients</option>${db.clients.map(c=>`<option value="${esc(c.id)}" ${cl===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select>
+    <select id="rp-carrier" style="${sel}" onchange="render()"><option value="">Tous les transporteurs</option>${db.carriers.map(c=>`<option value="${esc(c.id)}" ${ca===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select>
+    <span style="flex:1"></span><button class="btn" onclick="exportReport()">⬇ Exporter en Excel</button>
+  </div></div>`;
+  return{ms,html,per};
+}
+function reportOtherPage(){
+  const f=reportFilters(),ms=f.ms;
+  const isDone=x=>['livré','facturé','payé'].includes(x);
+  const today=todayIso();
+  const cname=id=>(db.clients.find(c=>c.id===id)||{}).name||'—';
+  const caname=id=>(db.carriers.find(c=>c.id===id)||{}).name||'—';
+  const route=m=>`${place(m.pickupCountry,m.pickupCity)} → ${place(m.deliveryCountry,m.deliveryCity)}`;
+  const sum=a=>a.reduce((q,v)=>q+(v||0),0);
+  const pct=(a,b)=>b>0?Math.round(a/b*100)+' %':'—';
+  const lateOf=m=>{if(isDone(m.status)||m.status==='annulé')return 0;const lim=m.deliveryDate||deadlineOf(m);return(lim&&lim<today)?diffDays(lim,today):0;};
+  let R;
+  const kind=reportKind;
+  if(kind==='margin'){
+    const rows=ms.filter(m=>m.priceSell!=null||m.priceBuy!=null).sort((a,b)=>String(b.deliveryDate||b.pickupDate).localeCompare(String(a.deliveryDate||a.pickupDate))).map(m=>{
+      const mg=(m.priceSell!=null&&m.priceBuy!=null)?m.priceSell-m.priceBuy:null;
+      return[m.ref,cname(m.clientId),route(m),m.priceSell,m.priceBuy,mg,mg!=null&&m.priceSell>0?Math.round(mg/m.priceSell*100)+' %':'—'];
+    });
+    const sv=sum(rows.map(r=>r[3])),bv=sum(rows.map(r=>r[4])),both=rows.filter(r=>r[5]!=null);
+    R={title:'Marge par mission',cols:['Mission','Client','Trajet','Vente €','Achat €','Marge €','Marge %'],money:[3,4,5],rows,foot:['Total','','',sv,bv,sum(both.map(r=>r[5])),pct(sum(both.map(r=>r[5])),sum(both.map(r=>r[3])))],note:'La marge n\'est calculée que si le prix de vente et le prix d\'achat sont renseignés.'};
+  }else if(kind==='client'){
+    const by={};ms.forEach(m=>{const k=m.clientId||'—';const o=by[k]=by[k]||{n:0,v:0,s:0,b:0,mg:0,mgs:0};o.n++;o.v+=m.cars.length;o.s+=m.priceSell||0;o.b+=m.priceBuy||0;if(m.priceSell!=null&&m.priceBuy!=null){o.mg+=m.priceSell-m.priceBuy;o.mgs+=m.priceSell;}});
+    const rows=Object.entries(by).sort((a,b)=>b[1].s-a[1].s).map(([k,o])=>[cname(k),o.n,o.v,o.s,o.b,o.mg,pct(o.mg,o.mgs)]);
+    R={title:'Chiffre d\'affaires par client',cols:['Client','Missions','Véhicules','Vente €','Achat €','Marge €','Marge %'],money:[3,4,5],rows,foot:['Total',sum(rows.map(r=>r[1])),sum(rows.map(r=>r[2])),sum(rows.map(r=>r[3])),sum(rows.map(r=>r[4])),sum(rows.map(r=>r[5])),''],note:''};
+  }else if(kind==='carrier'){
+    const by={};ms.filter(m=>m.carrierId).forEach(m=>{const o=by[m.carrierId]=by[m.carrierId]||{n:0,d:0,late:0,b:0,km:0,bk:0};o.n++;if(isDone(m.status)){o.d++;}if(lateOf(m)>0||(isDone(m.status)&&m.deliveryDate&&m.deliveredAt&&String(m.deliveredAt).slice(0,10)>m.deliveryDate))o.late++;o.b+=m.priceBuy||0;if(m.priceBuy>0&&m.distanceKm>0){o.km+=m.distanceKm;o.bk+=m.priceBuy;}});
+    const rows=Object.entries(by).sort((a,b)=>b[1].n-a[1].n).map(([k,o])=>[caname(k),o.n,o.d,o.late,pct(o.n-o.late,o.n),o.b,o.km?Math.round(o.bk/o.km*100)/100:null]);
+    R={title:'Performance des transporteurs',cols:['Transporteur','Missions','Livrées','En retard','À temps','Achats €','€/km moyen'],money:[5,6],rows,foot:null,note:'« En retard » : missions actives dont la date de livraison (ou la date limite) est dépassée.'};
+  }else if(kind==='late'){
+    const rows=ms.map(m=>({m,d:lateOf(m)})).filter(x=>x.d>0).sort((a,b)=>b.d-a.d).map(x=>[x.m.ref,cname(x.m.clientId),caname(x.m.carrierId),route(x.m),x.m.status,x.m.deliveryDate?pretty(x.m.deliveryDate):('limite '+pretty(deadlineOf(x.m))),x.d+' j']);
+    R={title:'Missions en retard',cols:['Mission','Client','Transporteur','Trajet','Statut','Livraison prévue','Retard'],rows,foot:null,note:rows.length?'':'Aucune mission en retard sur cette période.'};
+  }else if(kind==='lanes'){
+    const by={};ms.forEach(m=>{const a=ccLabel(m.pickupCountry)||'?',b=ccLabel(m.deliveryCountry)||'?',k=a+' → '+b;const o=by[k]=by[k]||{n:0,s:0,sn:0,b:0,bn:0,km:0,ks:0,kb:0};o.n++;if(m.priceSell>0){o.s+=m.priceSell;o.sn++;if(m.distanceKm>0)o.ks+=m.priceSell/m.distanceKm;}if(m.priceBuy>0){o.b+=m.priceBuy;o.bn++;if(m.distanceKm>0)o.kb+=m.priceBuy/m.distanceKm;}if(m.distanceKm>0)o.km+=m.distanceKm;});
+    const r2=v=>v==null?null:Math.round(v*100)/100;
+    const rows=Object.entries(by).sort((a,b)=>b[1].n-a[1].n).map(([k,o])=>[k,o.n,o.sn?r2(o.s/o.sn):null,o.bn?r2(o.b/o.bn):null,o.n&&o.km?Math.round(o.km/o.n):null,o.sn&&o.ks?r2(o.ks/o.sn):null,o.bn&&o.kb?r2(o.kb/o.bn):null]);
+    R={title:'Prix par trajet',cols:['Trajet','Missions','Vente moyenne €','Achat moyen €','Km moyens','Vente €/km','Achat €/km'],money:[2,3,5,6],rows,foot:null,note:'Sert de repère pour comparer un nouveau prix à ce que tu pratiques déjà sur le même trajet.'};
+  }else if(kind==='tours'){
+    const per=f.per,cut=new Date();cut.setDate(cut.getDate()-per);
+    const rows=db.tours.filter(t=>!t.startDate||new Date(t.startDate+'T12:00:00')>=cut).sort((a,b)=>String(b.startDate).localeCompare(String(a.startDate))).map(t=>{
+      const p=tourPts(t);return[t.name,t.kind==='own'?'Camion propre':t.kind==='charter'?'Affrétée':'Brouillon',t.kind==='own'?((db.trucks.find(x=>x.id===t.truckId)||{}).name||'—'):caname(t.carrierId),t.startDate?pretty(t.startDate):'—',t.endDate?pretty(t.endDate):'—',tourMissions(t).length,Math.round(p*10)/10,Math.round(p/TRUCK_CAPACITY*100)+' %',t.km?Math.round(t.km):null];
+    });
+    R={title:'Tournées et remplissage',cols:['Tournée','Type','Camion / transporteur','Départ','Fin','Missions','Points','Remplissage','Km'],rows,foot:null,note:''};
+  }else if(kind==='docs'){
+    const rows=db.carriers.map(c=>{const comp=carrierCompliance(c.id);const L=DOC_LEVEL;const cell=k=>{const st=comp.sts.find(x=>x.k===k);return L[st.level].t+(st.doc?' · '+pretty(st.doc.validUntil):'');};return[c.name,cell('license'),cell('insurance'),comp.blocked?'Bloqué':L[comp.level].t];}).sort((a,b)=>(a[3]==='Bloqué'?0:1)-(b[3]==='Bloqué'?0:1));
+    R={title:'Documents des transporteurs',cols:['Transporteur','Licence','Assurance','Situation'],rows,foot:null,note:''};
+  }else{
+    const cat={},mk={};ms.forEach(m=>m.cars.forEach(c=>{const k=CATS[catOf(c)].label;cat[k]=(cat[k]||0)+1;const b=(c.make||'—').trim()||'—';mk[b]=(mk[b]||0)+1;}));
+    const rows=[...Object.entries(cat).sort((a,b)=>b[1]-a[1]).map(([k,n])=>['Catégorie',k,n]),...Object.entries(mk).sort((a,b)=>b[1]-a[1]).slice(0,15).map(([k,n])=>['Marque',k,n])];
+    R={title:'Véhicules transportés',cols:['Type','Valeur','Véhicules'],rows,foot:null,note:'Marques : les 15 plus fréquentes.'};
+  }
+  _lastReport=R;
+  const fmt=(v,i)=>v==null?'—':(R.money&&R.money.includes(i)&&typeof v==='number')?eur(v):esc(v);
+  const num=i=>(R.money&&R.money.includes(i))||(typeof (R.rows[0]||[])[i]==='number');
+  return heading('Rapports',esc(R.title)+' · '+R.rows.length+' ligne'+(R.rows.length>1?'s':''))+reportPicker()+f.html+
+    `<div class="panel">${R.rows.length?`<div class="table-wrap"><table><thead><tr>${R.cols.map((c,i)=>`<th ${num(i)?'style="text-align:right"':''}>${esc(c)}</th>`).join('')}</tr></thead><tbody>
+    ${R.rows.map(r=>`<tr>${r.map((v,i)=>`<td ${num(i)?'style="text-align:right"':''}>${fmt(v,i)}</td>`).join('')}</tr>`).join('')}
+    ${R.foot?`<tr style="font-weight:800;background:#f8fafc">${R.foot.map((v,i)=>`<td ${num(i)?'style="text-align:right"':''}>${fmt(v,i)}</td>`).join('')}</tr>`:''}</tbody></table></div>`:'<div class="empty">Aucune donnée sur cette période.</div>'}
+    ${R.note?`<p style="font-size:12px;color:var(--muted)">${esc(R.note)}</p>`:''}</div>`;
+}
+function exportReport(){
+  const R=_lastReport;if(!R||typeof XLSX==='undefined'){alert('Export indisponible.');return;}
+  const aoa=[R.cols,...R.rows.map(r=>r.map(v=>v==null?'':v))];if(R.foot)aoa.push(R.foot);
+  const ws=XLSX.utils.aoa_to_sheet(aoa),wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Rapport');
+  XLSX.writeFile(wb,'rapport-'+reportKind+'-'+todayIso()+'.xlsx');
+}
+
+function reportOverviewPage(){
   const isDone=s=>['livré','facturé','payé'].includes(s);
   const todayD=new Date();todayD.setHours(0,0,0,0);
 
@@ -1501,7 +1594,7 @@ function reportsPage(){
   const clientOpts=db.clients.map(c=>`<option value="${esc(c.id)}" ${rpClientF===c.id?'selected':''}>${esc(c.name)}</option>`).join('');
   const carrierOpts=db.carriers.map(c=>`<option value="${esc(c.id)}" ${rpCarrierF===c.id?'selected':''}>${esc(c.name)}</option>`).join('');
 
-  return heading('Rapports','Statistiques opérationnelles · actualisation automatique')+
+  return heading('Rapports','Choisis le rapport à afficher.')+reportPicker()+
   // ── Filtres ──
   `<div class="panel" style="margin-bottom:10px;padding:12px 16px">
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
@@ -2509,6 +2602,7 @@ const SETTINGS_DEFAULTS={
     BE:{th:'> 7,5 t',w:'veille 16:00-24:00, fer 00:00-24:00',q:'src',note:'Anneaux de Bruxelles/Anvers : heures de pointe 06–09 et 16–21.'},
     NL:{th:'—',w:'',q:'src',note:'Pas d\'interdiction générale de week-end ; interdiction en cas de verglas / faible visibilité ; heures de pointe dans le Randstad.'},
     ES:{th:'—',w:'',q:'est',note:'Restrictions régionales et pour les matières dangereuses (dim./fériés 08:00–24:00). À renseigner selon l\'itinéraire.'}},
+  depot:{name:'',street:'',postal:'',city:'',country:'BE',lat:null,lng:null},
   cost:{consumption:32,adblue:5,maintenance:0.12,driverHour:26,fixedDay:120,speedMargin:10,handlingMin:60,maxDrive:9}
 };
 let settings=JSON.parse(JSON.stringify(SETTINGS_DEFAULTS));
@@ -2530,6 +2624,19 @@ function sUpd(path,v,type){
   const t=document.getElementById('rules-save-note');if(t)t.textContent='● modifications non enregistrées';
   if(type==='num'||type==='bool')rulesCalc();
 }
+async function saveDepot(){
+  const d=settings.depot,note=document.getElementById('rules-save-note');
+  if(!d.city||!d.country){alert('Indique au moins la ville et le pays.');return;}
+  if(note)note.textContent='⏳ Recherche de l\'adresse…';
+  let g=null;try{g=await geocodeAddr(d.street,d.postal,d.city,d.country);}catch(_){}
+  if(!g){alert('Adresse introuvable. Vérifie la rue, le code postal et la ville.');if(note)note.textContent='adresse introuvable';return;}
+  d.lat=g.lat;d.lng=g.lng;
+  if(await saveSetting('depot')){render();}
+}
+const depotOk=()=>settings.depot&&settings.depot.lat!=null&&settings.depot.lng!=null;
+let tourReturnEmpty=(()=>{try{return localStorage.getItem('adRetEmpty')==='1';}catch(_){return false;}})();
+const retOn=()=>tourReturnEmpty&&depotOk();
+function setRetEmpty(v){tourReturnEmpty=!!v;try{localStorage.setItem('adRetEmpty',v?'1':'0');}catch(_){}refreshSelectionUI();}
 async function sSave(key){
   if(await saveSetting(key)){const t=document.getElementById('rules-save-note');if(t)t.innerHTML='<span style="color:var(--green)">✓ enregistré</span>';}
 }
@@ -2626,12 +2733,24 @@ function costTableHtml(){
   ${rows.map(r=>`<tr><td>${esc(r.cc)} · ${esc(ccName(r.cc))}</td><td>${fuelNet(r.cc).toFixed(3)}${fuelGross(r.cc)==null?' <small style="color:var(--amber)">moy. UE</small>':''}</td><td>${r.fuel.toFixed(3)}</td><td>${r.toll.toFixed(3)}</td><td>${r.maint.toFixed(3)}</td><td><b>${r.total.toFixed(3)} €</b></td></tr>`).join('')}</tbody></table>`;
 }
 function rulesPage(){
-  const tabs=[['drive','⏱ Conduite'],['cost','💶 Coût au km'],['fuel','⛽ Gasoil'],['tolls','🛣 Péages'],['ferries','⛴ Ferries'],['bans','🚫 Interdictions'],['holidays','📅 Jours fériés']];
+  const tabs=[['depot','🏠 Dépôt'],['drive','⏱ Conduite'],['cost','💶 Coût au km'],['fuel','⛽ Gasoil'],['tolls','🛣 Péages'],['ferries','⛴ Ferries'],['bans','🚫 Interdictions'],['holidays','📅 Jours fériés']];
   const head=heading('Règles et coûts','Temps de conduite, jours fériés, interdictions de rouler, gasoil, péages et ferries : tout ce qui sert à calculer une tournée.')+
     `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${tabs.map(([k,l])=>`<button class="btn ${rulesTab===k?'primary':''}" onclick="rulesTab='${k}';render()">${l}</button>`).join('')}</div>`;
   const note=`<span id="rules-save-note" style="font-size:12px;color:var(--muted);margin-left:8px"></span>`;
   const saveBar=key=>`<div style="display:flex;gap:8px;align-items:center;margin-top:12px"><button class="btn primary" onclick="sSave('${key}')">Enregistrer</button><button class="btn" onclick="sReset('${key}')">Valeurs par défaut</button>${note}</div>`;
   const inp=(path,val,type,w)=>`<input value="${esc(val??'')}" ${type==='num'?'type="number" step="0.001"':''} style="width:${w||90}px;padding:3px 6px" onchange="sUpd('${path}',this.value,'${type||'text'}')">`;
+  if(rulesTab==='depot'){
+    const d=settings.depot;
+    return head+`<div class="panel"><div class="panel-title"><h2>Adresse du dépôt (retour à vide)</h2><small>Le camion rentre toujours ici après la dernière livraison</small></div>
+    <div class="form-grid"><div class="field wide"><label>Nom</label>${inp('depot.name',d.name,'text',300)}</div>
+    <div class="field wide"><label>Rue et numéro</label>${inp('depot.street',d.street,'text',300)}</div>
+    <div class="field"><label>Code postal</label>${inp('depot.postal',d.postal,'text',120)}</div>
+    <div class="field"><label>Ville</label>${inp('depot.city',d.city,'text',200)}</div>
+    <div class="field"><label>Pays</label><select onchange="sUpd('depot.country',this.value)">${COUNTRIES.map(([k,n])=>`<option value="${k}" ${d.country===k?'selected':''}>${k} · ${esc(n)}</option>`).join('')}</select></div></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:12px"><button class="btn primary" onclick="saveDepot()">📍 Géolocaliser et enregistrer</button>
+      <span id="rules-save-note" style="font-size:12px;color:var(--muted)">${d.lat!=null?'✓ position enregistrée ('+Number(d.lat).toFixed(3)+', '+Number(d.lng).toFixed(3)+')':'adresse non encore géolocalisée'}</span></div>
+    <p style="font-size:12px;color:var(--muted)">Dans le panneau camion de la carte, coche « Retour à vide au dépôt » pour ajouter le trajet de retour (km, durée, péages, carburant, chauffeur) au calcul. Pour une tournée affrétée, le prix d'achat suffit : le retour est à la charge du transporteur.</p></div>`;
+  }
   if(rulesTab==='drive'){
     const c=settings.cost;
     return head+`<div class="panel"><div class="panel-title"><h2>Règles de conduite européennes</h2><small>Règlement (CE) n° 561/2006, modifié par le règlement (UE) 2020/1054 — camions de plus de 3,5 t</small></div>
@@ -3438,7 +3557,7 @@ function countryAt(lat,lng){
 }
 function decodePoly6(s){let i=0,lat=0,lng=0;const out=[];while(i<s.length){let b,sh=0,r=0;do{b=s.charCodeAt(i++)-63;r|=(b&31)<<sh;sh+=5;}while(b>=32);lat+=(r&1)?~(r>>1):(r>>1);sh=0;r=0;do{b=s.charCodeAt(i++)-63;r|=(b&31)<<sh;sh+=5;}while(b>=32);lng+=(r&1)?~(r>>1):(r>>1);out.push([lat/1e6,lng/1e6]);}return out;}
 // Transforme la réponse Valhalla en : segments par pays (km, secondes), ferries, pays de chaque arrêt
-async function buildTourPlan(trip,stops){
+async function buildTourPlan(trip,stops,ret){
   await loadCountryShapes();
   const hasShapes=_geoPolys&&_geoPolys.length>0;
   const k4=x=>x.lat.toFixed(4)+','+x.lng.toFixed(4);
@@ -3480,10 +3599,10 @@ async function buildTourPlan(trip,stops){
   });
   // sans frontières : répartition simple entre pays de départ et d'arrivée de chaque tronçon
   if(!hasShapes)legs.forEach((lg,li)=>{
-    const a=stopCcs[idx.indexOf(li)]||null,b=stopCcs[idx.lastIndexOf(li+1)]||a;
+    const a=stopCcs[idx.indexOf(li)]||null,b=stopCcs[idx.lastIndexOf(li+1)]||(ret?settings.depot.country:null)||a;
     lg.segs.forEach((sg,k)=>{sg.cc=k<lg.segs.length/2?a:b;});
   });
-  return{legs,idx,stopCcs,hasShapes,km:legs.reduce((s,l)=>s+l.segs.reduce((q,g)=>q+g.km,0),0)};
+  return{legs,idx,stopCcs,hasShapes,ret:!!ret,km:legs.reduce((s,l)=>s+l.segs.reduce((q,g)=>q+g.km,0),0)};
 }
 const isBizCC=(cc,iso)=>{const d=new Date(iso+'T12:00:00Z').getUTCDay();return d!==0&&d!==6&&!isHolidayCC(cc||'BE',iso);};
 function ferryFor(f){
@@ -3543,14 +3662,14 @@ function simulateTour(t,plan,startIso){
     });
     (sameSpot[li+1]||[]).forEach(i=>doStop(i));
   });
-  const endDate=date,span=Math.max(1,Math.round((new Date(endDate+'T12:00:00Z')-new Date(startIso+'T12:00:00Z'))/86400000)+1);
+  const finalDate=date,endDate=stopsOut.length?stopsOut[stopsOut.length-1].date:date,span=Math.max(1,Math.round((new Date(finalDate+'T12:00:00Z')-new Date(startIso+'T12:00:00Z'))/86400000)+1);
   const cost={fuel:0,toll:0,maint:0,ferry:ferries.reduce((q,f)=>q+f.cost,0)};
   Object.entries(perCc).forEach(([cc,v])=>{const c=costPerKm(cc);cost.fuel+=v.km*c.fuel;cost.toll+=v.km*c.toll;cost.maint+=v.km*c.maint;});
   const workH=driveH+breakH+handlingH;
   cost.driver=workH*(Number(C.driverHour)||0);
   cost.fixed=span*(Number(C.fixedDay)||0);
   cost.total=cost.fuel+cost.toll+cost.maint+cost.ferry+cost.driver+cost.fixed;
-  return{startDate:startIso,endDate,days:span,driveH,workH,perCc,ferries,waits,stops:stopsOut,cost,km:plan.km};
+  return{startDate:startIso,endDate,returnDate:plan.ret?finalDate:null,days:span,driveH,workH,perCc,ferries,waits,stops:stopsOut,cost,km:plan.km};
 }
 function tourStart(t){
   const today=todayIso(),firstPick=t.ms.map(m=>m.pickupDate).filter(Boolean).sort()[0]||today;
@@ -3563,6 +3682,7 @@ function simHtml(t){
   const fer=s.ferries.map(f=>`<div style="font-size:11.5px">⛴ ${esc(f.name)} · ${fmtH(f.hours)} · ${eur(f.cost)}${f.q==='est'?' <span style="color:var(--amber)">(estimé)</span>':''}</div>`).join('');
   return `<div class="tp-h" style="margin-top:10px">Planning simulé (règles de conduite, interdictions, jours fériés)</div>
     <div style="font-size:12.5px;line-height:1.6">Départ <b>${pretty(s.startDate)}</b> → arrivée <b>${pretty(s.endDate)}</b> · ${s.days} jour${s.days>1?'s':''} · conduite ${fmtH(s.driveH)}</div>
+    ${s.returnDate?`<div style="font-size:12px;color:var(--muted)">Retour à vide au dépôt : <b>${pretty(s.returnDate)}</b> (inclus dans les km, la durée et les coûts)</div>`:''}
     <table style="min-width:0;width:auto;margin:4px 0;font-size:11.5px"><tbody>${rows}</tbody></table>${fer}
     ${s.waits.length?`<div style="font-size:11px;color:var(--amber);margin-top:4px">${s.waits.map(w=>'• '+esc(w)).join('<br>')}</div>`:''}
     ${t.plan&&!t.plan.hasShapes?'<div style="font-size:10.5px;color:var(--amber)">Frontières indisponibles : répartition par pays approximative.</div>':''}`;
@@ -3680,7 +3800,7 @@ function tourMetrics(ms){
   const late=ms.filter(m=>{const u=mapUrgency(m);return u.left!=null&&u.left<0;}).length;
   const urgent=ms.filter(m=>{const u=mapUrgency(m);return u.left!=null&&u.left>=0&&u.left<=2;}).length;
   const deadlines=ms.map(m=>deadlineOf(m)).filter(Boolean).sort();
-  const key=stops.map(x=>x.lat.toFixed(3)+','+x.lng.toFixed(3)).join('|');
+  const key=stops.map(x=>x.lat.toFixed(3)+','+x.lng.toFixed(3)).join('|')+(retOn()?'|R'+Number(settings.depot.lat).toFixed(3)+','+Number(settings.depot.lng).toFixed(3):'');
   const real=_tourKmCache[key]||null;
   const plan=real&&real.plan?real.plan:null;
   let sim=null;if(plan){try{sim=simulateTour({ms,stops},plan,tourStart({ms}));}catch(e){console.warn('Simulation :',e);}}
@@ -3691,6 +3811,7 @@ async function tourRealKm(){
   // les arrêts consécutifs au même endroit comptent 0 km : on les fusionne
   const k4=x=>x.lat.toFixed(4)+','+x.lng.toFixed(4);
   const pts=[];t.stops.forEach(x=>{if(!pts.length||k4(pts[pts.length-1])!==k4(x))pts.push(x);});
+  if(retOn()&&pts.length)pts.push({lat:Number(settings.depot.lat),lng:Number(settings.depot.lng)});
   if(pts.length>20){alert('Trop d\'arrêts pour le calcul routier (20 maximum).');return;}
   const btn=document.getElementById('tp-real-btn');if(btn){btn.disabled=true;btn.textContent='⏳ Calcul (pays, ferries, calendrier)…';}
   try{
@@ -3707,7 +3828,7 @@ async function tourRealKm(){
     let plan=null;
     if(trip){
       try{
-        plan=await buildTourPlan(trip,t.stops);
+        plan=await buildTourPlan(trip,t.stops,retOn());
         const ccs=new Set();plan.legs.forEach(l=>l.segs.forEach(g=>g.cc&&ccs.add(g.cc)));plan.stopCcs.forEach(c=>c&&ccs.add(c));
         const y=new Date().getFullYear();
         for(const cc of ccs)for(const yy of [y,y+1])await holLoad(cc,yy);
@@ -3788,6 +3909,7 @@ function truckPanelHtml(t){
         <ol style="margin:0;padding-left:20px;font-size:12px;line-height:1.6">${t.stops.map(x=>`<li>${x.t==='P'?'⬆ chargement':'⬇ déchargement'} <b>${esc(x.m.ref)}</b> — ${esc(place(x.t==='P'?x.m.pickupCountry:x.m.deliveryCountry,x.t==='P'?x.m.pickupCity:x.m.deliveryCity))}</li>`).join('')}</ol>
         <div style="font-size:12.5px;margin-top:8px">${t.realKm!=null?`<b>${t.realKm} km</b> routiers (${t.realMode==='camion'?'itinéraire poids lourd':'itinéraire voiture : poids lourd indisponible ici'})`:`≈ <b>${Math.round(t.kmEst)} km</b> estimés`} · missions séparées : ${Math.round(t.directKm)} km<br>
           ${saving>=0?`<span style="color:var(--green)">économie de ${Math.round(saving)} km grâce au regroupement</span>`:`<span style="color:var(--red)">${Math.round(-saving)} km de plus qu'en missions séparées</span>`}</div>
+        <label style="display:block;font-size:12px;margin-top:6px"><input type="checkbox" ${tourReturnEmpty?'checked':''} onchange="setRetEmpty(this.checked)"> Retour à vide au dépôt${depotOk()?'':' <span style="color:var(--amber)">(renseigne le dépôt dans Règles et coûts)</span>'}</label>
         ${t.realKm==null?'<button class="btn" id="tp-real-btn" style="margin-top:6px;font-size:11px" onclick="tourRealKm()">📏 Calculer itinéraire, durée et coûts</button>':''}
         ${simHtml(t)}
         <div style="font-size:10.5px;color:var(--muted);margin-top:4px">Sans retour à vide.</div></div>
