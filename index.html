@@ -151,8 +151,8 @@ const CARRIER_TOKEN = new URLSearchParams(window.location.search).get('t');
 const INSPECTION_TOKEN = new URLSearchParams(window.location.search).get('inspection');
 
 // ─── STATE ──────────────────────────────────────────────────────
-const NAV=[["Vue d'ensemble",'⌂'],['Planning','▦'],['Missions','▤'],['Véhicules','▣'],['Clients','◫'],['Transporteurs','▰'],['Documents','▧'],['Carte','◎'],['Finance','€'],['Rapports','📊'],['Résumé','i']];
-let db={clients:[],carriers:[],missions:[],carrierEvents:[],deliveryInspections:[],selectedIds:[],sort:'ref',direction:1};
+const NAV=[["Vue d'ensemble",'⌂'],['Planning','▦'],['Missions','▤'],['Véhicules','▣'],['Clients','◫'],['Transporteurs','▰'],['Documents','▧'],['Carte','◎'],['Tournées','⇄'],['Finance','€'],['Rapports','📊'],['Résumé','i']];
+let db={clients:[],carriers:[],missions:[],carrierEvents:[],deliveryInspections:[],trucks:[],tours:[],selectedIds:[],sort:'ref',direction:1};
 let current="Vue d'ensemble",search='',filterStatus='Tous les statuts',docSearch='',docFilter='';
 let editingMission=null,detailId=null,currentUser=null;
 let weekOffset=0,filterClient='Tous les clients',filterCarrier='Tous les transporteurs';
@@ -533,6 +533,11 @@ async function loadData(){
     // delivery_inspections : états des lieux véhicules
     try{const ri=await sb.from('delivery_inspections').select('*').order('created_at');db.deliveryInspections=ri.data||[];}
     catch(e){console.warn('delivery_inspections non disponible:',e.message);db.deliveryInspections=[];};
+    // camions et tournées (tables facultatives : l'application fonctionne aussi sans)
+    try{const rt=await sb.from('trucks').select('*').order('name');
+      db.trucks=(rt.data||[]).map(x=>({id:x.id,name:x.name||'',plate:x.plate||'',capacity:Number(x.capacity_pts)||8,active:x.active!==false}));}catch(e){db.trucks=[];}
+    try{const rr=await sb.from('tours').select('*').order('start_date');
+      db.tours=(rr.data||[]).map(x=>({id:x.id,name:x.name||'',kind:x.kind||'draft',truckId:x.truck_id||'',carrierId:x.carrier_id||'',startDate:x.start_date||'',endDate:x.end_date||'',returnDay:x.return_day||'',km:x.km!=null?Number(x.km):null,stops:Array.isArray(x.stops)?x.stops:[],notes:x.notes||''}));}catch(e){db.tours=[];}
     const cars=r4.data||[],notifs=r5.data||[],docs=r6.data||[];
     db.missions=(r3.data||[]).map(m=>({
       id:m.id,ref:m.ref||'',
@@ -558,6 +563,7 @@ async function loadData(){
       pickupLat:m.pickup_lat!=null?Number(m.pickup_lat):null,pickupLng:m.pickup_lng!=null?Number(m.pickup_lng):null,
       deliveryLat:m.delivery_lat!=null?Number(m.delivery_lat):null,deliveryLng:m.delivery_lng!=null?Number(m.delivery_lng):null,
       orderDate:m.order_date||(m.created_at?String(m.created_at).slice(0,10):''),
+      tourId:m.tour_id||'',
       cars:cars.filter(c=>c.mission_id===m.id).map(c=>({
         id:c.id,make:c.make||'',model:c.model||'',vin:c.vin||'',plate:c.plate||'',
         status:c.status||'à charger',
@@ -794,6 +800,7 @@ function render(){
   else if(current==='Documents')view.innerHTML=documentsPage();
   else if(current==='Rapports')view.innerHTML=reportsPage();
   else if(current==='Carte'){view.innerHTML=mapPage();setTimeout(initMapView,0);}
+  else if(current==='Tournées')view.innerHTML=toursPage();
   else view.innerHTML=financePage();
 }
 
@@ -1834,6 +1841,225 @@ function profitBlock(m){
   <p>${km?'':`<button class="btn soft" onclick="calcKmForMission('${esc(m.id)}')">📍 Calculer les km</button> `}<button class="btn" onclick="openMissionForm('${esc(m.id)}')">Modifier les prix</button></p></div>`;
 }
 
+// ─── TOURNÉES : camions, tournées enregistrées, planning hebdomadaire ───
+let tourWeek=0;
+const TOUR_KM_MIN=2500,TOUR_KM_MAX=3000;   // objectif hebdomadaire par camion
+const tourOf=m=>m.tourId?db.tours.find(t=>t.id===m.tourId):null;
+const tourMissions=t=>db.missions.filter(m=>m.tourId===t.id);
+const KIND_LABEL={own:'Camion propre',charter:'Affrété',draft:'Brouillon'};
+const KIND_COLOR={own:'#2675a9',charter:'#9a6b18',draft:'#8094a6'};
+const addDays=(iso,n)=>{const d=new Date(iso+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return _isoD(d);};
+const diffDays=(a,b)=>Math.round((new Date(b+'T12:00:00Z')-new Date(a+'T12:00:00Z'))/86400000);
+const mondayOf=iso=>addDays(iso,-((new Date(iso+'T12:00:00Z').getUTCDay()+6)%7));
+function addWorkdays(iso,n){let d=iso;while(n>0){d=addDays(d,1);const w=new Date(d+'T12:00:00Z').getUTCDay();if(w!==0&&w!==6)n--;}return d;}
+const fmtDay=iso=>iso?new Date(iso+'T12:00:00Z').toLocaleDateString('fr-BE',{day:'numeric',month:'short'}):'—';
+const truckName=id=>(db.trucks.find(x=>x.id===id)||{}).name||'—';
+function tourPts(t){return tourMissions(t).reduce((s,m)=>s+missionPoints(m),0);}
+function tourBlock(m){
+  const t=tourOf(m);if(!t)return '';
+  return `<div class="detail-block"><h3>Tournée</h3><div class="info-grid">
+    <span>Tournée<strong>${esc(t.name)}</strong></span>
+    <span>Affectation<strong>${t.kind==='own'?'🚛 '+esc(truckName(t.truckId)):(t.kind==='charter'?'Affrété : '+esc((db.carriers.find(c=>c.id===t.carrierId)||{}).name||'—'):'Brouillon')}</strong></span>
+    <span>Dates<strong>${fmtDay(t.startDate)} → ${fmtDay(t.endDate)}</strong></span>
+    <span>Missions<strong>${tourMissions(t).length} · ${fmtPts(tourPts(t))} pts</strong></span></div>
+    <p><button class="btn" onclick="openTourDetail('${esc(t.id)}')">Ouvrir la tournée</button></p></div>`;
+}
+
+function toursPage(){
+  const monday=addDays(mondayOf(todayIso()),tourWeek*7);
+  const days=Array.from({length:7},(_,i)=>addDays(monday,i));
+  const inWeek=t=>t.startDate&&t.startDate>=monday&&t.startDate<=days[6];
+  const rows=[...db.trucks.filter(x=>x.active).map(x=>({key:'t'+x.id,truck:x,label:x.name,sub:x.plate,tours:db.tours.filter(t=>t.kind==='own'&&t.truckId===x.id)})),
+    {key:'ch',label:'Affrétées',sub:'transporteurs',tours:db.tours.filter(t=>t.kind==='charter')},
+    {key:'dr',label:'Brouillons',sub:'non affectées',tours:db.tours.filter(t=>t.kind==='draft')}];
+  const gridRow=r=>{
+    const visible=r.tours.filter(t=>t.startDate&&diffDays(monday,t.endDate||t.startDate)>=0&&diffDays(monday,t.startDate)<=6).sort((a,b)=>a.startDate.localeCompare(b.startDate));
+    const lanes=[];
+    const bars=visible.map(t=>{
+      const s=Math.max(0,diffDays(monday,t.startDate)),e=Math.min(6,diffDays(monday,t.endDate||t.startDate));
+      let lane=lanes.findIndex(end=>end<s);if(lane<0){lane=lanes.length;lanes.push(e);}else lanes[lane]=e;
+      const ms=tourMissions(t);
+      return `<div onclick="openTourDetail('${esc(t.id)}')" title="${esc(t.name)}" style="grid-column:${s+1}/${e+2};grid-row:${lane+1};background:${KIND_COLOR[t.kind]};color:#fff;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis"><b>${esc(t.name)}</b> · ${ms.length} mission${ms.length>1?'s':''} · ${fmtPts(tourPts(t))} pts${t.km?' · '+Math.round(t.km)+' km':''}${t.kind==='charter'?' · '+esc((db.carriers.find(c=>c.id===t.carrierId)||{}).name||''):''}${t.returnDay?' · ↩ '+(t.returnDay==='friday'?'ven.':'sam.'):''}</div>`;
+    }).join('');
+    let gauge='';
+    if(r.truck){
+      const km=r.tours.filter(inWeek).reduce((s,t)=>s+(t.km||0),0);
+      const col=km>=TOUR_KM_MIN?'#24784d':(km>0?'#9a6b18':'#a54b48');
+      gauge=`<div style="height:6px;background:#e6edf3;border-radius:3px;margin-top:5px"><div style="height:100%;width:${Math.min(100,km/TOUR_KM_MAX*100)}%;background:${col};border-radius:3px"></div></div><div style="font-size:10.5px;color:${col}">${Math.round(km).toLocaleString('fr-BE')} km / ${TOUR_KM_MIN.toLocaleString('fr-BE')}–${TOUR_KM_MAX.toLocaleString('fr-BE')}</div>`;
+    }
+    return `<div style="display:grid;grid-template-columns:170px 1fr;gap:8px;border-top:1px solid var(--line);padding:8px 0">
+      <div><strong style="font-size:13px">${esc(r.label)}</strong> <small style="color:var(--muted)">${esc(r.sub||'')}</small>${r.truck?` <a href="javascript:void(0)" onclick="openTruckForm('${esc(r.truck.id)}')" style="font-size:11px;color:var(--blue)">modifier</a>`:''}${gauge}</div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:30px;gap:3px;position:relative;min-height:36px">
+        ${days.map((d,i)=>`<div style="grid-column:${i+1};grid-row:1/span ${Math.max(1,lanes.length)};background:${[5,6].includes(i)?'#f4f7fa':'#fafcfd'};border-radius:4px"></div>`).join('')}${bars}</div></div>`;
+  };
+  const all=[...db.tours].sort((a,b)=>String(b.startDate).localeCompare(String(a.startDate)));
+  return heading('Tournées','Camions, tournées et planning hebdomadaire.',
+    `<button class="btn" onclick="openTruckForm()">＋ Camion</button> <button class="btn primary" onclick="setView('Carte')">＋ Nouvelle tournée (depuis la carte)</button>`)+
+  `<div class="panel">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+      <button class="btn" onclick="tourWeek--;render()">‹</button>
+      <strong>Semaine du ${fmtDay(monday)} au ${fmtDay(days[6])}</strong>
+      <button class="btn" onclick="tourWeek++;render()">›</button>
+      <button class="btn" onclick="tourWeek=0;render()">Aujourd'hui</button>
+      <span style="font-size:11.5px;color:var(--muted)">Objectif camion propre : ${TOUR_KM_MIN.toLocaleString('fr-BE')} à ${TOUR_KM_MAX.toLocaleString('fr-BE')} km par semaine</span>
+    </div>
+    <div style="display:grid;grid-template-columns:170px 1fr;gap:8px"><div></div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center;font-size:11px;font-weight:700;color:var(--muted)">${days.map(d=>`<div ${d===todayIso()?'style="color:var(--blue)"':''}>${new Date(d+'T12:00:00Z').toLocaleDateString('fr-BE',{weekday:'short',day:'numeric'})}</div>`).join('')}</div></div>
+    ${db.trucks.filter(x=>x.active).length?'':'<div class="notice" style="margin:8px 0">Aucun camion : clique sur « ＋ Camion » pour créer tes camions (2 pour les tests).</div>'}
+    ${rows.map(gridRow).join('')}
+  </div>
+  <div class="panel"><div style="font-weight:700;margin-bottom:8px">Toutes les tournées (${all.length})</div>
+    <div class="table-wrap"><table><thead><tr><th>Tournée</th><th>Affectation</th><th>Dates</th><th>Missions</th><th>Points</th><th>Km</th><th></th></tr></thead><tbody>
+    ${all.map(t=>`<tr><td><strong>${esc(t.name)}</strong></td><td>${t.kind==='own'?'🚛 '+esc(truckName(t.truckId)):(t.kind==='charter'?'Affrété · '+esc((db.carriers.find(c=>c.id===t.carrierId)||{}).name||'—'):'Brouillon')}</td><td>${fmtDay(t.startDate)} → ${fmtDay(t.endDate)}</td><td>${tourMissions(t).map(m=>esc(m.ref)).join(', ')||'—'}</td><td>${fmtPts(tourPts(t))}</td><td>${t.km?Math.round(t.km):'—'}</td><td><button class="btn" onclick="openTourDetail('${esc(t.id)}')">Ouvrir</button></td></tr>`).join('')||'<tr><td colspan="7" class="empty">Aucune tournée enregistrée.</td></tr>'}
+    </tbody></table></div></div>`;
+}
+
+// — Camions —
+function openTruckForm(id){
+  const x=id?db.trucks.find(t=>t.id===id):null;
+  document.getElementById('modal-content').innerHTML=`<div class="modal-header"><div><h2>${x?'Modifier':'Ajouter'} un camion</h2></div><button class="x" onclick="closeModal()">×</button></div>
+  <div class="form-grid"><div class="field"><label>Nom *</label><input id="tr-name" value="${esc(x?.name||'')}" placeholder="Camion 1"></div>
+  <div class="field"><label>Plaque</label><input id="tr-plate" value="${esc(x?.plate||'')}"></div>
+  <div class="field"><label>Capacité (points)</label><input id="tr-cap" type="number" step="0.5" min="1" value="${esc(x?.capacity||8)}"></div>
+  <div class="field"><label>Actif</label><select id="tr-active"><option value="1" ${x&&!x.active?'':'selected'}>Oui</option><option value="0" ${x&&!x.active?'selected':''}>Non (archivé)</option></select></div></div>
+  <div id="form-error"></div><div class="modal-footer"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn primary" onclick="saveTruck('${esc(id||'')}')">Enregistrer</button></div>`;
+  document.getElementById('modal').classList.add('open');
+}
+async function saveTruck(id){
+  if(!val('tr-name')){document.getElementById('form-error').innerHTML='<div class="notice error">Indique le nom du camion.</div>';return;}
+  const row={id:id||crypto.randomUUID(),name:val('tr-name'),plate:val('tr-plate')||null,capacity_pts:parseNum(val('tr-cap'))||8,active:val('tr-active')!=='0'};
+  setLoading(true);
+  const{error}=await sb.from('trucks').upsert(row);
+  setLoading(false);
+  if(error){document.getElementById('form-error').innerHTML=`<div class="notice error">Camion non enregistré : ${esc(error.message)}</div>`;return;}
+  const o={id:row.id,name:row.name,plate:row.plate||'',capacity:row.capacity_pts,active:row.active};
+  db.trucks=id?db.trucks.map(t=>t.id===id?o:t):[...db.trucks,o];
+  closeModal();render();
+}
+
+// — Création d'une tournée depuis la sélection de la carte —
+function openTourForm(){
+  const t=_lastTour;if(!t)return;
+  if(t.ms.some(m=>m.tourId)){alert('Certaines missions sont déjà dans une tournée.');return;}
+  const today=todayIso(),firstPick=t.ms.map(m=>m.pickupDate).filter(Boolean).sort()[0]||today;
+  const start=firstPick<today?today:firstPick;
+  const km=Math.round(t.realKm??t.kmEst),days=Math.max(1,Math.ceil(km/550));   // ≈ 550 km par jour
+  const trucks=db.trucks.filter(x=>x.active);
+  document.getElementById('modal-content').innerHTML=`<div class="modal-header"><div><h2>Créer la tournée</h2><p>${t.ms.length} mission${t.ms.length>1?'s':''} · ${t.veh} véhicule${t.veh>1?'s':''} · ${fmtPts(t.pts)} pts · ≈ ${km} km</p></div><button class="x" onclick="closeModal()">×</button></div>
+  <div class="form-grid">
+    <div class="field wide"><label>Affectation</label><select id="tf-kind" onchange="tourFormKind()"><option value="own">🚛 Camion propre</option><option value="charter">Affréter à un transporteur</option><option value="draft">Brouillon (non affecté)</option></select></div>
+    <div class="field" id="tf-truck-f"><label>Camion</label><select id="tf-truck">${trucks.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}${x.plate?' · '+esc(x.plate):''}</option>`).join('')||'<option value="">— aucun camion : crée-en un dans « Tournées » —</option>'}</select></div>
+    <div class="field" id="tf-carrier-f" style="display:none"><label>Transporteur</label><select id="tf-carrier"><option value="">Choisir…</option>${db.carriers.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></div>
+    <div class="field"><label>Départ</label><input id="tf-start" type="date" value="${start}"></div>
+    <div class="field"><label>Fin prévue</label><input id="tf-end" type="date" value="${addWorkdays(start,days-1)}"></div>
+    <div class="field" id="tf-return-f"><label>Retour du camion</label><select id="tf-return"><option value="">Pas de retour (le dernier point est le départ suivant)</option><option value="friday">Rentre le vendredi</option><option value="saturday">Rentre le samedi</option></select></div>
+    <div class="field wide"><label>Note</label><input id="tf-notes" placeholder="facultatif"></div>
+  </div><div id="form-error"></div>
+  <div class="modal-footer"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn primary" onclick="saveTour()">Créer la tournée</button></div>`;
+  document.getElementById('modal').classList.add('open');
+}
+function tourFormKind(){
+  const k=document.getElementById('tf-kind').value;
+  document.getElementById('tf-truck-f').style.display=k==='own'?'':'none';
+  document.getElementById('tf-return-f').style.display=k==='own'?'':'none';
+  document.getElementById('tf-carrier-f').style.display=k==='charter'?'':'none';
+}
+async function saveTour(){
+  const t=_lastTour,err=document.getElementById('form-error');
+  if(!t)return;
+  const kind=val('tf-kind'),truckId=val('tf-truck'),carrierId=val('tf-carrier'),start=val('tf-start'),end=val('tf-end')||start;
+  if(kind==='own'&&!truckId){err.innerHTML='<div class="notice error">Choisis un camion (ou crée-en un dans l\'onglet Tournées).</div>';return;}
+  if(kind==='charter'&&!carrierId){err.innerHTML='<div class="notice error">Choisis un transporteur.</div>';return;}
+  if(!start){err.innerHTML='<div class="notice error">Indique la date de départ.</div>';return;}
+  if(end<start){err.innerHTML='<div class="notice error">La date de fin est avant le départ.</div>';return;}
+  const n=db.tours.filter(x=>x.startDate===start).length+1;
+  const name=`T-${start.replace(/-/g,'').slice(2)}-${n}`;
+  const mids=t.ms.map(m=>m.id);
+  const row={id:crypto.randomUUID(),name,kind,truck_id:kind==='own'?truckId:null,carrier_id:kind==='charter'?carrierId:null,start_date:start,end_date:end,
+    return_day:kind==='own'?(val('tf-return')||null):null,km:Math.round(t.realKm??t.kmEst),stops:t.stops.map(x=>({t:x.t,mid:x.m.id})),notes:val('tf-notes')||null};
+  setLoading(true);
+  const{error}=await sb.from('tours').insert(row);
+  if(error){setLoading(false);err.innerHTML=`<div class="notice error">Tournée non enregistrée : ${esc(error.message)}</div>`;return;}
+  const{error:e2}=await sb.from('missions').update({tour_id:row.id}).in('id',mids);
+  if(e2){setLoading(false);err.innerHTML=`<div class="notice error">Missions non rattachées : ${esc(e2.message)}</div>`;return;}
+  // statut : « à planifier » devient « attribué » (affecté à une tournée)
+  const upgrade=t.ms.filter(m=>m.status==='à planifier').map(m=>m.id);
+  if(upgrade.length&&kind!=='draft'){await sb.from('missions').update({status:'attribué'}).in('id',upgrade);upgrade.forEach(id=>{db.missions.find(m=>m.id===id).status='attribué';});}
+  db.tours.push({id:row.id,name,kind,truckId:row.truck_id||'',carrierId:row.carrier_id||'',startDate:start,endDate:end,returnDay:row.return_day||'',km:row.km,stops:row.stops,notes:row.notes||''});
+  t.ms.forEach(m=>{m.tourId=row.id;});
+  mapSelected.clear();
+  setLoading(false);closeModal();
+  if(kind==='charter')await assignCarrierToMissions(carrierId,mids,'');   // statut, liens portail, e-mail au transporteur
+  refreshSelectionUI();
+  if(current==='Carte'){render();}else render();
+  setTimeout(()=>alert(`Tournée ${name} créée (${mids.length} mission${mids.length>1?'s':''}).`),100);
+}
+
+// — Fiche d'une tournée —
+function openTourDetail(id){
+  const t=db.tours.find(x=>x.id===id);if(!t)return;
+  const ms=tourMissions(t),trucks=db.trucks.filter(x=>x.active||x.id===t.truckId);
+  document.getElementById('modal-content').innerHTML=`<div class="modal-header"><div><h2>Tournée ${esc(t.name)}</h2><p>${ms.length} mission${ms.length>1?'s':''} · ${fmtPts(tourPts(t))} / 8 pts${t.km?' · '+Math.round(t.km)+' km':''}</p></div><button class="x" onclick="closeModal()">×</button></div>
+  <div class="form-grid">
+    <div class="field wide"><label>Affectation</label><select id="td-kind" onchange="document.getElementById('td-truck-f').style.display=this.value==='own'?'':'none';document.getElementById('td-carrier-f').style.display=this.value==='charter'?'':'none'"><option value="own" ${t.kind==='own'?'selected':''}>🚛 Camion propre</option><option value="charter" ${t.kind==='charter'?'selected':''}>Affrété à un transporteur</option><option value="draft" ${t.kind==='draft'?'selected':''}>Brouillon</option></select></div>
+    <div class="field" id="td-truck-f" style="${t.kind==='own'?'':'display:none'}"><label>Camion</label><select id="td-truck"><option value="">—</option>${trucks.map(x=>`<option value="${esc(x.id)}" ${t.truckId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>
+    <div class="field" id="td-carrier-f" style="${t.kind==='charter'?'':'display:none'}"><label>Transporteur</label><select id="td-carrier"><option value="">—</option>${db.carriers.map(c=>`<option value="${esc(c.id)}" ${t.carrierId===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
+    <div class="field"><label>Départ</label><input id="td-start" type="date" value="${esc(t.startDate)}"></div>
+    <div class="field"><label>Fin prévue</label><input id="td-end" type="date" value="${esc(t.endDate)}"></div>
+    <div class="field"><label>Retour du camion</label><select id="td-return"><option value="">Pas de retour</option><option value="friday" ${t.returnDay==='friday'?'selected':''}>Rentre le vendredi</option><option value="saturday" ${t.returnDay==='saturday'?'selected':''}>Rentre le samedi</option></select></div>
+    <div class="field wide"><label>Note</label><input id="td-notes" value="${esc(t.notes)}"></div>
+    <div class="form-section">MISSIONS DE LA TOURNÉE</div>
+    <div class="field wide">${ms.map(m=>`<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)"><span style="flex:1"><b>${esc(m.ref)}</b> · ${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))} · ${m.cars.length} véh. · ${fmtPts(missionPoints(m))} pts</span><button class="btn" onclick="openDetail('${esc(m.id)}');closeModal()">Ouvrir</button><button class="btn" onclick="removeFromTour('${esc(t.id)}','${esc(m.id)}')">Retirer</button></div>`).join('')||'<div style="color:var(--muted)">Aucune mission.</div>'}</div>
+  </div><div id="form-error"></div>
+  <div class="modal-footer"><button class="btn" style="margin-right:auto;color:var(--red)" onclick="deleteTour('${esc(t.id)}')">Supprimer la tournée</button><button class="btn" onclick="viewTourOnMap('${esc(t.id)}')">Voir sur la carte</button><button class="btn" onclick="closeModal()">Fermer</button><button class="btn primary" onclick="saveTourEdit('${esc(t.id)}')">Enregistrer</button></div>`;
+  document.getElementById('modal').classList.add('open');
+}
+async function saveTourEdit(id){
+  const t=db.tours.find(x=>x.id===id),err=document.getElementById('form-error');if(!t)return;
+  const kind=val('td-kind'),truckId=val('td-truck'),carrierId=val('td-carrier'),start=val('td-start'),end=val('td-end')||start;
+  if(kind==='own'&&!truckId){err.innerHTML='<div class="notice error">Choisis un camion.</div>';return;}
+  if(kind==='charter'&&!carrierId){err.innerHTML='<div class="notice error">Choisis un transporteur.</div>';return;}
+  if(!start||end<start){err.innerHTML='<div class="notice error">Vérifie les dates.</div>';return;}
+  const row={kind,truck_id:kind==='own'?truckId:null,carrier_id:kind==='charter'?carrierId:null,start_date:start,end_date:end,return_day:kind==='own'?(val('td-return')||null):null,notes:val('td-notes')||null};
+  setLoading(true);
+  const{error}=await sb.from('tours').update(row).eq('id',id);
+  setLoading(false);
+  if(error){err.innerHTML=`<div class="notice error">Non enregistré : ${esc(error.message)}</div>`;return;}
+  const newCarrier=kind==='charter'&&carrierId&&carrierId!==t.carrierId;
+  Object.assign(t,{kind,truckId:row.truck_id||'',carrierId:row.carrier_id||'',startDate:start,endDate:end,returnDay:row.return_day||'',notes:row.notes||''});
+  closeModal();render();
+  if(newCarrier)await assignCarrierToMissions(carrierId,tourMissions(t).map(m=>m.id),'');
+}
+async function removeFromTour(tid,mid){
+  if(!confirm('Retirer cette mission de la tournée ?'))return;
+  setLoading(true);
+  const{error}=await sb.from('missions').update({tour_id:null}).eq('id',mid);
+  setLoading(false);
+  if(error){alert('Erreur : '+error.message);return;}
+  const m=db.missions.find(x=>x.id===mid);if(m)m.tourId='';
+  const t=db.tours.find(x=>x.id===tid);
+  if(t)t.stops=t.stops.filter(s=>s.mid!==mid);
+  if(t&&!tourMissions(t).length){closeModal();if(confirm('La tournée est vide. La supprimer ?'))await deleteTour(tid,true);else render();return;}
+  openTourDetail(tid);render();
+}
+async function deleteTour(id,silent){
+  if(!silent&&!confirm('Supprimer cette tournée ? Les missions redeviennent disponibles (elles ne sont pas supprimées).'))return;
+  setLoading(true);
+  const{error}=await sb.from('tours').delete().eq('id',id);
+  setLoading(false);
+  if(error){alert('Erreur : '+error.message);return;}
+  db.missions.forEach(m=>{if(m.tourId===id)m.tourId='';});
+  db.tours=db.tours.filter(t=>t.id!==id);
+  closeModal();render();
+}
+function viewTourOnMap(id){
+  const t=db.tours.find(x=>x.id===id);if(!t)return;
+  closeModal();
+  mapFilter.group='Toutes';mapSelected.clear();
+  setView('Carte');
+  setTimeout(()=>{const ids=tourMissions(t).filter(hasGeo).map(m=>m.id);if(ids.length&&_map){_map.fitBounds(ids.flatMap(i=>[_mapItems[i]?.pa,_mapItems[i]?.pb]).filter(Boolean),{padding:[60,60],maxZoom:8});}},400);
+}
+
 function deadlineBlock(m){
   if(!m.orderDate)return '';
   const dl=deadlineOf(m),left=daysLeft(dl),done=DONE_STATUSES.includes(m.status);
@@ -1846,7 +2072,7 @@ function deadlineBlock(m){
 }
 
 // ─── CARTE : une couleur par mission ; rond ⬆ = chargement, carré ⬇ = déchargement, flèche = sens du trajet ───
-let mapFilter={group:'En cours',urgent:false,lines:true};
+let mapFilter={group:'Sans tournée',urgent:false,lines:true};
 let _map=null,_mapView=null,_mapItems={},mapSel=null,_selLayer=null,_drawLayer=null;
 let mapSelected=new Set(),mapSelMode=null,mapSelTarget='pickup',truckPanelOpen=true,_lastTour=null;
 let truckCostKm=(()=>{try{return localStorage.getItem('adCostKm')||'';}catch(_){return'';}})();
@@ -1856,7 +2082,7 @@ const MAP_PALETTE=['#e6194b','#4363d8','#f58231','#911eb4','#008080','#9a6324','
 const mapColor=id=>{let h=0;for(const ch of String(id))h=(h*31+ch.charCodeAt(0))>>>0;return MAP_PALETTE[h%MAP_PALETTE.length];};
 const hasGeo=m=>m.pickupLat!=null&&m.deliveryLat!=null;
 function mapMissions(){
-  return db.missions.filter(m=>mapFilter.group==='Toutes'?true:(mapFilter.group==='Terminées'?DONE_STATUSES.includes(m.status):!DONE_STATUSES.includes(m.status)))
+  return db.missions.filter(m=>mapFilter.group==='Toutes'?true:(mapFilter.group==='Terminées'?DONE_STATUSES.includes(m.status):(!DONE_STATUSES.includes(m.status)&&(mapFilter.group!=='Sans tournée'||!m.tourId))))
     .filter(m=>{if(!mapFilter.urgent)return true;const dl=deadlineOf(m);return dl&&!DONE_STATUSES.includes(m.status)&&daysLeft(dl)<=2;});
 }
 function mapUrgency(m){
@@ -1868,10 +2094,10 @@ function mapItemHtml(m){
   const u=mapUrgency(m),geo=hasGeo(m);
   const chip=u.dl?`<span style="color:${u.ring||'var(--muted)'};font-weight:${u.ring?800:400}">${u.left<0?'⚠ '+(-u.left)+' j de retard':u.left+' j'}</span>`:'';
   return `<div class="map-item${mapSel===m.id?' sel':''}${mapSelected.has(m.id)?' chk':''}" data-id="${esc(m.id)}" data-geo="${geo?1:0}" data-q="${esc((m.ref+' '+(getClient(m).name||'')+' '+(m.pickupCity||'')+' '+(m.deliveryCity||'')).toLowerCase())}" style="--c:${mapColor(m.id)}" onmouseenter="mapHover('${esc(m.id)}')" onmouseleave="mapHover(null)" onclick="mapSelect('${esc(m.id)}')">
-    <input type="checkbox" ${geo?'':'disabled'} ${mapSelected.has(m.id)?'checked':''} title="Ajouter à la sélection (camion)" onclick="event.stopPropagation();mapToggle('${esc(m.id)}')" style="margin:3px 2px 0 0;flex-shrink:0">
+    <input type="checkbox" ${(geo&&!m.tourId)?'':'disabled'} ${mapSelected.has(m.id)?'checked':''} title="Ajouter à la sélection (camion)" onclick="event.stopPropagation();mapToggle('${esc(m.id)}')" style="margin:3px 2px 0 0;flex-shrink:0">
     <div style="flex:1;min-width:0"><strong style="font-size:12px">${esc(m.ref)}</strong> <span style="font-size:11px;color:var(--muted)">${esc(getClient(m).name||'')}</span>
     <div style="font-size:11px;color:#536a7d">${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}</div>
-    <div style="font-size:10.5px;color:var(--muted)">${m.cars.length} véh. · ${fmtPts(missionPoints(m))} pts${m.distanceKm?' · '+m.distanceKm+' km':''} ${chip}${geo?'':' <b style="color:var(--amber)">· à géolocaliser</b>'}</div></div></div>`;
+    <div style="font-size:10.5px;color:var(--muted)">${m.cars.length} véh. · ${fmtPts(missionPoints(m))} pts${m.distanceKm?' · '+m.distanceKm+' km':''} ${chip}${geo?'':' <b style="color:var(--amber)">· à géolocaliser</b>'}${m.tourId?` <b style="color:#24784d">· 🚛 ${esc((tourOf(m)||{}).name||'tournée')}</b>`:''}</div></div></div>`;
 }
 function mapPage(){
   const list=mapMissions();
@@ -1909,7 +2135,7 @@ function mapPage(){
   </style>
   <div class="panel">
     <div class="toolbar" style="margin-bottom:10px;gap:10px;flex-wrap:wrap;align-items:center">
-      <select onchange="mapFilter.group=this.value;render()">${['En cours','Toutes','Terminées'].map(g=>`<option ${mapFilter.group===g?'selected':''}>${g}</option>`).join('')}</select>
+      <select onchange="mapFilter.group=this.value;render()">${['Sans tournée','En cours','Toutes','Terminées'].map(g=>`<option ${mapFilter.group===g?'selected':''}>${g}</option>`).join('')}</select>
       <label style="font-size:12px"><input type="checkbox" ${mapFilter.urgent?'checked':''} onchange="mapFilter.urgent=this.checked;render()"> Urgentes (≤ 2 j)</label>
       <label style="font-size:12px"><input type="checkbox" ${mapFilter.lines?'checked':''} onchange="mapFilter.lines=this.checked;render()"> Liaisons</label>
       <span style="border-left:1px solid var(--line);height:22px"></span>
@@ -1954,12 +2180,13 @@ function mapSelect(id){
 
 // ─── SÉLECTION (camion) : clic, Maj+clic, case à cocher, lasso, rectangle ───
 function mapToggle(id){
+  const mm=db.missions.find(x=>x.id===id);if(mm&&mm.tourId)return;   // déjà dans une tournée
   if(mapSelected.has(id))mapSelected.delete(id);else mapSelected.add(id);
   refreshSelectionUI();
 }
 function mapClear(){mapSelected.clear();refreshSelectionUI();}
 function mapSelectVisible(){
-  document.querySelectorAll('#map-list .map-item').forEach(el=>{if(el.style.display!=='none'&&el.dataset.geo==='1')mapSelected.add(el.dataset.id);});
+  document.querySelectorAll('#map-list .map-item').forEach(el=>{if(el.style.display!=='none'&&el.dataset.geo==='1'&&!(db.missions.find(x=>x.id===el.dataset.id)||{}).tourId)mapSelected.add(el.dataset.id);});
   refreshSelectionUI();
 }
 function ptInPoly(lat,lng,poly){
@@ -1975,7 +2202,7 @@ function mapSelectInZone(test){
   mapMissions().filter(hasGeo).forEach(m=>{
     const inP=test(m.pickupLat,m.pickupLng),inD=test(m.deliveryLat,m.deliveryLng);
     const ok=mapSelTarget==='pickup'?inP:(mapSelTarget==='delivery'?inD:(inP||inD));
-    if(ok&&!mapSelected.has(m.id)){mapSelected.add(m.id);n++;}
+    if(ok&&!m.tourId&&!mapSelected.has(m.id)){mapSelected.add(m.id);n++;}
   });
   refreshSelectionUI();
   return n;
@@ -2134,6 +2361,7 @@ function truckPanelHtml(t){
       <strong style="font-size:15px">🚛 Camion — ${t.ms.length} mission${t.ms.length>1?'s':''} · ${t.veh} véhicule${t.veh>1?'s':''}</strong>
       <span style="font-size:12px;color:var(--muted)">${t.firstDeadline?'1re date limite : '+pretty(t.firstDeadline):''}</span>
       <span style="flex:1"></span>
+      <button class="btn primary" onclick="openTourForm()">＋ Créer la tournée</button>
       <button class="btn" onclick="mapZoomSel()">⌖ Zoom</button>
       <button class="btn" onclick="mapClear()">✕ Effacer</button>
       <button class="btn" onclick="truckPanelOpen=!truckPanelOpen;refreshSelectionUI()">${truckPanelOpen?'▾ Réduire':'▴ Ouvrir'}</button>
@@ -2480,8 +2708,13 @@ async function assignCarrier(){
   if(!carrierId){alert('Choisis un transporteur.');return;}
   const items=selectedVehicles();
   if(!items.length){alert('Coche au moins un véhicule.');return;}
-  setLoading(true);
   const mids=[...new Set(items.map(({m})=>m.id))];
+  await assignCarrierToMissions(carrierId,mids,document.getElementById('bulk-email').value.trim());
+}
+
+// Affecte un transporteur à des missions : statut, liens portail et brouillon d'e-mail (utilisé aussi par les tournées affrétées)
+async function assignCarrierToMissions(carrierId,mids,emailInput=''){
+  setLoading(true);
   const tokens=[];
   const earlyStatuses=['à planifier','attribué'];
   for(const mid of mids){
@@ -2507,7 +2740,6 @@ async function assignCarrier(){
 
   if(!tokens.length){alert('Transporteur affecté.');return;}
 
-  const emailInput=document.getElementById('bulk-email').value.trim();
   const carrier=db.carriers.find(x=>x.id===carrierId);
   const carrierEmail=emailInput||carrier?.email||'';
   const baseUrl=window.location.origin+window.location.pathname;
@@ -2796,6 +3028,7 @@ function openDetail(id){
   <div class="detail-block"><h3>Dates et adresses</h3><div class="route"><div class="routebox"><small>ENLÈVEMENT · ${pretty(m.pickupDate)}</small><strong>${esc(m.pickupSite)}</strong><p>${esc([ccLabel(m.pickupCountry),[m.pickupPostal,m.pickupCity].filter(Boolean).join(' '),m.pickupStreet].filter(Boolean).join(' · '))}<br>Contact : ${esc(m.pickupContact||'—')}${m.keys?`<br><span style="font-weight:700;color:${m.keys==='1'?'#9a6b18':'#286d99'}">🔑 ${m.keys} clef${m.keys==='2'?'s':''} remise${m.keys==='2'?'s':''} au chargement</span>`:''}</p></div><div class="routebox"><small>LIVRAISON · ${pretty(m.deliveryDate)}</small><strong>${esc(m.deliverySite)}</strong><p>${esc([ccLabel(m.deliveryCountry),[m.deliveryPostal,m.deliveryCity].filter(Boolean).join(' '),m.deliveryStreet].filter(Boolean).join(' · '))}<br>Contact : ${esc(m.deliveryContact||'—')}${m.deliveryEmail?`<br>E-mail : <a href="mailto:${esc(m.deliveryEmail)}" style="color:var(--blue)">${esc(m.deliveryEmail)}</a>`:''}</p>${m.deliveryEmail?`<button class="btn soft" style="margin-top:7px;font-size:11px" onclick="draftDeliverySite('${esc(m.id)}')">📧 Notifier site de livraison (${detectLang(m.deliveryCountry).toUpperCase()})</button>`:`<div style="font-size:10px;color:var(--muted);margin-top:6px">Pas d'e-mail livraison — modifier la mission pour en ajouter un.</div>`}</div></div><p><button class="btn" onclick="openMissionForm('${esc(m.id)}')">Modifier la mission / dates</button></p></div>
   ${profitBlock(m)}
   ${deadlineBlock(m)}
+  ${tourBlock(m)}
   <div class="detail-block"><h3>Transporteur</h3><div class="info-grid"><span>Société<strong>${esc(getCarrier(m).name||'À attribuer')}</strong></span><span>E-mail<strong>${esc(getCarrier(m).email||'—')}</strong></span></div>${portalLink?`<div style="margin-top:12px;padding:11px;background:#edf6fc;border:1px solid #d0e8f5;border-radius:7px;font-size:11px"><div style="font-size:10px;font-weight:800;letter-spacing:1px;color:var(--blue);margin-bottom:6px">🔗 LIEN PORTAIL TRANSPORTEUR</div><div style="word-break:break-all;color:#1e6592;margin-bottom:8px">${esc(portalLink)}</div><button class="btn soft" style="font-size:11px" onclick="copyPortalLink('${esc(m.id)}')">Copier le lien</button> <a href="${esc(portalLink)}" target="_blank" class="btn" style="font-size:11px;text-decoration:none">Ouvrir le portail ↗</a></div>`:'<p style="font-size:12px;color:var(--muted)">Aucun lien portail — affecte un transporteur depuis le Planning.</p>'}</div>
   <div class="detail-block"><h3>Notifications client</h3>
   ${(()=>{
