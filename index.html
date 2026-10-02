@@ -106,6 +106,7 @@
     <nav class="nav" id="nav"></nav>
     <div class="sidebar-foot">
       <div id="user-info" style="margin-bottom:10px;word-break:break-all"></div>
+      <button onclick="openChangePassword()" style="width:100%;background:transparent;border:1px solid #294d6c;color:#acc2d4;border-radius:6px;padding:8px;font-size:11px;font-weight:600;cursor:pointer;margin-bottom:6px">🔑 Mon mot de passe</button>
       <button onclick="logout()" style="width:100%;background:transparent;border:1px solid #294d6c;color:#acc2d4;border-radius:6px;padding:8px;font-size:11px;font-weight:600;cursor:pointer">Déconnexion</button>
     </div>
   </aside>
@@ -2010,14 +2011,16 @@ async function carrierAccountCreate(cid){
     const r=await callCarrierAccounts({action:'create',email,password,carrier_id:cid});
     db.profiles.push({user_id:r.user_id,role:'carrier',carrier_id:cid,email});
     openCarrierDocs(cid);render();
-    alert('✓ Accès créé.\n\nE-mail : '+email+'\nMot de passe : '+password+'\n\nNote-le maintenant : il ne sera plus affiché.');
+    alert('✓ Accès créé.\n\nE-mail : '+email+'\nMot de passe temporaire : '+password+'\n\nNote-le maintenant : il ne sera plus affiché.\nLe transporteur pourra le remplacer lui-même (onglet « Mon compte »).');
+    offerAccessMail(cid,email,password);
   }catch(e){_cdErr(e.message);}
   setLoading(false);
 }
 async function carrierAccountPassword(uid){
   const password=val('ca-pass');if(password.length<8){_cdErr('8 caractères minimum.');return;}
   setLoading(true);
-  try{await callCarrierAccounts({action:'set_password',user_id:uid,password});alert('✓ Mot de passe changé : '+password);}catch(e){_cdErr(e.message);}
+  try{await callCarrierAccounts({action:'set_password',user_id:uid,password});alert('✓ Mot de passe changé : '+password);
+    const pr=db.profiles.find(p=>p.user_id===uid);if(pr)offerAccessMail(pr.carrier_id,pr.email,password);}catch(e){_cdErr(e.message);}
   setLoading(false);
 }
 async function carrierAccountDelete(uid,cid){
@@ -2063,6 +2066,64 @@ function sendDocReminder(cid,kind){
   if(!c.email){alert('Ajoute d\'abord l\'adresse e-mail du transporteur (bouton « Modifier »).');return;}
   const m=buildDocReminder(c,kind);
   showEmailDraft(m.email,m.subject,m.body);
+}
+
+// ─── MOT DE PASSE : chaque utilisateur change le sien ───
+async function changeOwnPassword(current,next){
+  if(!current)throw new Error('PWD_WRONG');
+  const{error:e1}=await sb.auth.signInWithPassword({email:currentUser.email,password:current});   // vérifie le mot de passe actuel
+  if(e1)throw new Error('PWD_WRONG');
+  const{data,error}=await sb.auth.updateUser({password:next,data:{password_changed:true}});
+  if(error)throw error;
+  if(data&&data.user)currentUser=data.user;
+}
+function openChangePassword(){
+  document.getElementById('modal-content').innerHTML=`<div class="modal-header"><div><h2>Changer mon mot de passe</h2><p>${esc(currentUser?.email||'')}</p></div><button class="x" onclick="closeModal()">×</button></div>
+  <div class="form-grid"><div class="field wide"><label>Mot de passe actuel</label><input id="pw-cur" type="password" autocomplete="current-password"></div>
+  <div class="field"><label>Nouveau mot de passe (8 caractères minimum)</label><input id="pw-new" type="password" autocomplete="new-password"></div>
+  <div class="field"><label>Confirmer</label><input id="pw-conf" type="password" autocomplete="new-password"></div></div>
+  <div id="form-error"></div><div class="modal-footer"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn primary" onclick="saveOwnPassword()">Changer le mot de passe</button></div>`;
+  document.getElementById('modal').classList.add('open');
+}
+async function saveOwnPassword(){
+  const err=document.getElementById('form-error'),cur=document.getElementById('pw-cur').value,n=document.getElementById('pw-new').value,c=document.getElementById('pw-conf').value;
+  if(n.length<8){err.innerHTML='<div class="notice error">8 caractères minimum.</div>';return;}
+  if(n!==c){err.innerHTML='<div class="notice error">Les deux mots de passe sont différents.</div>';return;}
+  setLoading(true);
+  try{await changeOwnPassword(cur,n);setLoading(false);closeModal();alert('✓ Mot de passe modifié.');}
+  catch(e){setLoading(false);err.innerHTML=`<div class="notice error">${e.message==='PWD_WRONG'?'Mot de passe actuel incorrect.':esc(e.message)}</div>`;}
+}
+// E-mail d'accès (identifiant + mot de passe TEMPORAIRE) dans la langue du pays du transporteur (à faire relire par un locuteur natif)
+const ACCESS_MAIL={
+ fr:{subj:'Votre accès à AutoDispatch',body:'Bonjour {carrier},\n\nVotre espace transporteur est prêt : {link}\n\nIdentifiant : {email}\nMot de passe temporaire : {password}\n\nÀ votre première connexion, merci de remplacer ce mot de passe par le vôtre (onglet « Mon compte »).\nVous pourrez y déposer votre licence de transport et votre assurance, consulter les lots à vendre et proposer vos prix.\n\nCordialement'},
+ en:{subj:'Your AutoDispatch access',body:'Dear {carrier},\n\nYour carrier space is ready: {link}\n\nLogin: {email}\nTemporary password: {password}\n\nAt your first login, please replace this password with your own (« My account » tab).\nThere you can upload your transport licence and insurance, view loads for sale and submit your prices.\n\nKind regards'},
+ nl:{subj:'Uw toegang tot AutoDispatch',body:'Beste {carrier},\n\nUw transporteursruimte is klaar: {link}\n\nGebruikersnaam: {email}\nTijdelijk wachtwoord: {password}\n\nGelieve bij uw eerste aanmelding dit wachtwoord te vervangen door uw eigen wachtwoord (tabblad « Mijn account »).\nDaar kunt u uw transportvergunning en verzekering uploaden, de te koop aangeboden vrachten bekijken en uw prijzen voorstellen.\n\nMet vriendelijke groeten'},
+ de:{subj:'Ihr Zugang zu AutoDispatch',body:'Guten Tag {carrier},\n\nIhr Frachtführer-Bereich ist bereit: {link}\n\nBenutzername: {email}\nTemporäres Passwort: {password}\n\nBitte ersetzen Sie dieses Passwort bei der ersten Anmeldung durch Ihr eigenes (Reiter „Mein Konto“).\nDort können Sie Ihre Transportlizenz und Versicherung hochladen, angebotene Ladungen einsehen und Ihre Preise abgeben.\n\nMit freundlichen Grüßen'},
+ es:{subj:'Su acceso a AutoDispatch',body:'Estimado/a {carrier}:\n\nSu espacio de transportista está listo: {link}\n\nUsuario: {email}\nContraseña temporal: {password}\n\nEn su primer acceso, sustituya esta contraseña por una propia (pestaña «Mi cuenta»).\nAllí podrá subir su licencia de transporte y su seguro, consultar las cargas a la venta y proponer sus precios.\n\nUn cordial saludo'},
+ it:{subj:'Il vostro accesso ad AutoDispatch',body:'Gentile {carrier},\n\nIl vostro spazio trasportatore è pronto: {link}\n\nUtente: {email}\nPassword temporanea: {password}\n\nAl primo accesso, vi preghiamo di sostituire questa password con una vostra (scheda «Il mio account»).\nPotrete caricare la licenza di trasporto e l\'assicurazione, consultare i carichi in vendita e proporre i vostri prezzi.\n\nCordiali saluti'},
+ pt:{subj:'O seu acesso ao AutoDispatch',body:'Caro(a) {carrier},\n\nO seu espaço de transportador está pronto: {link}\n\nUtilizador: {email}\nPalavra-passe temporária: {password}\n\nNo primeiro acesso, substitua esta palavra-passe pela sua (separador «A minha conta»).\nPoderá carregar a sua licença de transporte e o seguro, consultar as cargas à venda e propor os seus preços.\n\nCom os melhores cumprimentos'},
+ pl:{subj:'Twój dostęp do AutoDispatch',body:'Szanowni Państwo, {carrier},\n\nPanel przewoźnika jest gotowy: {link}\n\nLogin: {email}\nHasło tymczasowe: {password}\n\nPrzy pierwszym logowaniu prosimy o zastąpienie tego hasła własnym (zakładka „Moje konto”).\nMożna tam przesłać licencję transportową i ubezpieczenie, przeglądać ładunki na sprzedaż i składać oferty cenowe.\n\nZ poważaniem'},
+ ro:{subj:'Accesul dumneavoastră la AutoDispatch',body:'Stimate {carrier},\n\nSpațiul dumneavoastră de transportator este pregătit: {link}\n\nUtilizator: {email}\nParolă temporară: {password}\n\nLa prima autentificare, vă rugăm să înlocuiți această parolă cu a dumneavoastră (fila „Contul meu”).\nAcolo puteți încărca licența de transport și asigurarea, consulta încărcăturile de vândut și propune prețurile dumneavoastră.\n\nCu stimă'},
+ cs:{subj:'Váš přístup do AutoDispatch',body:'Dobrý den, {carrier},\n\nVáš prostor dopravce je připraven: {link}\n\nPřihlašovací jméno: {email}\nDočasné heslo: {password}\n\nPři prvním přihlášení prosím nahraďte toto heslo vlastním (záložka „Můj účet“).\nMůžete zde nahrát dopravní licenci a pojištění, prohlížet nabízené zakázky a navrhovat své ceny.\n\nS pozdravem'},
+ sk:{subj:'Váš prístup do AutoDispatch',body:'Dobrý deň, {carrier},\n\nVáš priestor dopravcu je pripravený: {link}\n\nPrihlasovacie meno: {email}\nDočasné heslo: {password}\n\nPri prvom prihlásení, prosím, nahraďte toto heslo vlastným (záložka „Môj účet“).\nMôžete tu nahrať dopravnú licenciu a poistenie, prezerať ponúkané zákazky a navrhovať svoje ceny.\n\nS pozdravom'},
+ hu:{subj:'Hozzáférése az AutoDispatch-hez',body:'Tisztelt {carrier}!\n\nA fuvarozói felülete elkészült: {link}\n\nFelhasználónév: {email}\nIdeiglenes jelszó: {password}\n\nAz első bejelentkezéskor kérjük, cserélje le ezt a jelszót a sajátjára („Fiókom” fül).\nItt feltöltheti a fuvarozói engedélyét és biztosítását, megtekintheti az eladó fuvarokat, és megadhatja áraját.\n\nÜdvözlettel'},
+ bg:{subj:'Вашият достъп до AutoDispatch',body:'Уважаеми {carrier},\n\nВашето пространство за превозвачи е готово: {link}\n\nПотребител: {email}\nВременна парола: {password}\n\nПри първото влизане, моля, заменете тази парола със своя (раздел „Моят профил“).\nТам можете да качите транспортния си лиценз и застраховка, да разгледате предлаганите товари и да предложите цени.\n\nС уважение'},
+ sl:{subj:'Vaš dostop do AutoDispatch',body:'Spoštovani {carrier},\n\nVaš prostor prevoznika je pripravljen: {link}\n\nUporabniško ime: {email}\nZačasno geslo: {password}\n\nPri prvi prijavi to geslo zamenjajte s svojim (zavihek »Moj račun«).\nTam lahko naložite prevozno licenco in zavarovanje, si ogledate ponujene prevoze in predlagate svoje cene.\n\nLep pozdrav'},
+ hr:{subj:'Vaš pristup AutoDispatchu',body:'Poštovani {carrier},\n\nVaš prostor prijevoznika je spreman: {link}\n\nKorisničko ime: {email}\nPrivremena lozinka: {password}\n\nPri prvoj prijavi zamijenite ovu lozinku vlastitom (kartica „Moj račun”).\nTamo možete učitati prijevozničku licenciju i osiguranje, pregledati ponuđene prijevoze i predložiti svoje cijene.\n\nSrdačan pozdrav'},
+ sr:{subj:'Vaš pristup AutoDispatch-u',body:'Poštovani {carrier},\n\nVaš prostor prevoznika je spreman: {link}\n\nKorisničko ime: {email}\nPrivremena lozinka: {password}\n\nPri prvoj prijavi zamenite ovu lozinku sopstvenom (kartica „Moj nalog”).\nTamo možete otpremiti prevozničku licencu i osiguranje, pregledati ponuđene prevoze i predložiti svoje cene.\n\nSrdačan pozdrav'},
+ lt:{subj:'Jūsų prieiga prie AutoDispatch',body:'Gerb. {carrier},\n\nJūsų vežėjo erdvė paruošta: {link}\n\nPrisijungimo vardas: {email}\nLaikinas slaptažodis: {password}\n\nPirmą kartą prisijungę, prašome pakeisti šį slaptažodį savo (skirtukas „Mano paskyra“).\nČia galite įkelti transporto licenciją ir draudimą, peržiūrėti parduodamus krovinius ir siūlyti savo kainas.\n\nSu pagarba'},
+ lv:{subj:'Jūsu piekļuve AutoDispatch',body:'Cienījamie {carrier},\n\nJūsu pārvadātāja vide ir gatava: {link}\n\nLietotājvārds: {email}\nPagaidu parole: {password}\n\nPirmajā pieslēgšanās reizē, lūdzu, nomainiet šo paroli pret savu (cilne „Mans konts”).\nTur varat augšupielādēt transporta licenci un apdrošināšanu, apskatīt pārdošanā esošos kravas un piedāvāt savas cenas.\n\nAr cieņu'},
+ et:{subj:'Teie ligipääs AutoDispatchile',body:'Lugupeetud {carrier},\n\nTeie vedaja keskkond on valmis: {link}\n\nKasutajanimi: {email}\nAjutine parool: {password}\n\nEsimesel sisselogimisel asendage see parool oma parooliga (vaheleht „Minu konto“).\nSiin saate üles laadida veolitsentsi ja kindlustuse, vaadata müügil olevaid vedusid ja pakkuda oma hindu.\n\nLugupidamisega'},
+};
+function buildAccessMail(c,email,password){
+  const lang=detectLang(c.country),T=ACCESS_MAIL[lang]||ACCESS_MAIL.en,link=window.location.origin+window.location.pathname;
+  const f=t=>t.replace(/\{carrier\}/g,c.name).replace(/\{email\}/g,email).replace(/\{password\}/g,password).replace(/\{link\}/g,link);
+  return{lang:ACCESS_MAIL[lang]?lang:'en',email:c.email||email,subject:f(T.subj),body:f(T.body)};
+}
+function offerAccessMail(cid,email,password){
+  const c=db.carriers.find(x=>x.id===cid);if(!c)return;
+  if(!confirm('Préparer l\'e-mail d\'accès (identifiant + mot de passe temporaire) pour '+c.name+' ?'))return;
+  const m=buildAccessMail(c,email,password);showEmailDraft(m.email,m.subject,m.body);
 }
 
 // ─── BOURSE DE FRET ───
@@ -2283,11 +2344,13 @@ async function csLoadBourse(){
 const CS_T={
   fr:{hello:'Espace transporteur',docs:'Mes documents',bourse:'Bourse de fret',transports:'Mes transports',license:'Licence de transport',insurance:'Assurance',valid:'Valable jusqu\'au',file:'Document (PDF)',send:'Envoyer',pending:'En attente de validation',none:'Aucun document',logout:'Déconnexion',hint:'Déposez ici votre licence et votre assurance en cours de validité. Sans documents valides, nous ne pouvons pas vous confier de transports.',ok:'Document envoyé : il sera validé par notre équipe.',
     lv:{ok:'Valide',yellow:'Échéance < 2 mois',orange:'Échéance < 1 mois',red:'Échéance < 15 jours',blocked:'EXPIRÉ',missing:'Manquant'},
+    account:'Mon compte',pwdTitle:'Changer mon mot de passe',curPwd:'Mot de passe actuel',newPwd:'Nouveau mot de passe (8 caractères minimum)',confPwd:'Confirmer le nouveau mot de passe',pwdBtn:'Changer le mot de passe',pwdOk:'Mot de passe modifié.',pwdShort:'8 caractères minimum.',pwdMismatch:'Les deux mots de passe sont différents.',pwdWrong:'Mot de passe actuel incorrect.',pwdBanner:'Pour votre sécurité, veuillez remplacer votre mot de passe temporaire par le vôtre.',pwdBannerBtn:'Changer maintenant',
     lots:'Lots à vendre',noLots:'Aucun lot à vendre pour le moment.',vehicles:'Véhicules',yourOffer:'Votre prix (€, hors TVA)',comment:'Commentaire (facultatif)',offer:'Proposer ce prix',update:'Modifier mon offre',withdraw:'Retirer mon offre',published:'Mis en vente le',blockedMsg:'Vos documents sont expirés ou manquants : vous ne pouvez pas faire d\'offre tant qu\'ils ne sont pas renouvelés (onglet « Mes documents »).',
     st:{pending:'Votre offre est envoyée',rejected:'Offre non retenue',withdrawn:'Offre retirée'},priceErr:'Indiquez un prix valide.',
     noTr:'Aucun transport pour le moment.',accepted:'Votre offre est acceptée',plate:'Plaque du camion',driver:'Nom du chauffeur',loadDate:'Date de chargement prévue',delDate:'Date de livraison prévue',confirm:'Confirmer le transport',confirmed:'Transport confirmé',portal:'Ouvrir le portail de suivi (photos, CMR)',fill:'Merci d\'indiquer les informations du camion.',dateErr:'La livraison ne peut pas précéder le chargement.',allErr:'Complétez tous les champs.'},
   en:{hello:'Carrier space',docs:'My documents',bourse:'Freight exchange',transports:'My transports',license:'Transport licence',insurance:'Insurance',valid:'Valid until',file:'Document (PDF)',send:'Upload',pending:'Awaiting validation',none:'No document',logout:'Log out',hint:'Upload your valid transport licence and insurance here. Without valid documents we cannot assign transports to you.',ok:'Document sent: our team will validate it.',
     lv:{ok:'Valid',yellow:'Expires < 2 months',orange:'Expires < 1 month',red:'Expires < 15 days',blocked:'EXPIRED',missing:'Missing'},
+    account:'My account',pwdTitle:'Change my password',curPwd:'Current password',newPwd:'New password (8 characters minimum)',confPwd:'Confirm the new password',pwdBtn:'Change password',pwdOk:'Password changed.',pwdShort:'8 characters minimum.',pwdMismatch:'The two passwords are different.',pwdWrong:'Current password is incorrect.',pwdBanner:'For your security, please replace your temporary password with your own.',pwdBannerBtn:'Change now',
     lots:'Loads for sale',noLots:'No load for sale at the moment.',vehicles:'Vehicles',yourOffer:'Your price (€, excl. VAT)',comment:'Comment (optional)',offer:'Submit this price',update:'Update my offer',withdraw:'Withdraw my offer',published:'Listed on',blockedMsg:'Your documents are expired or missing: you cannot make offers until they are renewed (« My documents » tab).',
     st:{pending:'Your offer has been sent',rejected:'Offer not selected',withdrawn:'Offer withdrawn'},priceErr:'Enter a valid price.',
     noTr:'No transport at the moment.',accepted:'Your offer has been accepted',plate:'Truck plate',driver:'Driver name',loadDate:'Planned loading date',delDate:'Planned delivery date',confirm:'Confirm the transport',confirmed:'Transport confirmed',portal:'Open the tracking portal (photos, CMR)',fill:'Please enter the truck details.',dateErr:'Delivery cannot be before loading.',allErr:'Please fill in all fields.'}
@@ -2320,6 +2383,22 @@ function csTransportsHtml(T){
       ${done?`<div style="font-size:13px;margin-top:6px">🚛 <b>${esc(t.carrier_plate||'')}</b> · ${esc(t.carrier_driver||'')} · ${pretty(t.carrier_load_date)} → ${pretty(t.carrier_delivery_date)}</div><p style="margin:8px 0 0"><a class="btn primary" href="${esc(link)}" target="_blank">${esc(T.portal)}</a></p>`
       :`<div style="font-size:12.5px;margin:6px 0">${esc(T.fill)}</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end"><div class="field"><label>${esc(T.plate)}</label><input id="cs-plate-${esc(t.id)}" style="width:130px"></div><div class="field"><label>${esc(T.driver)}</label><input id="cs-driver-${esc(t.id)}"></div><div class="field"><label>${esc(T.loadDate)}</label><input type="date" id="cs-ld-${esc(t.id)}"></div><div class="field"><label>${esc(T.delDate)}</label><input type="date" id="cs-dd-${esc(t.id)}"></div><button class="btn primary" onclick="csConfirmTransport('${esc(t.id)}','${esc(o.id)}')">${esc(T.confirm)}</button></div><div id="cs-err-${esc(t.id)}" style="font-size:12px;color:var(--red);margin-top:4px"></div>`}</div>`;}).join('')||`<div style="color:var(--muted);font-size:13px;padding:8px 0">${esc(T.noTr)}</div>`}</div>`;
 }
+function csAccountHtml(T){
+  return `<div class="panel"><div class="panel-title"><h2>${esc(T.pwdTitle)}</h2></div><div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">${esc(currentUser?.email||'')}</div>
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:360px"><div class="field"><label>${esc(T.curPwd)}</label><input id="cs-pw-cur" type="password" autocomplete="current-password"></div>
+  <div class="field"><label>${esc(T.newPwd)}</label><input id="cs-pw-new" type="password" autocomplete="new-password"></div>
+  <div class="field"><label>${esc(T.confPwd)}</label><input id="cs-pw-conf" type="password" autocomplete="new-password"></div>
+  <div><button class="btn primary" onclick="csChangePassword()">${esc(T.pwdBtn)}</button></div><div id="cs-pw-msg" style="font-size:13px"></div></div></div>`;
+}
+async function csChangePassword(){
+  const T=csT(),msg=document.getElementById('cs-pw-msg');
+  const cur=document.getElementById('cs-pw-cur').value,n=document.getElementById('cs-pw-new').value,c=document.getElementById('cs-pw-conf').value;
+  if(n.length<8){msg.innerHTML=`<span style="color:var(--red)">${esc(T.pwdShort)}</span>`;return;}
+  if(n!==c){msg.innerHTML=`<span style="color:var(--red)">${esc(T.pwdMismatch)}</span>`;return;}
+  msg.textContent='⏳';
+  try{await changeOwnPassword(cur,n);renderCarrierSpace();document.getElementById('cs-pw-msg').innerHTML=`<span style="color:var(--green)">✓ ${esc(T.pwdOk)}</span>`;}
+  catch(e){msg.innerHTML=`<span style="color:var(--red)">${e.message==='PWD_WRONG'?esc(T.pwdWrong):esc(e.message)}</span>`;}
+}
 function csDocsHtml(T){
   return `<div class="panel"><div class="panel-title"><h2>${esc(T.docs)}</h2></div><p style="font-size:13px;color:var(--muted);margin-top:0">${esc(T.hint)}</p>
   ${DOC_KINDS.map(([k])=>{const st=docStatus(db.carrierDocs,k),all=db.carrierDocs.filter(d=>d.kind===k);
@@ -2333,8 +2412,9 @@ function renderCarrierSpace(){
   const tab=(k,l,n)=>`<button class="btn ${csTab===k?'primary':''}" onclick="csTab='${k}';renderCarrierSpace()">${esc(l)}${n?` (${n})`:''}</button>`;
   const todo=csTransports.filter(t=>{const o=csOffers.find(x=>x.missionId===t.id);return o&&o.status==='accepted';}).length;
   document.getElementById('carrier-space').innerHTML=`<div style="background:var(--navy);color:#fff;padding:16px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap"><div style="font-weight:800;font-size:18px">auto<span style="color:#5ab0e8">dispatch</span></div><div style="opacity:.8;font-size:13px">${esc(T.hello)} · <b>${esc(c.name)}</b></div><div style="flex:1"></div><button class="btn" onclick="logout()">${esc(T.logout)}</button></div>
-  <div style="max-width:820px;margin:0 auto;padding:18px 16px"><div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">${tab('bourse',T.bourse,csLots.length)}${tab('transports',T.transports,todo)}${tab('docs',T.docs)}</div>
-  ${csTab==='bourse'?csBourseHtml(T):csTab==='transports'?csTransportsHtml(T):csDocsHtml(T)}</div>`;
+  <div style="max-width:820px;margin:0 auto;padding:18px 16px"><div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">${tab('bourse',T.bourse,csLots.length)}${tab('transports',T.transports,todo)}${tab('docs',T.docs)}${tab('account',T.account)}</div>
+  ${(currentUser&&currentUser.user_metadata&&currentUser.user_metadata.password_changed)?'':`<div class="tp-al amb" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="flex:1">🔑 ${esc(T.pwdBanner)}</span><button class="btn" onclick="csTab='account';renderCarrierSpace()">${esc(T.pwdBannerBtn)}</button></div>`}
+  ${csTab==='bourse'?csBourseHtml(T):csTab==='transports'?csTransportsHtml(T):csTab==='account'?csAccountHtml(T):csDocsHtml(T)}</div>`;
 }
 async function carrierSpaceUpload(kind){
   const c=db.carriers[0],T=csT(),msg=document.getElementById('cs-msg');
