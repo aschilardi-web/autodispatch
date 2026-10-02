@@ -95,6 +95,9 @@
 <!-- ═══════════ PORTAIL INSPECTION LIVRAISON ═══════════ -->
 <div id="inspection-portal" style="display:none"></div>
 
+<!-- ═══════════ ESPACE TRANSPORTEUR (compte avec mot de passe) ═══════════ -->
+<div id="carrier-space" style="display:none"></div>
+
 <!-- ═══════════ APP ═══════════ -->
 <div class="shell" id="app-shell" style="display:none">
   <aside class="sidebar">
@@ -152,7 +155,7 @@ const INSPECTION_TOKEN = new URLSearchParams(window.location.search).get('inspec
 
 // ─── STATE ──────────────────────────────────────────────────────
 const NAV=[["Vue d'ensemble",'⌂'],['Contrôle','◉'],['Planning général','▦'],['Missions','▤'],['Véhicules','▣'],['Clients','◫'],['Sites','◍'],['Transporteurs','▰'],['Documents','▧'],['Carte','◎'],['Planning camions','⇄'],['Affrètement','⇆'],['Finance','€'],['Rapports','📊'],['Résumé','i']];
-let db={clients:[],carriers:[],missions:[],carrierEvents:[],deliveryInspections:[],trucks:[],tours:[],sites:[],selectedIds:[],sort:'ref',direction:1};
+let db={clients:[],carriers:[],missions:[],carrierEvents:[],deliveryInspections:[],trucks:[],tours:[],sites:[],carrierDocs:[],profiles:[],selectedIds:[],sort:'ref',direction:1};
 let current="Vue d'ensemble",search='',filterStatus='Tous les statuts',docSearch='',docFilter='';
 let editingMission=null,detailId=null,currentUser=null;
 let weekOffset=0,filterClient='Tous les clients',filterCarrier='Tous les transporteurs';
@@ -494,12 +497,17 @@ async function logout(){
   currentUser=null;
   db={clients:[],carriers:[],missions:[],selectedIds:[],sort:'ref',direction:1};
   document.getElementById('app-shell').style.display='none';
+  const cs=document.getElementById('carrier-space');if(cs){cs.style.display='none';cs.innerHTML='';}
+  currentProfile=null;
   document.getElementById('auth-screen').style.display='flex';
   document.getElementById('login-err').textContent='';
 }
 
 async function initApp(){
   document.getElementById('auth-screen').style.display='none';
+  // rôle : transporteur → espace transporteur ; sans profil → administrateur (compte historique)
+  currentProfile=await loadProfile();
+  if(currentProfile&&currentProfile.role==='carrier'){await initCarrierSpace();return;}
   document.getElementById('app-shell').style.display='flex';
   document.getElementById('user-info').textContent=currentUser?.email||'';
   await loadData();
@@ -533,6 +541,8 @@ async function loadData(){
     // delivery_inspections : états des lieux véhicules
     try{const ri=await sb.from('delivery_inspections').select('*').order('created_at');db.deliveryInspections=ri.data||[];}
     catch(e){console.warn('delivery_inspections non disponible:',e.message);db.deliveryInspections=[];};
+    try{const rd=await sb.from('carrier_documents').select('*').order('created_at',{ascending:false});db.carrierDocs=(rd.data||[]).map(docFromRow);}catch(e){db.carrierDocs=[];}
+    try{const rp=await sb.from('profiles').select('*');db.profiles=rp.data||[];}catch(e){db.profiles=[];}
     try{const rs=await sb.from('sites').select('*').order('name');db.sites=(rs.data||[]).map(siteFromRow);}catch(e){db.sites=[];}
     // camions et tournées (tables facultatives : l'application fonctionne aussi sans)
     try{const rt=await sb.from('trucks').select('*').order('name');
@@ -690,6 +700,17 @@ function realtimeSetup(){
       if(status==='SUBSCRIBED')console.info('[Realtime] ✓ connecté — carrier_events');
       else if(status==='CHANNEL_ERROR')console.warn('[Realtime] ✗ erreur connexion — carrier_events');
     });
+  // Cloche + notification quand un transporteur dépose un document (licence / assurance)
+  if(window._docChannel){try{window._docChannel.unsubscribe();}catch(_){}}
+  window._docChannel=sb.channel('carrier-docs-admin-v1')
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'carrier_documents'},payload=>{
+      const d=docFromRow(payload.new);
+      if(d.uploadedBy!=='carrier'||db.carrierDocs.some(x=>x.id===d.id))return;
+      db.carrierDocs.unshift(d);
+      const c=db.carriers.find(x=>x.id===d.carrierId);
+      showToast('📄 Nouveau document',esc((c?c.name:'Transporteur')+' — '+(DOC_KINDS.find(k=>k[0]===d.kind)||[,''])[1]+' (à valider)'),'info',null);
+      render();
+    }).subscribe();
   // Cloche + notification quand une inspection de véhicule est terminée (PDF rattaché sur cars)
   if(_inspChannel){try{_inspChannel.unsubscribe();}catch(_){}}
   _inspChannel=sb.channel('inspection-done-admin-v1')
@@ -1615,7 +1636,7 @@ function vehiclesPage(){
 function partnersPage(kind){
   const arr=db[kind],label=kind==='clients'?'client':'transporteur';
   return heading(kind==='clients'?'Clients':'Transporteurs',`Répertoire des ${kind==='clients'?'clients':'transporteurs'} avec coordonnées complètes.`,`<button class="btn primary" onclick="partnerForm('${kind}')">＋ Ajouter ${label}</button>`)+
-  `<div class="grid cards">${arr.map(x=>`<div class="card entity-card"><h3>${esc(x.name)}</h3><p>${esc(x.contact||'Contact non renseigné')}<br>${esc(x.email||'E-mail non renseigné')}<br>TVA ${esc(x.vat||'—')} · ${esc(x.phone||'Téléphone —')}<br>${esc([x.street,x.postal,x.city,x.country].filter(Boolean).join(', '))}</p><div class="card-actions"><button class="btn" onclick="partnerForm('${kind}','${esc(x.id)}')">Modifier</button><button class="btn danger" onclick="deletePartner('${kind}','${esc(x.id)}')">Supprimer</button></div></div>`).join('')||'<div class="empty">Aucune fiche enregistrée.</div>'}</div>`;
+  `<div class="grid cards">${arr.map(x=>`<div class="card entity-card"><h3>${esc(x.name)}</h3><p>${esc(x.contact||'Contact non renseigné')}<br>${esc(x.email||'E-mail non renseigné')}<br>TVA ${esc(x.vat||'—')} · ${esc(x.phone||'Téléphone —')}<br>${esc([x.street,x.postal,x.city,x.country].filter(Boolean).join(', '))}</p>${kind==='carriers'?carrierDocsSummary(x):''}<div class="card-actions">${kind==='carriers'?`<button class="btn primary" onclick="openCarrierDocs('${esc(x.id)}')">📄 Documents et accès</button>`:''}<button class="btn" onclick="partnerForm('${kind}','${esc(x.id)}')">Modifier</button><button class="btn danger" onclick="deletePartner('${kind}','${esc(x.id)}')">Supprimer</button></div></div>`).join('')||'<div class="empty">Aucune fiche enregistrée.</div>'}</div>`;
 }
 
 function documentsPage(){
@@ -1856,6 +1877,224 @@ function profitBlock(m){
   <p>${km?'':`<button class="btn soft" onclick="calcKmForMission('${esc(m.id)}')">📍 Calculer les km</button> `}<button class="btn" onclick="openMissionForm('${esc(m.id)}')">Modifier les prix</button></p></div>`;
 }
 
+// ─── PROFIL / RÔLES ───
+let currentProfile=null;
+async function loadProfile(){
+  try{const{data}=await sb.from('profiles').select('*').eq('user_id',currentUser.id).maybeSingle();return data||null;}catch(_){return null;}
+}
+
+// ─── DOCUMENTS DES TRANSPORTEURS : licence + assurance, validité, rappels, blocage ───
+const DOC_KINDS=[['license','Licence de transport'],['insurance','Assurance']];
+const DOC_LEVEL={ok:{c:'#24784d',t:'Valide'},yellow:{c:'#b8960a',t:'< 2 mois'},orange:{c:'#e0850c',t:'< 1 mois'},red:{c:'#c0392b',t:'< 15 jours'},blocked:{c:'#111',t:'EXPIRÉ · bloqué'},missing:{c:'#6b7a8d',t:'Manquant'}};
+const DOC_RANK={ok:0,yellow:1,orange:2,red:3,blocked:4,missing:4};
+const docFromRow=x=>({id:x.id,carrierId:x.carrier_id,kind:x.kind,path:x.file_path,fileName:x.file_name||'',validUntil:x.valid_until,verified:!!x.verified,uploadedBy:x.uploaded_by||'admin',createdAt:x.created_at||''});
+const carrierDocs=id=>db.carrierDocs.filter(d=>d.carrierId===id);
+function docStatus(docs,kind){
+  const ds=docs.filter(d=>d.kind===kind);
+  const ver=ds.filter(d=>d.verified).sort((a,b)=>b.validUntil.localeCompare(a.validUntil))[0];
+  const pending=ds.filter(d=>!d.verified);
+  if(!ver)return{level:'missing',days:null,doc:null,pending};
+  const days=diffDays(todayIso(),ver.validUntil);
+  const level=days<=0?'blocked':days<=15?'red':days<=30?'orange':days<=60?'yellow':'ok';
+  return{level,days,doc:ver,pending};
+}
+function carrierCompliance(id){
+  const docs=carrierDocs(id);
+  const sts=DOC_KINDS.map(([k])=>({k,...docStatus(docs,k)}));
+  const worst=sts.reduce((a,b)=>DOC_RANK[b.level]>DOC_RANK[a.level]?b:a);
+  return{sts,level:worst.level,blocked:DOC_RANK[worst.level]>=4};
+}
+function docChip(st,T){
+  const l=DOC_LEVEL[st.level],txt=(T&&T.lv&&T.lv[st.level])||l.t;
+  return `<span style="background:${l.c};color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700;white-space:nowrap">${txt}${st.doc&&st.level!=='blocked'?' · '+pretty(st.doc.validUntil):''}</span>${st.pending&&st.pending.length?` <span style="font-size:10.5px;color:var(--amber)">⏳ ${esc((T&&T.pending)||'à valider')}</span>`:''}`;
+}
+function carrierDocsSummary(x){
+  const comp=carrierCompliance(x.id),prof=db.profiles.find(p=>p.carrier_id===x.id);
+  return `<div style="margin:8px 0;display:flex;flex-direction:column;gap:4px;font-size:12px">${comp.sts.map(st=>`<div>${DOC_KINDS.find(k=>k[0]===st.k)[1]} : ${docChip(st)}</div>`).join('')}
+    <div style="color:var(--muted)">${prof?'🔑 Accès créé · '+esc(prof.email||''):'Pas encore d\'accès à l\'espace transporteur'}</div></div>`;
+}
+// Affectation : avertit (sans bloquer définitivement) si les documents sont expirés ou manquants
+function confirmCarrierCompliance(carrierId){
+  const c=db.carriers.find(x=>x.id===carrierId);if(!c)return true;
+  const comp=carrierCompliance(carrierId);
+  if(!comp.blocked)return true;
+  const bad=comp.sts.filter(st=>DOC_RANK[st.level]>=4).map(st=>DOC_KINDS.find(k=>k[0]===st.k)[1]+' ('+(st.level==='missing'?'manquante':'expirée')+')');
+  return confirm('⛔ '+c.name+' : '+bad.join(', ')+'.\n\nUn transporteur sans licence ou assurance valide ne devrait pas recevoir de transport.\nAffecter quand même ?');
+}
+async function uploadDocFile(cid,kind,file,validUntil,by){
+  if(!file)throw new Error('Choisis un fichier PDF.');
+  if(file.type!=='application/pdf')throw new Error('Le document doit être un PDF.');
+  if(file.size>10*1024*1024)throw new Error('PDF trop volumineux (10 Mo maximum).');
+  if(!validUntil)throw new Error('Indique la date de validité.');
+  const path=`${cid}/${kind}_${Date.now()}.pdf`;
+  const{error:up}=await sb.storage.from('carrier-docs').upload(path,file,{contentType:'application/pdf'});
+  if(up)throw up;
+  const row={id:crypto.randomUUID(),carrier_id:cid,kind,file_path:path,file_name:file.name,valid_until:validUntil,verified:by==='admin',verified_at:by==='admin'?new Date().toISOString():null,uploaded_by:by};
+  const{error}=await sb.from('carrier_documents').insert(row);
+  if(error)throw error;
+  const d=docFromRow(row);db.carrierDocs.unshift(d);return d;
+}
+async function openCarrierDocFile(id){
+  const d=db.carrierDocs.find(x=>x.id===id);if(!d)return;
+  const{data,error}=await sb.storage.from('carrier-docs').createSignedUrl(d.path,300);   // lien temporaire de 5 minutes
+  if(error){alert('Ouverture impossible : '+error.message);return;}
+  window.open(data.signedUrl,'_blank');
+}
+async function callCarrierAccounts(body){
+  const{data,error}=await sb.functions.invoke('carrier-accounts',{body});
+  if(error){let m=error.message;try{const j=await error.context.json();if(j&&j.error)m=j.error;}catch(_){}throw new Error(m);}
+  if(data&&data.error)throw new Error(data.error);
+  return data;
+}
+const genPassword=()=>{const c='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';let p='';const a=new Uint32Array(12);crypto.getRandomValues(a);a.forEach(n=>p+=c[n%c.length]);return p;};
+
+function openCarrierDocs(cid){
+  const c=db.carriers.find(x=>x.id===cid);if(!c)return;
+  const comp=carrierCompliance(cid),prof=db.profiles.find(p=>p.carrier_id===cid);
+  const sec=(k,label)=>{
+    const st=comp.sts.find(x=>x.k===k),all=carrierDocs(cid).filter(d=>d.kind===k);
+    return `<div class="form-section">${esc(label.toUpperCase())} &nbsp; ${docChip(st)}</div>
+    <div class="field wide">${all.map(d=>`<div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);font-size:12.5px;flex-wrap:wrap">
+      <span style="flex:1;min-width:200px">${esc(d.fileName||'document.pdf')} · valable jusqu'au <b>${pretty(d.validUntil)}</b> · ${d.uploadedBy==='carrier'?'déposé par le transporteur':'déposé par toi'} ${d.verified?'<span style="color:var(--green)">✓ validé</span>':'<span style="color:var(--amber)">⏳ à valider</span>'}</span>
+      <button class="btn" onclick="openCarrierDocFile('${esc(d.id)}')">Ouvrir</button>${d.verified?'':`<button class="btn primary" onclick="verifyCarrierDoc('${esc(d.id)}')">✓ Valider</button>`}<button class="btn" onclick="deleteCarrierDoc('${esc(d.id)}')">🗑</button></div>`).join('')||'<div style="color:var(--muted);font-size:12px">Aucun document.</div>'}</div>
+    <div class="field"><label>Nouveau document (PDF)</label><input type="file" id="cd-file-${k}" accept="application/pdf"></div>
+    <div class="field"><label>Valable jusqu'au</label><input type="date" id="cd-valid-${k}"></div>
+    <div class="field"><label>&nbsp;</label><div style="display:flex;gap:6px"><button class="btn primary" type="button" onclick="adminUploadDoc('${esc(cid)}','${k}')">⬆ Ajouter</button>${st.level!=='ok'?`<button class="btn" type="button" onclick="sendDocReminder('${esc(cid)}','${k}')">✉ Rappel</button>`:''}</div></div>`;
+  };
+  document.getElementById('modal-content').innerHTML=`<div class="modal-header"><div><h2>${esc(c.name)}</h2><p>Licence de transport, assurance et accès à l'espace transporteur.</p></div><button class="x" onclick="closeModal()">×</button></div>
+  <div class="form-grid">${DOC_KINDS.map(([k,l])=>sec(k,l)).join('')}
+    <div class="form-section">ACCÈS À L'ESPACE TRANSPORTEUR</div>
+    ${prof?`<div class="field wide"><div style="font-size:13px">🔑 Compte actif : <b>${esc(prof.email||'')}</b></div></div>
+      <div class="field"><label>Nouveau mot de passe</label><input id="ca-pass" type="text" placeholder="8 caractères minimum"></div>
+      <div class="field"><label>&nbsp;</label><div style="display:flex;gap:6px"><button class="btn" type="button" onclick="document.getElementById('ca-pass').value=genPassword()">Générer</button><button class="btn primary" type="button" onclick="carrierAccountPassword('${esc(prof.user_id)}')">Changer</button><button class="btn danger" type="button" onclick="carrierAccountDelete('${esc(prof.user_id)}','${esc(cid)}')">Supprimer l'accès</button></div></div>`
+    :`<div class="field"><label>E-mail de connexion</label><input id="ca-email" type="email" value="${esc(c.email||'')}"></div>
+      <div class="field"><label>Mot de passe</label><input id="ca-pass" type="text" placeholder="8 caractères minimum"></div>
+      <div class="field wide"><div style="display:flex;gap:6px"><button class="btn" type="button" onclick="document.getElementById('ca-pass').value=genPassword()">Générer un mot de passe</button><button class="btn primary" type="button" onclick="carrierAccountCreate('${esc(cid)}')">Créer l'accès</button></div><div style="font-size:11px;color:var(--muted);margin-top:4px">Communique l'e-mail et le mot de passe au transporteur. Il se connecte sur la même adresse que toi et arrive sur son espace.</div></div>`}
+  </div><div id="form-error"></div><div class="modal-footer"><button class="btn" onclick="closeModal()">Fermer</button></div>`;
+  document.getElementById('modal').classList.add('open');
+}
+function _cdErr(m){const e=document.getElementById('form-error');if(e)e.innerHTML=m?`<div class="notice error">${esc(m)}</div>`:'';}
+async function adminUploadDoc(cid,kind){
+  _cdErr('');setLoading(true);
+  try{await uploadDocFile(cid,kind,document.getElementById('cd-file-'+kind).files[0],document.getElementById('cd-valid-'+kind).value,'admin');openCarrierDocs(cid);render();}
+  catch(e){_cdErr(e.message||String(e));}
+  setLoading(false);
+}
+async function verifyCarrierDoc(id){
+  const d=db.carrierDocs.find(x=>x.id===id);if(!d)return;
+  const{error}=await sb.from('carrier_documents').update({verified:true,verified_at:new Date().toISOString()}).eq('id',id);
+  if(error){_cdErr(error.message);return;}
+  d.verified=true;openCarrierDocs(d.carrierId);render();
+}
+async function deleteCarrierDoc(id){
+  const d=db.carrierDocs.find(x=>x.id===id);if(!d||!confirm('Supprimer ce document ?'))return;
+  await sb.storage.from('carrier-docs').remove([d.path]);
+  const{error}=await sb.from('carrier_documents').delete().eq('id',id);
+  if(error){_cdErr(error.message);return;}
+  db.carrierDocs=db.carrierDocs.filter(x=>x.id!==id);openCarrierDocs(d.carrierId);render();
+}
+async function carrierAccountCreate(cid){
+  const email=val('ca-email'),password=val('ca-pass');
+  if(!email||password.length<8){_cdErr('Indique un e-mail et un mot de passe de 8 caractères minimum.');return;}
+  setLoading(true);
+  try{
+    const r=await callCarrierAccounts({action:'create',email,password,carrier_id:cid});
+    db.profiles.push({user_id:r.user_id,role:'carrier',carrier_id:cid,email});
+    openCarrierDocs(cid);render();
+    alert('✓ Accès créé.\n\nE-mail : '+email+'\nMot de passe : '+password+'\n\nNote-le maintenant : il ne sera plus affiché.');
+  }catch(e){_cdErr(e.message);}
+  setLoading(false);
+}
+async function carrierAccountPassword(uid){
+  const password=val('ca-pass');if(password.length<8){_cdErr('8 caractères minimum.');return;}
+  setLoading(true);
+  try{await callCarrierAccounts({action:'set_password',user_id:uid,password});alert('✓ Mot de passe changé : '+password);}catch(e){_cdErr(e.message);}
+  setLoading(false);
+}
+async function carrierAccountDelete(uid,cid){
+  if(!confirm('Supprimer l\'accès de ce transporteur ? Il ne pourra plus se connecter.'))return;
+  setLoading(true);
+  try{await callCarrierAccounts({action:'delete',user_id:uid});db.profiles=db.profiles.filter(p=>p.user_id!==uid);openCarrierDocs(cid);render();}catch(e){_cdErr(e.message);}
+  setLoading(false);
+}
+
+// Message de rappel d'échéance dans la langue du pays du transporteur (à faire relire par un locuteur natif)
+const DOC_MAIL={
+ fr:{subj:'Action requise : {doc} — renouvellement',doc:{license:'licence de transport',insurance:'assurance'},body:'Bonjour {carrier},\n\nLa validité de votre {doc} est : {date}.\nMerci de déposer le document renouvelé (PDF) avec sa nouvelle date de validité dans votre espace transporteur :\n{link}\n(connexion avec votre adresse e-mail)\n\nSans licence et assurance en cours de validité, nous ne pouvons plus vous confier de transports.\n\nCordialement'},
+ en:{subj:'Action required: {doc} — renewal',doc:{license:'transport licence',insurance:'insurance'},body:'Dear {carrier},\n\nThe validity of your {doc} is: {date}.\nPlease upload the renewed document (PDF) with its new validity date in your carrier space:\n{link}\n(log in with your e-mail address)\n\nWithout a valid licence and insurance we cannot assign new transports to you.\n\nKind regards'},
+ nl:{subj:'Actie vereist: {doc} — verlenging',doc:{license:'transportvergunning',insurance:'verzekering'},body:'Beste {carrier},\n\nDe geldigheid van uw {doc} is: {date}.\nGelieve het vernieuwde document (PDF) met de nieuwe geldigheidsdatum te uploaden in uw transporteursruimte:\n{link}\n(log in met uw e-mailadres)\n\nZonder geldige vergunning en verzekering kunnen wij u geen transporten meer toewijzen.\n\nMet vriendelijke groeten'},
+ de:{subj:'Handlungsbedarf: {doc} — Erneuerung',doc:{license:'Transportlizenz',insurance:'Versicherung'},body:'Guten Tag {carrier},\n\nDie Gültigkeit Ihres Dokuments „{doc}“ ist: {date}.\nBitte laden Sie das erneuerte Dokument (PDF) mit dem neuen Gültigkeitsdatum in Ihrem Frachtführer-Bereich hoch:\n{link}\n(Anmeldung mit Ihrer E-Mail-Adresse)\n\nOhne gültige Lizenz und Versicherung können wir Ihnen keine Transporte mehr zuweisen.\n\nMit freundlichen Grüßen'},
+ es:{subj:'Acción requerida: {doc} — renovación',doc:{license:'licencia de transporte',insurance:'seguro'},body:'Estimado/a {carrier}:\n\nLa validez de su {doc} es: {date}.\nLe rogamos que suba el documento renovado (PDF) con su nueva fecha de validez en su espacio de transportista:\n{link}\n(acceda con su dirección de correo electrónico)\n\nSin licencia y seguro en vigor no podemos asignarle nuevos transportes.\n\nUn cordial saludo'},
+ it:{subj:'Azione richiesta: {doc} — rinnovo',doc:{license:'licenza di trasporto',insurance:'assicurazione'},body:'Gentile {carrier},\n\nLa validità del vostro documento «{doc}» è: {date}.\nVi preghiamo di caricare il documento rinnovato (PDF) con la nuova data di validità nel vostro spazio trasportatore:\n{link}\n(accesso con il vostro indirizzo e-mail)\n\nSenza licenza e assicurazione in corso di validità non possiamo assegnarvi nuovi trasporti.\n\nCordiali saluti'},
+ pt:{subj:'Ação necessária: {doc} — renovação',doc:{license:'licença de transporte',insurance:'seguro'},body:'Caro(a) {carrier},\n\nA validade do seu documento «{doc}» é: {date}.\nPor favor, carregue o documento renovado (PDF) com a nova data de validade no seu espaço de transportador:\n{link}\n(inicie sessão com o seu endereço de e-mail)\n\nSem licença e seguro válidos não podemos atribuir-lhe novos transportes.\n\nCom os melhores cumprimentos'},
+ pl:{subj:'Wymagane działanie: {doc} — odnowienie',doc:{license:'licencja transportowa',insurance:'ubezpieczenie'},body:'Szanowni Państwo, {carrier},\n\nTermin ważności dokumentu „{doc}” upływa: {date}.\nProsimy o przesłanie odnowionego dokumentu (PDF) z nową datą ważności w Państwa panelu przewoźnika:\n{link}\n(logowanie adresem e-mail)\n\nBez ważnej licencji i ubezpieczenia nie możemy zlecać Państwu nowych transportów.\n\nZ poważaniem'},
+ ro:{subj:'Acțiune necesară: {doc} — reînnoire',doc:{license:'licența de transport',insurance:'asigurarea'},body:'Stimate {carrier},\n\nValabilitatea documentului „{doc}” este: {date}.\nVă rugăm să încărcați documentul reînnoit (PDF), cu noua dată de valabilitate, în spațiul dumneavoastră de transportator:\n{link}\n(autentificare cu adresa dumneavoastră de e-mail)\n\nFără licență și asigurare valabile nu vă mai putem atribui transporturi noi.\n\nCu stimă'},
+ cs:{subj:'Nutná akce: {doc} — obnovení',doc:{license:'dopravní licence',insurance:'pojištění'},body:'Dobrý den, {carrier},\n\nPlatnost dokumentu „{doc}“ je: {date}.\nNahrajte prosím obnovený dokument (PDF) s novým datem platnosti ve svém prostoru dopravce:\n{link}\n(přihlášení pomocí e-mailové adresy)\n\nBez platné licence a pojištění vám nemůžeme přidělovat nové přepravy.\n\nS pozdravem'},
+ sk:{subj:'Vyžaduje sa akcia: {doc} — obnovenie',doc:{license:'dopravná licencia',insurance:'poistenie'},body:'Dobrý deň, {carrier},\n\nPlatnosť dokumentu „{doc}“ je: {date}.\nNahrajte prosím obnovený dokument (PDF) s novým dátumom platnosti vo svojom priestore dopravcu:\n{link}\n(prihlásenie pomocou e-mailovej adresy)\n\nBez platnej licencie a poistenia vám nemôžeme prideľovať nové prepravy.\n\nS pozdravom'},
+ hu:{subj:'Teendő: {doc} — megújítás',doc:{license:'fuvarozói engedély',insurance:'biztosítás'},body:'Tisztelt {carrier}!\n\nA(z) „{doc}” érvényessége: {date}.\nKérjük, töltse fel a megújított dokumentumot (PDF) az új érvényességi dátummal a fuvarozói felületén:\n{link}\n(bejelentkezés az e-mail-címével)\n\nÉrvényes engedély és biztosítás nélkül nem tudunk új fuvarokat kiosztani Önnek.\n\nÜdvözlettel'},
+ bg:{subj:'Необходимо действие: {doc} — подновяване',doc:{license:'транспортен лиценз',insurance:'застраховка'},body:'Уважаеми {carrier},\n\nВалидността на „{doc}“ е: {date}\nМоля, качете подновения документ (PDF) с новата дата на валидност във вашето пространство за превозвачи:\n{link}\n(влизане с вашия имейл адрес)\n\nБез валиден лиценз и застраховка не можем да ви възлагаме нови превози.\n\nС уважение'},
+ sl:{subj:'Potrebno ukrepanje: {doc} — podaljšanje',doc:{license:'prevozna licenca',insurance:'zavarovanje'},body:'Spoštovani {carrier},\n\nVeljavnost dokumenta »{doc}« je: {date}.\nProsimo, naložite obnovljeni dokument (PDF) z novim datumom veljavnosti v svojem prostoru prevoznika:\n{link}\n(prijava z vašim e-poštnim naslovom)\n\nBrez veljavne licence in zavarovanja vam ne moremo dodeljevati novih prevozov.\n\nLep pozdrav'},
+ hr:{subj:'Potrebna radnja: {doc} — obnova',doc:{license:'prijevoznička licencija',insurance:'osiguranje'},body:'Poštovani {carrier},\n\nValjanost dokumenta „{doc}” je: {date}.\nMolimo učitajte obnovljeni dokument (PDF) s novim datumom valjanosti u svom prostoru prijevoznika:\n{link}\n(prijava s vašom adresom e-pošte)\n\nBez valjane licencije i osiguranja ne možemo vam dodjeljivati nove prijevoze.\n\nSrdačan pozdrav'},
+ sr:{subj:'Potrebna radnja: {doc} — obnova',doc:{license:'prevoznička licenca',insurance:'osiguranje'},body:'Poštovani {carrier},\n\nVažnost dokumenta „{doc}” je: {date}.\nMolimo vas da otpremite obnovljeni dokument (PDF) sa novim datumom važenja u vašem prostoru prevoznika:\n{link}\n(prijava sa vašom adresom e-pošte)\n\nBez važeće licence i osiguranja ne možemo vam dodeljivati nove prevoze.\n\nSrdačan pozdrav'},
+ lt:{subj:'Reikalingas veiksmas: {doc} — atnaujinimas',doc:{license:'transporto licencija',insurance:'draudimas'},body:'Gerb. {carrier},\n\nDokumento „{doc}“ galiojimo laikas: {date}.\nPrašome įkelti atnaujintą dokumentą (PDF) su nauja galiojimo data savo vežėjo erdvėje:\n{link}\n(prisijunkite savo el. pašto adresu)\n\nBe galiojančios licencijos ir draudimo negalime jums skirti naujų pervežimų.\n\nSu pagarba'},
+ lv:{subj:'Nepieciešama darbība: {doc} — atjaunošana',doc:{license:'transporta licence',insurance:'apdrošināšana'},body:'Cienījamie {carrier},\n\nDokumenta „{doc}” derīgums: {date}.\nLūdzu, augšupielādējiet atjaunoto dokumentu (PDF) ar jauno derīguma termiņu savā pārvadātāja vidē:\n{link}\n(pieslēgšanās ar jūsu e-pasta adresi)\n\nBez derīgas licences un apdrošināšanas mēs nevaram jums piešķirt jaunus pārvadājumus.\n\nAr cieņu'},
+ et:{subj:'Vajalik tegevus: {doc} — uuendamine',doc:{license:'veoluba',insurance:'kindlustus'},body:'Lugupeetud {carrier},\n\nDokumendi „{doc}“ kehtivus: {date}.\nPalun laadige uuendatud dokument (PDF) uue kehtivuskuupäevaga üles oma vedaja keskkonnas:\n{link}\n(sisselogimine oma e-posti aadressiga)\n\nIlma kehtiva litsentsi ja kindlustuseta ei saa me teile uusi vedusid määrata.\n\nLugupidamisega'},
+};
+function buildDocReminder(c,kind){
+  const st=docStatus(carrierDocs(c.id),kind);
+  const lang=detectLang(c.country),T=DOC_MAIL[lang]||DOC_MAIL.en;
+  const link=window.location.origin+window.location.pathname;
+  const loc=DOC_MAIL[lang]?lang:'en';
+  const doc=T.doc[kind],date=st.doc?new Date(st.doc.validUntil+'T12:00:00Z').toLocaleDateString(loc,{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}):'—';
+  return{lang:DOC_MAIL[lang]?lang:'en',email:c.email||'',subject:T.subj.replace('{doc}',doc),
+    body:T.body.replace(/\{carrier\}/g,c.name).replace(/\{doc\}/g,doc).replace(/\{date\}/g,date).replace(/\{link\}/g,link)};
+}
+function sendDocReminder(cid,kind){
+  const c=db.carriers.find(x=>x.id===cid);if(!c)return;
+  if(!c.email){alert('Ajoute d\'abord l\'adresse e-mail du transporteur (bouton « Modifier »).');return;}
+  const m=buildDocReminder(c,kind);
+  showEmailDraft(m.email,m.subject,m.body);
+}
+
+// ─── ESPACE TRANSPORTEUR (connexion avec mot de passe) ───
+async function initCarrierSpace(){
+  const host=document.getElementById('carrier-space');
+  document.getElementById('app-shell').style.display='none';
+  host.style.display='block';
+  host.innerHTML='<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg)"><div style="font-size:32px">⏳</div></div>';
+  const cid=currentProfile.carrier_id;
+  const[{data:c},{data:docs}]=await Promise.all([
+    sb.from('carriers').select('*').eq('id',cid).maybeSingle(),
+    sb.from('carrier_documents').select('*').eq('carrier_id',cid).order('created_at',{ascending:false})]);
+  db.carriers=c?[mapPartner(c)]:[];db.carrierDocs=(docs||[]).map(docFromRow);
+  renderCarrierSpace();
+}
+const CS_T={
+  fr:{hello:'Espace transporteur',docs:'Mes documents',license:'Licence de transport',insurance:'Assurance',valid:'Valable jusqu\'au',file:'Document (PDF)',send:'Envoyer',pending:'En attente de validation',none:'Aucun document',logout:'Déconnexion',bourse:'Bourse de fret',soon:'Bientôt disponible : les lots à vendre et vos offres de prix.',hint:'Déposez ici votre licence et votre assurance en cours de validité. Sans documents valides, nous ne pouvons pas vous confier de transports.',ok:'Document envoyé : il sera validé par notre équipe.',lv:{ok:'Valide',yellow:'Échéance < 2 mois',orange:'Échéance < 1 mois',red:'Échéance < 15 jours',blocked:'EXPIRÉ',missing:'Manquant'}},
+  en:{hello:'Carrier space',docs:'My documents',license:'Transport licence',insurance:'Insurance',valid:'Valid until',file:'Document (PDF)',send:'Upload',pending:'Awaiting validation',none:'No document',logout:'Log out',bourse:'Freight exchange',soon:'Coming soon: loads for sale and your price offers.',hint:'Upload your valid transport licence and insurance here. Without valid documents we cannot assign transports to you.',ok:'Document sent: our team will validate it.',lv:{ok:'Valid',yellow:'Expires < 2 months',orange:'Expires < 1 month',red:'Expires < 15 days',blocked:'EXPIRED',missing:'Missing'}}
+};
+function renderCarrierSpace(){
+  const c=db.carriers[0]||{name:'—',country:''};
+  const T=CS_T[detectLang(c.country)]||(detectLang(c.country)==='fr'?CS_T.fr:CS_T.en);
+  const host=document.getElementById('carrier-space');
+  host.innerHTML=`<div style="background:var(--navy);color:#fff;padding:16px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap"><div style="font-weight:800;font-size:18px">auto<span style="color:#5ab0e8">dispatch</span></div><div style="opacity:.8;font-size:13px">${esc(T.hello)} · <b>${esc(c.name)}</b></div><div style="flex:1"></div><button class="btn" onclick="logout()">${esc(T.logout)}</button></div>
+  <div style="max-width:760px;margin:0 auto;padding:22px 16px">
+    <div class="panel"><div class="panel-title"><h2>${esc(T.docs)}</h2></div><p style="font-size:13px;color:var(--muted);margin-top:0">${esc(T.hint)}</p>
+    ${DOC_KINDS.map(([k])=>{const st=docStatus(db.carrierDocs,k),all=db.carrierDocs.filter(d=>d.kind===k);
+      return `<div style="border-top:1px solid var(--line);padding:12px 0"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><strong>${esc(T[k])}</strong> ${docChip(st,T)}</div>
+        ${all.map(d=>`<div style="font-size:12px;color:#536a7d;margin-top:4px">${esc(d.fileName)} · ${esc(T.valid)} ${pretty(d.validUntil)} ${d.verified?'<span style="color:var(--green)">✓</span>':'<span style="color:var(--amber)">⏳ '+esc(T.pending)+'</span>'}</div>`).join('')||`<div style="font-size:12px;color:var(--muted);margin-top:4px">${esc(T.none)}</div>`}
+        <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:10px"><div class="field"><label>${esc(T.file)}</label><input type="file" id="cs-file-${k}" accept="application/pdf"></div><div class="field"><label>${esc(T.valid)}</label><input type="date" id="cs-valid-${k}"></div><button class="btn primary" onclick="carrierSpaceUpload('${k}')">${esc(T.send)}</button></div></div>`;}).join('')}
+    <div id="cs-msg" style="margin-top:8px;font-size:13px"></div></div>
+    <div class="panel"><div class="panel-title"><h2>${esc(T.bourse)}</h2></div><p style="color:var(--muted);font-size:13px;margin:0">${esc(T.soon)}</p></div>
+  </div>`;
+}
+async function carrierSpaceUpload(kind){
+  const c=db.carriers[0],T=CS_T[detectLang(c.country)]||(detectLang(c.country)==='fr'?CS_T.fr:CS_T.en),msg=document.getElementById('cs-msg');
+  msg.textContent='⏳';
+  try{await uploadDocFile(c.id,kind,document.getElementById('cs-file-'+kind).files[0],document.getElementById('cs-valid-'+kind).value,'carrier');renderCarrierSpace();document.getElementById('cs-msg').innerHTML=`<span style="color:var(--green)">✓ ${esc(T.ok)}</span>`;}
+  catch(e){msg.innerHTML=`<span style="color:var(--red)">⚠ ${esc(e.message||String(e))}</span>`;}
+}
+
 // ─── DOCUMENTS DE TRANSPORT : CMR toujours, documents douaniers hors UE ───
 const EU27=new Set(['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE']);
 const isNonEU=m=>[m.pickupCountry,m.deliveryCountry].map(ccLabel).some(c=>/^[A-Z]{2}$/.test(c)&&!EU27.has(c));
@@ -2002,14 +2241,16 @@ function controlPage(){
   const monday=mondayOf(today),sunday=addDays(monday,6);
   const trucks=db.trucks.filter(x=>x.active).map(x=>({x,km:db.tours.filter(t=>t.kind==='own'&&t.truckId===x.id&&t.startDate>=monday&&t.startDate<=sunday).reduce((q,t)=>q+(t.km||0),0)}));
   const lowTours=db.tours.filter(t=>t.kind!=='draft'&&(t.endDate||t.startDate)>=today).map(t=>({t,pts:tourPts(t)})).filter(o=>o.pts<TRUCK_CAPACITY*0.75);
+  const docAl=db.carriers.map(c=>({c,comp:carrierCompliance(c.id)})).filter(o=>o.comp.level!=='ok').sort((a,b)=>DOC_RANK[b.comp.level]-DOC_RANK[a.comp.level]);
   const row=(m,extra)=>`<div class="recent-row" style="cursor:pointer" onclick="openDetail('${esc(m.id)}')"><strong>${esc(m.ref)}<small>${esc(getClient(m).name||'—')}</small></strong><span>${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}</span><span>${extra||''}</span><span style="font-size:12px">${esc(execInfo(m).label)}</span></div>`;
   const panel=(title,color,list,fmt,hint)=>`<div class="panel"><div class="panel-title"><h2 style="color:${color}">${title} <span style="font-size:13px">(${list.length})</span></h2>${hint?`<small>${hint}</small>`:''}</div>
     ${list.slice(0,8).map(fmt).join('')||'<div style="color:var(--green);font-size:13px;padding:6px 0">✓ Rien à signaler</div>'}${list.length>8?`<div style="font-size:12px;color:var(--muted);padding:6px 0">… et ${list.length-8} autre(s)</div>`:''}</div>`;
   const tile=(label,n,col)=>`<div class="stat" style="${n?'border-color:'+col+';background:'+col+'12':''}"><small style="${n?'color:'+col+';font-weight:800':''}">${label}</small><strong style="color:${n?col:'var(--green)'};font-size:30px;margin-top:8px;display:block">${n}</strong></div>`;
   return heading('Contrôle','Tableau de bord du dispatcher : ce qui demande une action aujourd\'hui.')+
-  `<div class="grid stats" style="grid-template-columns:repeat(6,minmax(0,1fr));margin-bottom:12px">
-    ${tile('En retard',late.length,'#c0392b')}${tile('À risque (≤ 2 j)',risk.length,'#e0850c')}${tile('Sans camion ni transporteur',unplanned.length,'#2675a9')}
+  `<div class="grid stats" style="grid-template-columns:repeat(7,minmax(0,1fr));margin-bottom:12px">
+    ${tile('Docs transporteurs',docAl.length,'#7a3b8f')}${tile('En retard',late.length,'#c0392b')}${tile('À risque (≤ 2 j)',risk.length,'#e0850c')}${tile('Sans camion ni transporteur',unplanned.length,'#2675a9')}
     ${tile('Documents manquants',docs.length,'#9a6b18')}${tile('Non géolocalisées',nogeo.length,'#8094a6')}${tile('Prix manquants',noprice.length,'#8094a6')}</div>
+  ${panel('📑 Licences et assurances des transporteurs','#7a3b8f',docAl,o=>`<div class="recent-row"><strong>${esc(o.c.name)}<small>${esc(o.c.email||'sans e-mail')}</small></strong><span>${o.comp.sts.map(st=>DOC_KINDS.find(k=>k[0]===st.k)[1]+' : '+docChip(st)).join(' &nbsp; ')}</span><span></span><span>${o.comp.sts.filter(st=>st.level!=='ok').map(st=>`<button class="btn" onclick="sendDocReminder('${esc(o.c.id)}','${st.k}')">✉ Rappel ${st.k==='license'?'licence':'assurance'}</button>`).join(' ')}</span></div>`,'Échéance à 2 mois (jaune), 1 mois (orange), 15 jours (rouge), expiré ou manquant (bloqué)')}
   ${panel('⚠ En retard','#c0392b',late,m=>row(m,`<b style="color:#c0392b">${-left(m)} j de retard</b>`),'Date limite de livraison dépassée')}
   ${panel('⏱ À risque','#e0850c',risk,m=>row(m,`<b style="color:#e0850c">${left(m)} j restant${left(m)>1?'s':''}</b>`),'Date limite dans 2 jours ou moins')}
   ${panel('🚛 À planifier (sans camion ni transporteur)','#2675a9',unplanned,m=>row(m,left(m)==null?'':(left(m)<0?'<b style="color:#c0392b">en retard</b>':left(m)+' j restants')),'À placer sur un camion, à affréter, ou à mettre en bourse de fret')}
@@ -2208,6 +2449,7 @@ async function saveTour(){
   const n=db.tours.filter(x=>x.startDate===start).length+1;
   const name=`T-${start.replace(/-/g,'').slice(2)}-${n}`;
   const mids=t.ms.map(m=>m.id);
+  if(kind==='charter'&&!confirmCarrierCompliance(carrierId))return;
   const row={id:crypto.randomUUID(),name,kind,truck_id:kind==='own'?truckId:null,carrier_id:kind==='charter'?carrierId:null,start_date:start,end_date:end,
     return_day:kind==='own'?(val('tf-return')||null):null,km:Math.round(t.realKm??t.kmEst),stops:t.stops.map(x=>({t:x.t,mid:x.m.id})),notes:val('tf-notes')||null};
   setLoading(true);
@@ -2222,7 +2464,7 @@ async function saveTour(){
   t.ms.forEach(m=>{m.tourId=row.id;});
   mapSelected.clear();
   setLoading(false);closeModal();
-  if(kind==='charter')await assignCarrierToMissions(carrierId,mids,'');   // statut, liens portail, e-mail au transporteur
+  if(kind==='charter')await assignCarrierToMissions(carrierId,mids,'',true);   // statut, liens portail, e-mail au transporteur
   refreshSelectionUI();
   if(current==='Carte'){render();}else render();
   setTimeout(()=>alert(`Tournée ${name} créée (${mids.length} mission${mids.length>1?'s':''}).`),100);
@@ -2259,9 +2501,10 @@ async function saveTourEdit(id){
   setLoading(false);
   if(error){err.innerHTML=`<div class="notice error">Non enregistré : ${esc(error.message)}</div>`;return;}
   const newCarrier=kind==='charter'&&carrierId&&carrierId!==t.carrierId;
+  if(newCarrier&&!confirmCarrierCompliance(carrierId))return;
   Object.assign(t,{kind,truckId:row.truck_id||'',carrierId:row.carrier_id||'',startDate:start,endDate:end,returnDay:row.return_day||'',notes:row.notes||''});
   closeModal();render();
-  if(newCarrier)await assignCarrierToMissions(carrierId,tourMissions(t).map(m=>m.id),'');
+  if(newCarrier)await assignCarrierToMissions(carrierId,tourMissions(t).map(m=>m.id),'',true);
 }
 async function removeFromTour(tid,mid){
   if(!confirm('Retirer cette mission de la tournée ?'))return;
@@ -2987,7 +3230,8 @@ async function assignCarrier(){
 }
 
 // Affecte un transporteur à des missions : statut, liens portail et brouillon d'e-mail (utilisé aussi par les tournées affrétées)
-async function assignCarrierToMissions(carrierId,mids,emailInput=''){
+async function assignCarrierToMissions(carrierId,mids,emailInput='',force=false){
+  if(!force&&!confirmCarrierCompliance(carrierId))return;
   setLoading(true);
   const tokens=[];
   const earlyStatuses=['à planifier','attribué'];
