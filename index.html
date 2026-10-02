@@ -3194,7 +3194,7 @@ let _map=null,_mapView=null,_mapItems={},mapSel=null,_selLayer=null,_drawLayer=n
 let mapSelected=new Set(),mapSelMode=null,mapSelTarget='pickup',truckPanelOpen=true,_lastTour=null;
 let truckCostKm=(()=>{try{return localStorage.getItem('adCostKm')||'';}catch(_){return'';}})();
 const _tourKmCache={};
-const TOUR_RULES={pickupSpreadKm:250,deliverySpreadKm:600,detourRatio:1.5};   // règles « tournée qui a du sens » (ajustables)
+const TOUR_RULES={pickupSpreadKm:250,deliverySpreadKm:250,detourRatio:1.5,pickupDetourKm:40,pickupDetourPct:0.10};   // règles « tournée qui a du sens » (ajustables)
 const MAP_PALETTE=['#e6194b','#4363d8','#f58231','#911eb4','#008080','#9a6324','#d2308f','#3a7d00','#0b3d91','#b8860b','#c0392b','#17a2b8'];
 const mapColor=id=>{let h=0;for(const ch of String(id))h=(h*31+ch.charCodeAt(0))>>>0;return MAP_PALETTE[h%MAP_PALETTE.length];};
 const hasGeo=m=>m.pickupLat!=null&&m.deliveryLat!=null;
@@ -3240,7 +3240,7 @@ function mapPage(){
     'Client':(a,b)=>destKeys(a).client.localeCompare(destKeys(b).client,'fr')}[mapSort]||(()=>0);
   const sorted=[...geo].sort(cmp).concat(missing);
   return heading('Carte','Chargements et déchargements des missions en Europe.',
-    `<button class="btn" onclick="geocodeBatch()">📍 Géolocaliser les missions</button>`)+
+    `<button class="btn primary" onclick="openOptimiser()">✨ Optimiser</button> <button class="btn" onclick="geocodeBatch()">📍 Géolocaliser les missions</button>`)+
   `<style>
     .map-layout{display:flex;gap:12px;align-items:stretch}
     #map-canvas{flex:1;min-width:0;min-height:420px;height:70vh;border-radius:8px;border:1px solid var(--line);isolation:isolate}
@@ -3568,6 +3568,72 @@ function simHtml(t){
     ${t.plan&&!t.plan.hasShapes?'<div style="font-size:10.5px;color:var(--amber)">Frontières indisponibles : répartition par pays approximative.</div>':''}`;
 }
 
+// ─── OPTIMISER : propose des regroupements (rien n'est créé sans ta validation) ───
+// Règles : missions non scindables, capacité du camion, chargements proches ou sur le trajet, déchargements proches ;
+// objectif : aucun retard d'abord, puis le moins de camions, puis le moins de km entre les déchargements.
+let _optProps=[];
+function optCoherent(ms){
+  const dS=maxSpread(ms.map(m=>({lat:m.deliveryLat,lng:m.deliveryLng})));
+  if(dS>TOUR_RULES.deliverySpreadKm)return false;
+  const pS=maxSpread(ms.map(m=>({lat:m.pickupLat,lng:m.pickupLng})));
+  if(pS>TOUR_RULES.pickupSpreadKm&&pickupOffRoute(ms).off)return false;
+  if(ms.some(isNonEU)&&!ms.every(isNonEU))return false;   // pas de mélange UE / hors UE
+  return true;
+}
+function optimizeProposals(){
+  const pool=db.missions.filter(m=>hasGeo(m)&&!m.tourId&&m.status==='à planifier'&&missionPoints(m)>0&&missionPoints(m)<=TRUCK_CAPACITY+1e-6)
+    .sort((a,b)=>(deadlineOf(a)||'9999').localeCompare(deadlineOf(b)||'9999'));
+  const left=[...pool],groups=[];
+  while(left.length){
+    const seed=left.shift(),g=[seed];let pts=missionPoints(seed);
+    for(;;){
+      let best=null,bestCost=Infinity;
+      for(const c of left){
+        if(pts+missionPoints(c)>TRUCK_CAPACITY+1e-6)continue;
+        const test=[...g,c];if(!optCoherent(test))continue;
+        const dc={lat:c.deliveryLat,lng:c.deliveryLng};
+        const near=Math.min(...g.map(x=>hav(dc,{lat:x.deliveryLat,lng:x.deliveryLng})));   // km entre déchargements
+        const wasted=TRUCK_CAPACITY-(pts+missionPoints(c));
+        const cost=near+wasted*2;
+        if(cost<bestCost){bestCost=cost;best=c;}
+      }
+      if(!best)break;
+      g.push(best);left.splice(left.indexOf(best),1);pts+=missionPoints(best);
+    }
+    groups.push(g);
+  }
+  return groups.map(g=>{const t=tourMetrics(g);return{ms:g,t,saving:t.directKm-t.kmEst};})
+    .sort((a,b)=>b.ms.length-a.ms.length||b.saving-a.saving);
+}
+function openOptimiser(){
+  _optProps=optimizeProposals();
+  const multi=_optProps.filter(p=>p.ms.length>1),solo=_optProps.filter(p=>p.ms.length===1);
+  const card=(p,i)=>{
+    const t=p.t,free=Math.max(0,TRUCK_CAPACITY-t.pts);
+    const lateN=p.ms.filter(m=>{const u=mapUrgency(m);return u.left!=null&&u.left<=2;}).length;
+    return `<div style="border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>Camion ${i+1}</b>
+        <span class="badge ${t.pts>=TRUCK_CAPACITY*0.85?'green':'amber'}">${fmtPts(t.pts)} / ${TRUCK_CAPACITY} pts</span>
+        <span style="font-size:12px;color:var(--muted)">${p.ms.length} missions · ≈ ${Math.round(t.kmEst)} km · déchargements à ${Math.round(t.dSpread)} km max l'un de l'autre${p.saving>0?` · <span style="color:var(--green)">−${Math.round(p.saving)} km vs séparées</span>`:''}${lateN?` · <span style="color:var(--red)">${lateN} urgente(s)</span>`:''}</span>
+        <span style="flex:1"></span><button class="btn primary" onclick="optSelect(${_optProps.indexOf(p)})">Sélectionner sur la carte</button></div>
+      <div style="font-size:12px;margin-top:6px;line-height:1.6">${p.ms.map(m=>`<div><b>${esc(m.ref)}</b> · ${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))} <span style="color:var(--muted)">· ${fmtPts(missionPoints(m))} pts${deadlineOf(m)?' · limite '+pretty(deadlineOf(m)):''}</span></div>`).join('')}</div></div>`;
+  };
+  document.getElementById('modal-content').innerHTML=`<div class="modal-header"><div><h2>✨ Optimiser</h2><p>${_optProps.reduce((q,p)=>q+p.ms.length,0)} missions à planifier · ${multi.length} regroupement${multi.length>1?'s':''} proposé${multi.length>1?'s':''} · ${solo.length} mission${solo.length>1?'s':''} sans partenaire</p></div><button class="x" onclick="closeModal()">×</button></div>
+    <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Règles : capacité ${TRUCK_CAPACITY} pts (missions non scindables) · chargements à ${TOUR_RULES.pickupSpreadKm} km au plus, ou plus loin s'ils sont sur le trajet · déchargements à ${TOUR_RULES.deliverySpreadKm} km au plus l'un de l'autre · les plus urgentes d'abord · moins de km entre les déchargements. Vérifie ensuite chaque tournée (itinéraire, durée, coûts) avant de la créer.</div>
+    ${multi.length?multi.map(card).join(''):'<div class="empty">Aucun regroupement possible avec les règles actuelles.</div>'}
+    ${solo.length?`<details style="margin-top:6px"><summary style="cursor:pointer;font-size:12.5px;font-weight:700">${solo.length} mission${solo.length>1?'s':''} seule${solo.length>1?'s':''}</summary><div style="margin-top:8px">${solo.map(card).join('')}</div></details>`:''}
+    <div class="modal-footer"><button class="btn" onclick="closeModal()">Fermer</button></div>`;
+  document.getElementById('modal').classList.add('open');
+}
+function optSelect(i){
+  const p=_optProps[i];if(!p)return;
+  mapSelected=new Set(p.ms.map(m=>m.id));
+  closeModal();
+  if(current!=='Carte'){current='Carte';render();}
+  refreshSelectionUI();
+  setTimeout(()=>{try{mapZoomSel();}catch(_){}} ,300);
+}
+
 // ─── CALCULS DE TOURNÉE (sans enregistrement) ───
 const hav=(a,b)=>{const R=6371,r=x=>x*Math.PI/180,dl=r(b.lat-a.lat),dn=r(b.lng-a.lng),q=Math.sin(dl/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(q));};
 // Ordre des arrêts : tous les chargements (du plus éloigné vers le plus proche), puis tous les déchargements
@@ -3582,6 +3648,17 @@ function orderStops(ms){
   const rd=[...D];
   while(rd.length){rd.sort((a,b)=>hav(cur,a)-hav(cur,b));cur=rd.shift();seq.push(cur);}
   return seq;
+}
+// Chargements éloignés mais SUR LE TRAJET vers la destination (ex. Paris puis Lauterbourg pour aller à Prague) : le détour est faible
+function pickupOffRoute(ms){
+  if(ms.length<2)return{off:false,detour:0};
+  const D=ms.map(m=>({lat:m.deliveryLat,lng:m.deliveryLng}));
+  const dc={lat:D.reduce((q,d)=>q+d.lat,0)/D.length,lng:D.reduce((q,d)=>q+d.lng,0)/D.length};
+  const P=ms.map(m=>({lat:m.pickupLat,lng:m.pickupLng}));
+  const S=[...P].sort((a,b)=>hav(b,dc)-hav(a,dc))[0];
+  const direct=hav(S,dc);
+  const detour=Math.max(0,...P.map(p=>hav(S,p)+hav(p,dc)-direct));
+  return{off:detour>Math.max(TOUR_RULES.pickupDetourKm,direct*TOUR_RULES.pickupDetourPct),detour};
 }
 const maxSpread=pts=>{let mx=0;for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++)mx=Math.max(mx,hav(pts[i],pts[j]));return mx;};
 function tourMetrics(ms){
@@ -3675,8 +3752,8 @@ function truckPanelHtml(t){
   if(t.late)al.push(['red',`${t.late} mission${t.late>1?'s':''} en retard (date limite dépassée).`]);
   if(t.urgent)al.push(['amb',`${t.urgent} mission${t.urgent>1?'s':''} urgente${t.urgent>1?'s':''} (≤ 2 jours).`]);
   if(t.sim){t.sim.stops.filter(x=>x.t==='D').forEach(x=>{const dl=deadlineOf(x.m);if(dl&&x.date>dl)al.push(['red',`${x.m.ref} : livraison simulée le ${pretty(x.date)}, après la date limite (${pretty(dl)}).`]);});}
-  if(t.pSpread>TOUR_RULES.pickupSpreadKm)al.push(['amb',`Chargements très éloignés (${Math.round(t.pSpread)} km entre les plus distants).`]);
-  if(t.dSpread>TOUR_RULES.deliverySpreadKm)al.push(['amb',`Déchargements très éloignés (${Math.round(t.dSpread)} km entre les plus distants) : tournée peu cohérente ?`]);
+  if(t.pSpread>TOUR_RULES.pickupSpreadKm){const o=pickupOffRoute(t.ms);if(o.off)al.push(['amb',`Chargements éloignés (${Math.round(t.pSpread)} km) et hors trajet : détour d'environ ${Math.round(o.detour)} km.`]);}
+  if(t.dSpread>TOUR_RULES.deliverySpreadKm)al.push(['amb',`Déchargements éloignés (${Math.round(t.dSpread)} km entre les plus distants, maximum ${TOUR_RULES.deliverySpreadKm}) : tournée peu cohérente ?`]);
   const km=t.realKm??t.kmEst;
   if(t.longest>0&&t.ms.length>1&&km/t.longest>TOUR_RULES.detourRatio)al.push(['amb',`Détour important : ${Math.round(km)} km pour une mission la plus longue de ${Math.round(t.longest)} km.`]);
   const rdv=new Set(),cons=new Set();
