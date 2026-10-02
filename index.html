@@ -148,6 +148,63 @@
 const SUPABASE_URL  = 'https://srmesytesdspwdtumnfj.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNybWVzeXRlc2RzcHdkdHVtbmZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1ODMyMDEsImV4cCI6MjEwNjE1OTIwMX0.NpngBYSzBUNf7_OI516YhmtwzvPGPewlPRTPwbPwYoI';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+// ─── JOURNAL D'AUDIT : trace automatique des écritures importantes (ne bloque jamais l'application) ───
+const AUDIT_TABLES={missions:'Mission',tours:'Tournée',freight_offers:'Offre de la bourse',carrier_documents:'Document transporteur',carriers:'Transporteur',clients:'Client',sites:'Site',trucks:'Camion',app_settings:'Réglage'};
+const AUDIT_NOISE=new Set(['id','distance_km','pickup_lat','pickup_lng','delivery_lat','delivery_lng','delivery_token','updated_at','docs_checklist','order_date','exchange_snooze_until','exchange_published_at']);
+const AUDIT_KEEP=['status','carrier_id','price_sell','price_buy','tour_id','pickup_date','delivery_date','exchange_status','exchange_max_price','carrier_plate','carrier_driver','name','kind','start_date','end_date','price','key','verified','valid_until','truck_id','active'];
+let _auditOff=false;
+const _sbRaw=sb.from.bind(sb);
+Object.defineProperty(sb,'from',{configurable:true,writable:true,value:function(table){
+  const q=_sbRaw(table);
+  if(!AUDIT_TABLES[table]||_auditOff)return q;
+  ['insert','update','upsert','delete'].forEach(op=>{
+    const f=q[op];if(typeof f!=='function')return;
+    q[op]=function(...a){const b=f.apply(q,a);try{auditWatch(table,op,a[0],b);}catch(_){}return b;};
+  });
+  return q;
+}});
+function auditWatch(table,op,payload,b){
+  const filt={};
+  ['eq','in'].forEach(m=>{const o=b[m];if(typeof o==='function')b[m]=function(c,v){filt[c]=v;return o.call(b,c,v);};});
+  const t0=b.then;if(typeof t0!=='function')return;
+  b.then=function(res,rej){return t0.call(b,r=>{try{if(r&&!r.error)auditRecord(table,op,payload,filt);}catch(_){}return res?res(r):r;},rej);};
+}
+function auditRecord(table,op,payload,filt){
+  if(_auditOff)return;
+  const rows=Array.isArray(payload)?payload:[payload||{}];
+  let ids=(op==='delete'||op==='update')?[].concat(filt.id!==undefined?filt.id:(filt.mission_id!==undefined?[]:[])):rows.map(r=>r&&r.id).filter(Boolean);
+  if(table==='app_settings')ids=rows.map(r=>r&&r.key).filter(Boolean);
+  const keys=op==='delete'?[]:Object.keys(rows[0]||{});
+  const useful=keys.filter(k=>!AUDIT_NOISE.has(k));
+  if(op!=='delete'&&op!=='insert'&&table==='missions'&&!useful.length)return;
+  const label=AUDIT_TABLES[table],p=rows[0]||{};
+  let action;
+  if(op==='delete')action=label+' : suppression';
+  else if(op==='insert')action=label+' : création';
+  else if(table==='missions'&&op==='update'&&'status' in p)action='Statut → '+p.status;
+  else if(table==='missions'&&op==='update'&&'carrier_id' in p)action=p.carrier_id?'Transporteur attribué':'Transporteur retiré';
+  else if(table==='missions'&&op==='update'&&('price_sell' in p||'price_buy' in p))action='Prix modifié';
+  else if(table==='missions'&&op==='update'&&'tour_id' in p)action=p.tour_id?'Ajoutée à une tournée':'Retirée de la tournée';
+  else if(table==='missions'&&op==='update'&&'exchange_status' in p)action='Bourse de fret : '+p.exchange_status;
+  else if(table==='freight_offers'&&'status' in p)action='Offre '+({accepted:'acceptée',rejected:'refusée',declined:'refusée',pending:'en attente'}[p.status]||p.status);
+  else action=label+' : modification';
+  const details={};AUDIT_KEEP.forEach(k=>{if(k in p&&!/^(object|undefined)$/.test(typeof p[k]))details[k]=p[k];});
+  const refOf=id=>{
+    try{
+      if(table==='missions')return (db.missions.find(m=>m.id===id)||{}).ref||(p.ref||null);
+      if(table==='tours')return (db.tours.find(t=>t.id===id)||{}).name||p.name||null;
+      if(table==='carriers')return (db.carriers.find(c=>c.id===id)||{}).name||p.name||null;
+      if(table==='clients')return (db.clients.find(c=>c.id===id)||{}).name||p.name||null;
+      if(table==='freight_offers'){const o=db.offers.find(x=>x.id===id);const m=o&&db.missions.find(x=>x.id===o.missionId);return m?m.ref:null;}
+      if(table==='app_settings')return id;
+    }catch(_){}
+    return p.name||p.ref||null;
+  };
+  const who=(typeof currentUser!=='undefined'&&currentUser&&currentUser.email)||null;
+  const list=ids.length?ids:[null];
+  const out=list.slice(0,50).map(id=>({user_email:who,action,entity:table,entity_id:id==null?null:String(id),ref:id==null?(p.ref||p.name||null):refOf(id),details:Object.keys(details).length?details:null}));
+  _sbRaw('audit_log').insert(out).then(({error})=>{if(error&&/audit_log|relation|schema cache/i.test(error.message||''))_auditOff=true;},()=>{});
+}
 
 // Token transporteur dans l'URL (?t=UUID)
 const CARRIER_TOKEN = new URLSearchParams(window.location.search).get('t');
@@ -155,7 +212,7 @@ const CARRIER_TOKEN = new URLSearchParams(window.location.search).get('t');
 const INSPECTION_TOKEN = new URLSearchParams(window.location.search).get('inspection');
 
 // ─── STATE ──────────────────────────────────────────────────────
-const NAV=[["Vue d'ensemble",'⌂'],['Contrôle','◉'],['Planning général','▦'],['Missions','▤'],['Véhicules','▣'],['Clients','◫'],['Sites','◍'],['Transporteurs','▰'],['Documents','▧'],['Carte','◎'],['Planning camions','⇄'],['Règles et coûts','⚙'],['Affrètement','⇆'],['Bourse de fret','◈'],['Finance','€'],['Rapports','📊'],['Résumé','i']];
+const NAV=[["Vue d'ensemble",'⌂'],['Contrôle','◉'],['Planning général','▦'],['Missions','▤'],['Véhicules','▣'],['Clients','◫'],['Sites','◍'],['Transporteurs','▰'],['Documents','▧'],['Carte','◎'],['Planning camions','⇄'],['Règles et coûts','⚙'],['Exceptions et journal','⚑'],['Affrètement','⇆'],['Bourse de fret','◈'],['Finance','€'],['Rapports','📊'],['Résumé','i']];
 let db={clients:[],carriers:[],missions:[],carrierEvents:[],deliveryInspections:[],trucks:[],tours:[],sites:[],carrierDocs:[],profiles:[],offers:[],selectedIds:[],sort:'ref',direction:1};
 let current="Vue d'ensemble",search='',filterStatus='Tous les statuts',docSearch='',docFilter='';
 let editingMission=null,detailId=null,currentUser=null;
@@ -845,6 +902,7 @@ function render(){
   else if(current==='Rapports')view.innerHTML=reportsPage();
   else if(current==='Carte'){view.innerHTML=mapPage();setTimeout(initMapView,0);}
   else if(current==='Planning camions')view.innerHTML=toursPage();
+  else if(current==='Exceptions et journal'){view.innerHTML=exceptionsPage();if(excTab==='log')setTimeout(loadAuditLog,0);}
   else if(current==='Règles et coûts'){view.innerHTML=rulesPage();if(rulesTab==='holidays')setTimeout(holShow,0);}
   else if(current==='Contrôle')view.innerHTML=controlPage();
   else if(current==='Sites')view.innerHTML=sitesPage();
@@ -2653,6 +2711,69 @@ async function csConfirmTransport(mid,oid){
   const{error:e2}=await sb.from('freight_offers').update({status:'confirmed',updated_at:new Date().toISOString()}).eq('id',oid);
   if(e2){err.textContent=e2.message;return;}
   await csLoadBourse();renderCarrierSpace();
+}
+
+// ─── EXCEPTIONS (calculées en direct) ET JOURNAL D'AUDIT ───
+let excTab='exc',_auditRows=null,_auditFilter='';
+function computeExceptions(){
+  const out=[],today=todayIso();
+  const active=db.missions.filter(m=>!DONE_STATUSES.includes(m.status)&&m.status!=='annulé');
+  const mo=m=>`openDetail('${esc(m.id)}')`;
+  const cn=id=>(db.carriers.find(c=>c.id===id)||{}).name||'?';
+  active.forEach(m=>{
+    const u=mapUrgency(m);
+    if(u.left!=null&&u.left<0)out.push({sev:'red',cat:'Retard',text:`${m.ref} : ${-u.left} jour(s) de retard sur la date limite (${pretty(u.dl)}).`,act:mo(m),m});
+    else if(u.left!=null&&u.left<=2&&!m.carrierId&&!m.tourId)out.push({sev:'red',cat:'Urgence',text:`${m.ref} : date limite dans ${u.left} jour(s) et aucun transporteur ni tournée.`,act:mo(m),m});
+    if(!m.carrierId&&!m.tourId&&m.orderDate&&bdSince(m.orderDate)>=3&&!(u.left!=null&&u.left<=2))out.push({sev:'amb',cat:'Non planifiée',text:`${m.ref} : commandée il y a ${bdSince(m.orderDate)} jours ouvrés, toujours sans affectation.`,act:mo(m),m});
+    if(m.priceSell==null)out.push({sev:'amb',cat:'Prix',text:`${m.ref} : prix de vente manquant.`,act:mo(m),m});
+    if(m.carrierId&&m.priceBuy==null)out.push({sev:'amb',cat:'Prix',text:`${m.ref} : transporteur ${cn(m.carrierId)} attribué mais prix d'achat manquant.`,act:mo(m),m});
+    if(m.priceSell!=null&&m.priceBuy!=null&&m.priceBuy>m.priceSell)out.push({sev:'red',cat:'Marge négative',text:`${m.ref} : achat ${eur(m.priceBuy)} supérieur à la vente ${eur(m.priceSell)}.`,act:mo(m),m});
+    if(!hasGeo(m)&&(m.pickupCity||m.deliveryCity))out.push({sev:'info',cat:'Carte',text:`${m.ref} : non géolocalisée (absente de la carte et de l'Optimiser).`,act:mo(m),m});
+    if(isNonEU(m)){const dm=docsMissing(m).length;if(dm)out.push({sev:'amb',cat:'Douane',text:`${m.ref} : hors UE, ${dm} document(s) douanier(s) manquant(s).`,act:mo(m),m});}
+  });
+  db.carriers.forEach(c=>{
+    const comp=carrierCompliance(c.id),nAct=active.filter(m=>m.carrierId===c.id).length;
+    if(comp.blocked)out.push({sev:nAct?'red':'amb',cat:'Transporteur',text:`${c.name} : document manquant ou expiré${nAct?` — ${nAct} mission(s) active(s)`:''}.`,act:`openCarrierDocs('${esc(c.id)}')`});
+    else if(['red','orange'].includes(comp.level))out.push({sev:'amb',cat:'Transporteur',text:`${c.name} : un document expire bientôt.`,act:`openCarrierDocs('${esc(c.id)}')`});
+    const pend=carrierDocs(c.id).filter(d=>!d.verified).length;
+    if(pend)out.push({sev:'info',cat:'Documents',text:`${c.name} : ${pend} document(s) à valider.`,act:`openCarrierDocs('${esc(c.id)}')`});
+  });
+  db.offers.filter(o=>o.status==='pending'&&o.createdAt&&(Date.now()-new Date(o.createdAt).getTime())>86400000).forEach(o=>{
+    const m=db.missions.find(x=>x.id===o.missionId);
+    if(m)out.push({sev:'amb',cat:'Bourse',text:`${m.ref} : offre de ${cn(o.carrierId)} (${eur(o.price)}) en attente depuis plus de 24 h.`,act:mo(m),m});
+  });
+  db.tours.filter(t=>t.kind==='own'&&t.analysis).forEach(t=>{
+    const rev=tourMissions(t).reduce((q,m)=>q+(m.priceSell||0),0);
+    if(rev>0&&rev<t.analysis.cost.total)out.push({sev:'red',cat:'Tournée déficitaire',text:`${t.name} : coût estimé ${eur(t.analysis.cost.total)} pour ${eur(rev)} de ventes.`,act:`openTourDetail('${esc(t.id)}')`});
+  });
+  if(typeof settings!=='undefined'&&settings.fuel&&settings.fuel.updatedAt){
+    const age=Math.round((Date.now()-new Date(settings.fuel.updatedAt).getTime())/86400000);
+    if(age>35)out.push({sev:'amb',cat:'Réglages',text:`Prix du gasoil non actualisés depuis ${age} jours (Règles et coûts → Gasoil).`,act:`current='Règles et coûts';rulesTab='fuel';render()`});
+  }
+  const rank={red:0,amb:1,info:2};
+  return out.sort((a,b)=>rank[a.sev]-rank[b.sev]);
+}
+function exceptionsPage(){
+  const tabs=[['exc','⚑ Exceptions'],['log','📜 Journal des modifications']];
+  const head=heading('Exceptions et journal','Ce qui demande ton attention, et l\'historique de ce qui a été modifié.')+
+    `<div style="display:flex;gap:6px;margin-bottom:12px">${tabs.map(([k,l])=>`<button class="btn ${excTab===k?'primary':''}" onclick="excTab='${k}';render()">${l}</button>`).join('')}</div>`;
+  if(excTab==='log')return head+`<div class="panel"><div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"><input type="search" id="audit-q" placeholder="Filtrer (mission, action, utilisateur…)" value="${esc(_auditFilter)}" oninput="_auditFilter=this.value;renderAuditRows()" style="flex:1;min-width:220px;padding:8px;border:1px solid #dbe4eb;border-radius:7px"><button class="btn" onclick="loadAuditLog()">↻ Actualiser</button></div><div id="audit-box"><div class="empty">Chargement…</div></div></div>`;
+  const ex=computeExceptions(),n={red:0,amb:0,info:0};ex.forEach(x=>n[x.sev]++);
+  const col={red:'var(--red)',amb:'var(--amber)',info:'var(--blue)'};
+  return head+`<div class="panel"><div style="display:flex;gap:16px;margin-bottom:10px;font-size:13px"><span style="color:var(--red)"><b>${n.red}</b> critique(s)</span><span style="color:var(--amber)"><b>${n.amb}</b> à surveiller</span><span style="color:var(--blue)"><b>${n.info}</b> information(s)</span></div>
+    ${ex.length?`<div class="table-wrap"><table><thead><tr><th></th><th>Type</th><th>Exception</th><th></th></tr></thead><tbody>${ex.map(x=>`<tr><td style="width:14px"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${col[x.sev]}"></span></td><td style="white-space:nowrap;font-weight:700;font-size:11.5px">${esc(x.cat)}</td><td>${esc(x.text)}</td><td><button class="btn" onclick="${x.act}">Ouvrir</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">✓ Aucune exception : tout est en ordre.</div>'}</div>`;
+}
+async function loadAuditLog(){
+  const box=document.getElementById('audit-box');if(box)box.innerHTML='<div class="empty">Chargement…</div>';
+  const{data,error}=await _sbRaw('audit_log').select('*').order('at',{ascending:false}).limit(400);
+  if(error){if(box)box.innerHTML=`<div class="notice error">Journal indisponible : ${esc(error.message)}<br>(le script SQL 15 a-t-il été lancé ?)</div>`;return;}
+  _auditRows=data||[];renderAuditRows();
+}
+function renderAuditRows(){
+  const box=document.getElementById('audit-box');if(!box||!_auditRows)return;
+  const q=_auditFilter.trim().toLowerCase();
+  const rows=_auditRows.filter(r=>!q||[r.action,r.ref,r.user_email,r.entity,JSON.stringify(r.details||'')].join(' ').toLowerCase().includes(q));
+  box.innerHTML=rows.length?`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Utilisateur</th><th>Action</th><th>Élément</th><th>Détails</th></tr></thead><tbody>${rows.map(r=>`<tr><td style="white-space:nowrap">${new Date(r.at).toLocaleString('fr-BE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td><td style="font-size:11.5px">${esc(r.user_email||'—')}</td><td><b>${esc(r.action)}</b></td><td>${esc((AUDIT_TABLES[r.entity]||r.entity||'')+(r.ref?' · '+r.ref:''))}</td><td style="font-size:11px;color:var(--muted)">${esc(Object.entries(r.details||{}).map(([k,v])=>k+': '+v).join(' · '))}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Aucune entrée.</div>';
 }
 
 // ─── RÈGLES ET COÛTS : conduite, gasoil, péages, ferries, interdictions de rouler, jours fériés ───
