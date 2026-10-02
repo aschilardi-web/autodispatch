@@ -151,7 +151,7 @@ const CARRIER_TOKEN = new URLSearchParams(window.location.search).get('t');
 const INSPECTION_TOKEN = new URLSearchParams(window.location.search).get('inspection');
 
 // ─── STATE ──────────────────────────────────────────────────────
-const NAV=[["Vue d'ensemble",'⌂'],['Planning','▦'],['Missions','▤'],['Véhicules','▣'],['Clients','◫'],['Transporteurs','▰'],['Documents','▧'],['Carte','◎'],['Tournées','⇄'],['Finance','€'],['Rapports','📊'],['Résumé','i']];
+const NAV=[["Vue d'ensemble",'⌂'],['Planning général','▦'],['Missions','▤'],['Véhicules','▣'],['Clients','◫'],['Transporteurs','▰'],['Documents','▧'],['Carte','◎'],['Planning camions','⇄'],['Affrètement','⇆'],['Finance','€'],['Rapports','📊'],['Résumé','i']];
 let db={clients:[],carriers:[],missions:[],carrierEvents:[],deliveryInspections:[],trucks:[],tours:[],selectedIds:[],sort:'ref',direction:1};
 let current="Vue d'ensemble",search='',filterStatus='Tous les statuts',docSearch='',docFilter='';
 let editingMission=null,detailId=null,currentUser=null;
@@ -794,13 +794,14 @@ function render(){
   if(current==="Vue d'ensemble")view.innerHTML=dashboard();
   else if(current==='Résumé')view.innerHTML=summary();
   else if(current==='Clients'||current==='Transporteurs')view.innerHTML=partnersPage(current==='Clients'?'clients':'carriers');
-  else if(current==='Planning')view.innerHTML=planning();
+  else if(current==='Planning général')view.innerHTML=planning();
   else if(current==='Missions')view.innerHTML=missionsPage();
   else if(current==='Véhicules')view.innerHTML=vehiclesPage();
   else if(current==='Documents')view.innerHTML=documentsPage();
   else if(current==='Rapports')view.innerHTML=reportsPage();
   else if(current==='Carte'){view.innerHTML=mapPage();setTimeout(initMapView,0);}
-  else if(current==='Tournées')view.innerHTML=toursPage();
+  else if(current==='Planning camions')view.innerHTML=toursPage();
+  else if(current==='Affrètement')view.innerHTML=charterPage();
   else view.innerHTML=financePage();
 }
 
@@ -848,7 +849,7 @@ function dashboard(){
     const isLate=lateMissions.includes(m);
     return `<div class="recent-row"><strong>${esc(m.ref)}${isLate?'<span style="background:#fce8e8;color:var(--red);font-size:9px;border-radius:4px;padding:1px 5px;margin-left:5px;font-weight:700">RETARD</span>':''}<small>${esc(getClient(m).name||'—')}</small></strong><span>${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}</span><span>Chargement ${pretty(m.pickupDate)}<small>Livraison ${pretty(m.deliveryDate)}</small></span>${badge(m.status)}</div>`;
   }).join(''):'<div class="empty">Aucune mission. Crée une mission pour commencer.</div>'}</div></div>
-  <div class="panel"><div class="panel-title"><h2>Actions rapides</h2></div><div class="toolbar"><button class="btn soft" onclick="setView('Planning')">Ouvrir le planning</button><button class="btn soft" onclick="openNewMission()">Nouvelle mission</button><button class="btn soft" onclick="setView('Clients')">Gérer les clients</button><button class="btn soft" onclick="setView('Transporteurs')">Gérer les transporteurs</button></div></div>`;
+  <div class="panel"><div class="panel-title"><h2>Actions rapides</h2></div><div class="toolbar"><button class="btn soft" onclick="setView('Planning général')">Ouvrir le planning général</button><button class="btn soft" onclick="openNewMission()">Nouvelle mission</button><button class="btn soft" onclick="setView('Clients')">Gérer les clients</button><button class="btn soft" onclick="setView('Transporteurs')">Gérer les transporteurs</button></div></div>`;
 }
 
 function badge(s){return `<span class="badge ${s==='livré'||s==='chargé'||s==='payé'?'green':s==='en transport'?'blue':s==='à planifier'?'amber':''}">${esc(s)}</span>`}
@@ -896,13 +897,13 @@ function weekCalendar(){
         <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="width:7px;height:7px;border-radius:50%;background:#2675a9;flex-shrink:0"></span><strong style="font-size:11px">${esc(m.ref)}</strong></div>
         <div style="font-size:10.5px;color:#536a7d">Chargement · ${m.cars.length} véh.</div>
         <div style="font-size:10.5px;color:#536a7d">${esc(place(m.pickupCountry,m.pickupCity))}${m.deliveryCity?' → '+esc(place(m.deliveryCountry,m.deliveryCity)):''}</div>
-        <div style="font-size:10px;color:#8094a6;margin-top:2px">${esc(getClient(m).name||'—')} · ${esc(getCarrier(m).name||'À attribuer')}</div>
+        <div style="font-size:10px;color:#8094a6;margin-top:2px">${esc(getClient(m).name||'—')} · ${esc(execInfo(m).label)}</div>
       </div>`),
       ...delivs.map(m=>`<div onclick="openDetail('${esc(m.id)}')" style="border:1px solid #c3e6cb;border-left:3px solid #24784d;border-radius:7px;padding:9px;margin-bottom:6px;cursor:pointer;background:white;transition:box-shadow .15s" onmouseenter="this.style.boxShadow='0 2px 8px #24784d20'" onmouseleave="this.style.boxShadow=''">
         <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="width:7px;height:7px;border-radius:50%;background:#24784d;flex-shrink:0"></span><strong style="font-size:11px">${esc(m.ref)}</strong></div>
         <div style="font-size:10.5px;color:#536a7d">Livraison · ${m.cars.length} véh.</div>
         <div style="font-size:10.5px;color:#536a7d">${esc(place(m.deliveryCountry,m.deliveryCity))}</div>
-        <div style="font-size:10px;color:#8094a6;margin-top:2px">${esc(getClient(m).name||'—')} · ${esc(getCarrier(m).name||'À attribuer')}</div>
+        <div style="font-size:10px;color:#8094a6;margin-top:2px">${esc(getClient(m).name||'—')} · ${esc(execInfo(m).label)}</div>
       </div>`)
     ];
     return `<div style="flex:1;min-width:110px;padding:0 8px;${i<6?'border-right:1px solid #e8eef4':''}${isWe?';background:#fafbfc':''}${isToday?';background:#f5f9ff':''}">
@@ -981,7 +982,7 @@ function advancedFilterBar(totalMissions,totalVehicles){
 function planning(){
   const count=db.selectedIds.length;
   const tbl=missionTableFull(true);
-  return heading('Planning','Calendrier des opérations et affectation des transporteurs.')+
+  return heading('Planning général','Toutes les commandes : chargements, livraisons, camions propres et affrètement.')+
   weekCalendar()+
   `<div class="panel"><div class="panel-title"><h2>Véhicules à planifier</h2><small>La case de sélection se trouve à gauche de Mission / client.</small></div>
   <div class="bulkbar">
@@ -1855,16 +1856,34 @@ function addWorkdays(iso,n){let d=iso;while(n>0){d=addDays(d,1);const w=new Date
 const fmtDay=iso=>iso?new Date(iso+'T12:00:00Z').toLocaleDateString('fr-BE',{day:'numeric',month:'short'}):'—';
 const truckName=id=>(db.trucks.find(x=>x.id===id)||{}).name||'—';
 function tourPts(t){return tourMissions(t).reduce((s,m)=>s+missionPoints(m),0);}
-function tourBlock(m){
-  const t=tourOf(m);if(!t)return '';
-  return `<div class="detail-block"><h3>Tournée</h3><div class="info-grid">
-    <span>Tournée<strong>${esc(t.name)}</strong></span>
-    <span>Affectation<strong>${t.kind==='own'?'🚛 '+esc(truckName(t.truckId)):(t.kind==='charter'?'Affrété : '+esc((db.carriers.find(c=>c.id===t.carrierId)||{}).name||'—'):'Brouillon')}</strong></span>
-    <span>Dates<strong>${fmtDay(t.startDate)} → ${fmtDay(t.endDate)}</strong></span>
-    <span>Missions<strong>${tourMissions(t).length} · ${fmtPts(tourPts(t))} pts</strong></span></div>
-    <p><button class="btn" onclick="openTourDetail('${esc(t.id)}')">Ouvrir la tournée</button></p></div>`;
+// Mode d'exécution d'une mission : camion propre, affrètement (transporteur) ou non planifiée
+function execInfo(m){
+  const t=tourOf(m),car=getCarrier(m);
+  if(t&&t.kind==='own'){const tr=db.trucks.find(x=>x.id===t.truckId)||{};return{mode:'own',label:'🚛 '+(tr.name||'camion propre'),truck:tr,tour:t};}
+  if((t&&t.kind==='charter')||m.carrierId)return{mode:'charter',label:'🤝 '+(car.name||'transporteur'),carrier:car,tour:t};
+  if(t)return{mode:'draft',label:'Brouillon '+t.name,tour:t};
+  return{mode:'none',label:'À attribuer'};
 }
-
+function tourBlock(m){
+  const e=execInfo(m),t=e.tour;
+  const row=(k,v)=>v?`<span>${k}<strong>${v}</strong></span>`:'';
+  let body='';
+  if(e.mode==='own'){
+    body=row('Mode','🚛 Camion propre')+row('Camion',esc(e.truck.name||'—'))+row('Plaque',esc(e.truck.plate||'—'))
+      +row('Départ → fin',fmtDay(t.startDate)+' → '+fmtDay(t.endDate))+row('Retour',t.returnDay?(t.returnDay==='friday'?'Rentre le vendredi':'Rentre le samedi'):'')+row('Tournée',esc(t.name));
+  }else if(e.mode==='charter'){
+    const c=e.carrier||{},mg=marginOf(m);
+    body=row('Mode','🤝 Affrètement')+row('Transporteur',esc(c.name||'—'))+row('E-mail',esc(c.email||''))+row('Téléphone',esc(c.phone||''))
+      +row('Plaque',esc(m.carrierPlate||''))+row('Chauffeur',esc(m.carrierDriver||''))
+      +row('Chargement prévu',m.carrierLoadDate?fmtDay(m.carrierLoadDate):'')+row('Livraison prévue',m.carrierDeliveryDate?fmtDay(m.carrierDeliveryDate):'')
+      +row('Prix d\'achat',m.priceBuy!=null?eur(m.priceBuy):'')+row('Marge',mg!=null?`<span style="color:${mg>=0?'var(--green)':'var(--red)'}">${eur(mg)}</span>`:'')+(t?row('Tournée',esc(t.name)):'');
+  }else if(e.mode==='draft'){
+    body=row('Mode','Brouillon (non affecté)')+row('Tournée',esc(t.name));
+  }else{
+    body=row('Mode','Non planifiée');
+  }
+  return `<div class="detail-block"><h3>Exécution du transport</h3><div class="info-grid">${body}</div>${t?`<p><button class="btn" onclick="openTourDetail('${esc(t.id)}')">Ouvrir la tournée</button></p>`:''}</div>`;
+}
 function toursPage(){
   const monday=addDays(mondayOf(todayIso()),tourWeek*7);
   const days=Array.from({length:7},(_,i)=>addDays(monday,i));
@@ -1893,7 +1912,7 @@ function toursPage(){
         ${days.map((d,i)=>`<div style="grid-column:${i+1};grid-row:1/span ${Math.max(1,lanes.length)};background:${[5,6].includes(i)?'#f4f7fa':'#fafcfd'};border-radius:4px"></div>`).join('')}${bars}</div></div>`;
   };
   const all=[...db.tours].sort((a,b)=>String(b.startDate).localeCompare(String(a.startDate)));
-  return heading('Tournées','Camions, tournées et planning hebdomadaire.',
+  return heading('Planning camions','Camions gérés : tournées et planning hebdomadaire par camion.',
     `<button class="btn" onclick="openTruckForm()">＋ Camion</button> <button class="btn primary" onclick="setView('Carte')">＋ Nouvelle tournée (depuis la carte)</button>`)+
   `<div class="panel">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
@@ -1912,6 +1931,41 @@ function toursPage(){
     <div class="table-wrap"><table><thead><tr><th>Tournée</th><th>Affectation</th><th>Dates</th><th>Missions</th><th>Points</th><th>Km</th><th></th></tr></thead><tbody>
     ${all.map(t=>`<tr><td><strong>${esc(t.name)}</strong></td><td>${t.kind==='own'?'🚛 '+esc(truckName(t.truckId)):(t.kind==='charter'?'Affrété · '+esc((db.carriers.find(c=>c.id===t.carrierId)||{}).name||'—'):'Brouillon')}</td><td>${fmtDay(t.startDate)} → ${fmtDay(t.endDate)}</td><td>${tourMissions(t).map(m=>esc(m.ref)).join(', ')||'—'}</td><td>${fmtPts(tourPts(t))}</td><td>${t.km?Math.round(t.km):'—'}</td><td><button class="btn" onclick="openTourDetail('${esc(t.id)}')">Ouvrir</button></td></tr>`).join('')||'<tr><td colspan="7" class="empty">Aucune tournée enregistrée.</td></tr>'}
     </tbody></table></div></div>`;
+}
+
+// ─── AFFRÈTEMENT : tous les lots confiés à un transporteur, avec la marge directe ───
+let charterFilter={period:'Tout',carrier:''};
+function charterPage(){
+  const today=todayIso(),monthStart=today.slice(0,7)+'-01';
+  const prev=(()=>{const d=new Date(monthStart+'T12:00:00Z');d.setUTCMonth(d.getUTCMonth()-1);return _isoD(d);})();
+  const inPeriod=m=>{
+    const d=m.pickupDate||m.orderDate||'';
+    if(charterFilter.period==='Ce mois')return d>=monthStart;
+    if(charterFilter.period==='Mois précédent')return d>=prev&&d<monthStart;
+    if(charterFilter.period==='90 jours')return d>=addDays(today,-90);
+    return true;
+  };
+  const all=db.missions.filter(m=>execInfo(m).mode==='charter');
+  const rows=all.filter(inPeriod).filter(m=>!charterFilter.carrier||m.carrierId===charterFilter.carrier||(tourOf(m)||{}).carrierId===charterFilter.carrier)
+    .sort((a,b)=>String(b.pickupDate||'').localeCompare(String(a.pickupDate||'')));
+  const both=rows.filter(m=>marginOf(m)!==null);
+  const ca=both.reduce((s,m)=>s+m.priceSell,0),cost=both.reduce((s,m)=>s+m.priceBuy,0),marge=ca-cost;
+  const kmRows=rows.filter(m=>m.distanceKm>0&&m.priceBuy!=null),kmTot=kmRows.reduce((s,m)=>s+m.distanceKm,0);
+  const kpiStyle=c=>`color:${c};font-size:26px;margin-top:9px;display:block`;
+  const carriersUsed=[...new Set(all.map(m=>m.carrierId||(tourOf(m)||{}).carrierId).filter(Boolean))];
+  return heading('Affrètement','Lots confiés à des transporteurs : prix de vente, prix d\'achat et marge directe.',
+    `<select onchange="charterFilter.period=this.value;render()">${['Tout','Ce mois','Mois précédent','90 jours'].map(p=>`<option ${charterFilter.period===p?'selected':''}>${p}</option>`).join('')}</select>
+     <select onchange="charterFilter.carrier=this.value;render()"><option value="">Tous les transporteurs</option>${carriersUsed.map(id=>`<option value="${esc(id)}" ${charterFilter.carrier===id?'selected':''}>${esc((db.carriers.find(c=>c.id===id)||{}).name||'—')}</option>`).join('')}</select>`)+
+  `<div class="grid stats" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:8px">
+    <div class="stat"><small>Lots affrétés</small><strong style="${kpiStyle('var(--blue)')}">${rows.length}</strong><em>${rows.reduce((s,m)=>s+m.cars.length,0)} véhicules</em></div>
+    <div class="stat"><small>Chiffre d'affaires</small><strong style="${kpiStyle('#2f4858')}">${eur(ca)}</strong><em>${both.length} lot(s) avec prix de vente et d'achat</em></div>
+    <div class="stat"><small>Marge directe</small><strong style="${kpiStyle(both.length?(marge>=0?'var(--green)':'var(--red)'):'inherit')}">${both.length?eur(marge):'—'}</strong><em>${ca>0?(marge/ca*100).toFixed(1)+' % du CA':'—'}</em></div>
+    <div class="stat"><small>Coût transport / km</small><strong style="${kpiStyle('#2f4858')}">${kmTot>0?eur(kmRows.reduce((s,m)=>s+m.priceBuy,0)/kmTot):'—'}</strong><em>${kmTot>0?'sur '+kmTot.toLocaleString('fr-BE')+' km':'km ou prix manquants'}</em></div>
+  </div>
+  <div class="panel"><div class="table-wrap"><table><thead><tr><th>Mission / client</th><th>Trajet</th><th>Véhicules</th><th>Transporteur</th><th>Plaque</th><th>Vente</th><th>Achat</th><th>Marge</th><th>%</th><th>Statut</th><th></th></tr></thead><tbody>
+  ${rows.map(m=>{const e=execInfo(m),mg=marginOf(m),p=(mg!=null&&m.priceSell>0)?mg/m.priceSell*100:null;
+    return `<tr><td><strong>${esc(m.ref)}</strong><small>${esc(getClient(m).name||'—')}</small></td><td style="font-size:12px">${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}</td><td>${m.cars.length} · ${fmtPts(missionPoints(m))} pts</td><td>${esc((e.carrier||{}).name||'—')}</td><td>${esc(m.carrierPlate||'—')}</td><td>${eur(m.priceSell)}</td><td>${eur(m.priceBuy)}</td><td style="font-weight:700;color:${mg==null?'inherit':(mg>=0?'var(--green)':'var(--red)')}">${mg!=null?eur(mg):'—'}</td><td>${p!=null?p.toFixed(1)+' %':'—'}</td><td>${badge(m.status)}</td><td><button class="btn" onclick="openDetail('${esc(m.id)}')">Ouvrir</button></td></tr>`;}).join('')||'<tr><td colspan="11" class="empty">Aucun lot affrété pour cette sélection.</td></tr>'}
+  </tbody></table></div></div>`;
 }
 
 // — Camions —
@@ -1948,7 +2002,7 @@ function openTourForm(){
   document.getElementById('modal-content').innerHTML=`<div class="modal-header"><div><h2>Créer la tournée</h2><p>${t.ms.length} mission${t.ms.length>1?'s':''} · ${t.veh} véhicule${t.veh>1?'s':''} · ${fmtPts(t.pts)} pts · ≈ ${km} km</p></div><button class="x" onclick="closeModal()">×</button></div>
   <div class="form-grid">
     <div class="field wide"><label>Affectation</label><select id="tf-kind" onchange="tourFormKind()"><option value="own">🚛 Camion propre</option><option value="charter">Affréter à un transporteur</option><option value="draft">Brouillon (non affecté)</option></select></div>
-    <div class="field" id="tf-truck-f"><label>Camion</label><select id="tf-truck">${trucks.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}${x.plate?' · '+esc(x.plate):''}</option>`).join('')||'<option value="">— aucun camion : crée-en un dans « Tournées » —</option>'}</select></div>
+    <div class="field" id="tf-truck-f"><label>Camion</label><select id="tf-truck">${trucks.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}${x.plate?' · '+esc(x.plate):''}</option>`).join('')||'<option value="">— aucun camion : crée-en un dans « Planning camions » —</option>'}</select></div>
     <div class="field" id="tf-carrier-f" style="display:none"><label>Transporteur</label><select id="tf-carrier"><option value="">Choisir…</option>${db.carriers.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></div>
     <div class="field"><label>Départ</label><input id="tf-start" type="date" value="${start}"></div>
     <div class="field"><label>Fin prévue</label><input id="tf-end" type="date" value="${addWorkdays(start,days-1)}"></div>
@@ -1968,7 +2022,7 @@ async function saveTour(){
   const t=_lastTour,err=document.getElementById('form-error');
   if(!t)return;
   const kind=val('tf-kind'),truckId=val('tf-truck'),carrierId=val('tf-carrier'),start=val('tf-start'),end=val('tf-end')||start;
-  if(kind==='own'&&!truckId){err.innerHTML='<div class="notice error">Choisis un camion (ou crée-en un dans l\'onglet Tournées).</div>';return;}
+  if(kind==='own'&&!truckId){err.innerHTML='<div class="notice error">Choisis un camion (ou crée-en un dans « Planning camions »).</div>';return;}
   if(kind==='charter'&&!carrierId){err.innerHTML='<div class="notice error">Choisis un transporteur.</div>';return;}
   if(!start){err.innerHTML='<div class="notice error">Indique la date de départ.</div>';return;}
   if(end<start){err.innerHTML='<div class="notice error">La date de fin est avant le départ.</div>';return;}
@@ -2073,6 +2127,13 @@ function deadlineBlock(m){
 
 // ─── CARTE : une couleur par mission ; rond ⬆ = chargement, carré ⬇ = déchargement, flèche = sens du trajet ───
 let mapFilter={group:'Sans tournée',urgent:false,lines:true};
+let mapDest={country:new Set(),city:new Set(),site:new Set(),client:new Set()},mapSort='Date limite',mapOpenFilter='';
+const DEST_FIELDS=[['country','🌍 Pays de destination'],['city','🏙 Ville de destination'],['site','🏢 Site / client de destination'],['client','👤 Client (donneur d\'ordre)']];
+const destKeys=m=>({country:ccLabel(m.deliveryCountry)||'—',city:m.deliveryCity||'—',site:m.deliverySite||'—',client:getClient(m).name||'—'});
+const destMatch=m=>{const k=destKeys(m);return Object.entries(mapDest).every(([f,set])=>!set.size||set.has(k[f]));};
+function mapDestToggle(f,v,on){if(on)mapDest[f].add(v);else mapDest[f].delete(v);render();}
+function mapDestClear(){Object.values(mapDest).forEach(x=>x.clear());render();}
+function mfFilter(inp){const t=inp.value.toLowerCase();inp.parentElement.querySelectorAll('label').forEach(l=>{l.style.display=l.dataset.q.includes(t)?'':'none';});}
 let _map=null,_mapView=null,_mapItems={},mapSel=null,_selLayer=null,_drawLayer=null;
 let mapSelected=new Set(),mapSelMode=null,mapSelTarget='pickup',truckPanelOpen=true,_lastTour=null;
 let truckCostKm=(()=>{try{return localStorage.getItem('adCostKm')||'';}catch(_){return'';}})();
@@ -2081,9 +2142,23 @@ const TOUR_RULES={pickupSpreadKm:250,deliverySpreadKm:600,detourRatio:1.5};   //
 const MAP_PALETTE=['#e6194b','#4363d8','#f58231','#911eb4','#008080','#9a6324','#d2308f','#3a7d00','#0b3d91','#b8860b','#c0392b','#17a2b8'];
 const mapColor=id=>{let h=0;for(const ch of String(id))h=(h*31+ch.charCodeAt(0))>>>0;return MAP_PALETTE[h%MAP_PALETTE.length];};
 const hasGeo=m=>m.pickupLat!=null&&m.deliveryLat!=null;
-function mapMissions(){
+function mapBaseMissions(){
   return db.missions.filter(m=>mapFilter.group==='Toutes'?true:(mapFilter.group==='Terminées'?DONE_STATUSES.includes(m.status):(!DONE_STATUSES.includes(m.status)&&(mapFilter.group!=='Sans tournée'||!m.tourId))))
     .filter(m=>{if(!mapFilter.urgent)return true;const dl=deadlineOf(m);return dl&&!DONE_STATUSES.includes(m.status)&&daysLeft(dl)<=2;});
+}
+function mapMissions(){return mapBaseMissions().filter(destMatch);}
+// menus de filtre à choix multiples (le nombre de missions est calculé sur la liste avant ce filtre)
+function mapDestFiltersHtml(){
+  const base=mapBaseMissions();
+  return DEST_FIELDS.map(([f,label])=>{
+    const counts={};base.forEach(m=>{const k=destKeys(m)[f];counts[k]=(counts[k]||0)+1;});
+    const keys=Object.keys(counts).sort((a,b)=>a.localeCompare(b,'fr'));
+    const n=mapDest[f].size;
+    return `<details class="mf" ${mapOpenFilter===f?'open':''} ontoggle="if(this.open)mapOpenFilter='${f}';else if(mapOpenFilter==='${f}')mapOpenFilter=''">
+      <summary class="btn${n?' primary':''}" style="list-style:none;cursor:pointer">${label}${n?` (${n})`:''} ▾</summary>
+      <div class="mf-list"><input type="search" placeholder="Filtrer…" oninput="mfFilter(this)" style="width:100%;margin-bottom:6px">
+        ${keys.map(k=>`<label data-q="${esc(k.toLowerCase())}" style="display:flex;gap:6px;align-items:center;font-size:12px;padding:2px 0;cursor:pointer"><input type="checkbox" ${mapDest[f].has(k)?'checked':''} onchange="mapDestToggle('${f}',this.dataset.v,this.checked)" data-v="${esc(k)}"> <span style="flex:1">${esc(k)}</span><span style="color:var(--muted)">${counts[k]}</span></label>`).join('')||'<div style="color:var(--muted);font-size:12px">Aucune valeur.</div>'}</div></details>`;
+  }).join('');
 }
 function mapUrgency(m){
   if(DONE_STATUSES.includes(m.status))return{ring:null,left:null};
@@ -2096,14 +2171,18 @@ function mapItemHtml(m){
   return `<div class="map-item${mapSel===m.id?' sel':''}${mapSelected.has(m.id)?' chk':''}" data-id="${esc(m.id)}" data-geo="${geo?1:0}" data-q="${esc((m.ref+' '+(getClient(m).name||'')+' '+(m.pickupCity||'')+' '+(m.deliveryCity||'')).toLowerCase())}" style="--c:${mapColor(m.id)}" onmouseenter="mapHover('${esc(m.id)}')" onmouseleave="mapHover(null)" onclick="mapSelect('${esc(m.id)}')">
     <input type="checkbox" ${(geo&&!m.tourId)?'':'disabled'} ${mapSelected.has(m.id)?'checked':''} title="Ajouter à la sélection (camion)" onclick="event.stopPropagation();mapToggle('${esc(m.id)}')" style="margin:3px 2px 0 0;flex-shrink:0">
     <div style="flex:1;min-width:0"><strong style="font-size:12px">${esc(m.ref)}</strong> <span style="font-size:11px;color:var(--muted)">${esc(getClient(m).name||'')}</span>
-    <div style="font-size:11px;color:#536a7d">${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}</div>
+    <div style="font-size:11px;color:#536a7d">${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}${m.deliverySite?` <span style="color:var(--muted)">· ${esc(m.deliverySite)}</span>`:''}</div>
     <div style="font-size:10.5px;color:var(--muted)">${m.cars.length} véh. · ${fmtPts(missionPoints(m))} pts${m.distanceKm?' · '+m.distanceKm+' km':''} ${chip}${geo?'':' <b style="color:var(--amber)">· à géolocaliser</b>'}${m.tourId?` <b style="color:#24784d">· 🚛 ${esc((tourOf(m)||{}).name||'tournée')}</b>`:''}</div></div></div>`;
 }
 function mapPage(){
   const list=mapMissions();
   const geo=list.filter(hasGeo),missing=list.filter(m=>!hasGeo(m)&&(m.pickupCity||m.deliveryCity));
   const pts=geo.reduce((s,m)=>s+missionPoints(m),0);
-  const sorted=[...geo].sort((a,b)=>{const x=deadlineOf(a)||'9',y=deadlineOf(b)||'9';return x.localeCompare(y);}).concat(missing);
+  const cmp={'Date limite':(a,b)=>(deadlineOf(a)||'9').localeCompare(deadlineOf(b)||'9'),
+    'Destination (pays, ville)':(a,b)=>(destKeys(a).country+destKeys(a).city).localeCompare(destKeys(b).country+destKeys(b).city,'fr'),
+    'Site / client de destination':(a,b)=>destKeys(a).site.localeCompare(destKeys(b).site,'fr'),
+    'Client':(a,b)=>destKeys(a).client.localeCompare(destKeys(b).client,'fr')}[mapSort]||(()=>0);
+  const sorted=[...geo].sort(cmp).concat(missing);
   return heading('Carte','Chargements et déchargements des missions en Europe.',
     `<button class="btn" onclick="geocodeBatch()">📍 Géolocaliser les missions</button>`)+
   `<style>
@@ -2114,6 +2193,8 @@ function mapPage(){
     .map-item{display:flex;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);cursor:pointer;border-left:6px solid var(--c)}
     .map-item:hover,.map-item.sel{background:var(--pale)}
     .map-item.chk{background:#e7f4e7}
+    details.mf{position:relative}details.mf>summary::-webkit-details-marker{display:none}
+    .mf-list{position:absolute;top:100%;left:0;z-index:30;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:8px;min-width:230px;max-height:300px;overflow:auto;margin-top:4px}
     @media(max-width:900px){.map-layout{flex-direction:column}.map-side{width:auto;height:320px;min-height:0}}
     .mk{width:24px;height:24px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.55)}
     .mk.r{border-radius:50%}.mk.q{border-radius:6px}
@@ -2144,6 +2225,10 @@ function mapPage(){
       <select title="Que sélectionner dans la zone dessinée ?" onchange="mapSelTarget=this.value"><option value="pickup" ${mapSelTarget==='pickup'?'selected':''}>zone = chargements</option><option value="delivery" ${mapSelTarget==='delivery'?'selected':''}>zone = déchargements</option><option value="both" ${mapSelTarget==='both'?'selected':''}>zone = les deux</option></select>
       <button class="btn" id="btn-clearsel" onclick="mapClear()" style="display:none">✕ Désélectionner</button>
     </div>
+    <div class="toolbar" style="margin-bottom:10px;gap:8px;flex-wrap:wrap;align-items:center"><span style="font-size:12px;font-weight:700;color:var(--muted)">DESTINATION :</span>${mapDestFiltersHtml()}
+      ${Object.values(mapDest).some(x=>x.size)?'<button class="btn" onclick="mapDestClear()">✕ Effacer les filtres</button>':''}
+      <span style="flex:1"></span><span style="font-size:12px;color:var(--muted)">Tri de la liste :</span>
+      <select onchange="mapSort=this.value;render()">${['Date limite','Destination (pays, ville)','Site / client de destination','Client'].map(x=>`<option ${mapSort===x?'selected':''}>${x}</option>`).join('')}</select></div>
     <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px">● rond ⬆ chargement · ■ carré ⬇ déchargement · ▶ sens du trajet · une couleur par mission · bulle = nombre de véhicules · anneau <b style="color:#c0392b">rouge</b> en retard, <b style="color:#e0850c">orange</b> urgent · <b>Maj + clic</b> sur un point ou case à cocher dans la liste = sélection</div>
     <div class="map-layout">
       <div id="map-canvas"></div>
@@ -2384,7 +2469,7 @@ function truckPanelHtml(t){
 }
 function refreshSelectionUI(){
   // ne garde que les missions encore affichées et géolocalisées
-  const ok=new Set(mapMissions().filter(hasGeo).map(m=>m.id));
+  const ok=new Set(db.missions.filter(m=>hasGeo(m)&&!m.tourId).map(m=>m.id));
   [...mapSelected].forEach(id=>{if(!ok.has(id))mapSelected.delete(id);});
   document.querySelectorAll('#map-list .map-item').forEach(el=>{
     const on=mapSelected.has(el.dataset.id);
@@ -3029,7 +3114,7 @@ function openDetail(id){
   ${profitBlock(m)}
   ${deadlineBlock(m)}
   ${tourBlock(m)}
-  <div class="detail-block"><h3>Transporteur</h3><div class="info-grid"><span>Société<strong>${esc(getCarrier(m).name||'À attribuer')}</strong></span><span>E-mail<strong>${esc(getCarrier(m).email||'—')}</strong></span></div>${portalLink?`<div style="margin-top:12px;padding:11px;background:#edf6fc;border:1px solid #d0e8f5;border-radius:7px;font-size:11px"><div style="font-size:10px;font-weight:800;letter-spacing:1px;color:var(--blue);margin-bottom:6px">🔗 LIEN PORTAIL TRANSPORTEUR</div><div style="word-break:break-all;color:#1e6592;margin-bottom:8px">${esc(portalLink)}</div><button class="btn soft" style="font-size:11px" onclick="copyPortalLink('${esc(m.id)}')">Copier le lien</button> <a href="${esc(portalLink)}" target="_blank" class="btn" style="font-size:11px;text-decoration:none">Ouvrir le portail ↗</a></div>`:'<p style="font-size:12px;color:var(--muted)">Aucun lien portail — affecte un transporteur depuis le Planning.</p>'}</div>
+  <div class="detail-block"><h3>Transporteur</h3><div class="info-grid"><span>Société<strong>${esc(getCarrier(m).name||'À attribuer')}</strong></span><span>E-mail<strong>${esc(getCarrier(m).email||'—')}</strong></span></div>${portalLink?`<div style="margin-top:12px;padding:11px;background:#edf6fc;border:1px solid #d0e8f5;border-radius:7px;font-size:11px"><div style="font-size:10px;font-weight:800;letter-spacing:1px;color:var(--blue);margin-bottom:6px">🔗 LIEN PORTAIL TRANSPORTEUR</div><div style="word-break:break-all;color:#1e6592;margin-bottom:8px">${esc(portalLink)}</div><button class="btn soft" style="font-size:11px" onclick="copyPortalLink('${esc(m.id)}')">Copier le lien</button> <a href="${esc(portalLink)}" target="_blank" class="btn" style="font-size:11px;text-decoration:none">Ouvrir le portail ↗</a></div>`:'<p style="font-size:12px;color:var(--muted)">Aucun lien portail — affecte un transporteur depuis le Planning général.</p>'}</div>
   <div class="detail-block"><h3>Notifications client</h3>
   ${(()=>{
     const kindLabels={planned:'📅 Planification',loaded:'🚛 Chargement',delivered:'✅ Livraison'};
