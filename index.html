@@ -552,7 +552,7 @@ async function loadData(){
     try{const rt=await sb.from('trucks').select('*').order('name');
       db.trucks=(rt.data||[]).map(x=>({id:x.id,name:x.name||'',plate:x.plate||'',capacity:Number(x.capacity_pts)||8,active:x.active!==false}));}catch(e){db.trucks=[];}
     try{const rr=await sb.from('tours').select('*').order('start_date');
-      db.tours=(rr.data||[]).map(x=>({id:x.id,name:x.name||'',kind:x.kind||'draft',truckId:x.truck_id||'',carrierId:x.carrier_id||'',startDate:x.start_date||'',endDate:x.end_date||'',returnDay:x.return_day||'',km:x.km!=null?Number(x.km):null,stops:Array.isArray(x.stops)?x.stops:[],notes:x.notes||''}));}catch(e){db.tours=[];}
+      db.tours=(rr.data||[]).map(x=>({id:x.id,name:x.name||'',kind:x.kind||'draft',truckId:x.truck_id||'',carrierId:x.carrier_id||'',startDate:x.start_date||'',endDate:x.end_date||'',returnDay:x.return_day||'',km:x.km!=null?Number(x.km):null,analysis:x.analysis||null,stops:Array.isArray(x.stops)?x.stops:[],notes:x.notes||''}));}catch(e){db.tours=[];}
     const cars=r4.data||[],notifs=r5.data||[],docs=r6.data||[];
     db.missions=(r3.data||[]).map(m=>({
       id:m.id,ref:m.ref||'',
@@ -1386,7 +1386,7 @@ async function runXlsxImport(){
 // ─── RAPPORTS ───────────────────────────────────────────────────────────────
 // ─── RAPPORTS : choix du rapport, filtres communs, tableau et export Excel ───
 let reportKind='overview',_lastReport=null;
-const REPORT_LIST=[['overview','📊 Vue d\'ensemble'],['margin','💶 Marge par mission'],['client','🏢 Chiffre d\'affaires par client'],['carrier','🚛 Performance des transporteurs'],['late','⚠ Missions en retard'],['lanes','🛣 Prix par trajet (pays → pays)'],['tours','🗺 Tournées et remplissage'],['docs','📄 Documents des transporteurs'],['vehicles','🚗 Véhicules transportés']];
+const REPORT_LIST=[['overview','📊 Vue d\'ensemble'],['cfo','🧭 Tableau de bord financier (CFO)'],['owntours','🚛 Camions propres : coûts et rentabilité'],['loaded','📦 Camions chargés : km, occupation, rentabilité'],['empty','↩ Retours à vide'],['compare','⚖ Camion propre ou affrètement'],['fleet','🚚 Utilisation des camions'],['costs','⛽ Structure des coûts'],['margin','💶 Marge par mission'],['client','🏢 Chiffre d\'affaires par client'],['carrier','🚛 Performance des transporteurs'],['late','⚠ Missions en retard'],['lanes','🛣 Prix par trajet (pays → pays)'],['tours','🗺 Tournées et remplissage'],['docs','📄 Documents des transporteurs'],['vehicles','🚗 Véhicules transportés']];
 function reportPicker(){
   return `<div class="panel" style="margin-bottom:10px;padding:12px 16px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <span style="font-size:13px;font-weight:600;color:#555">📑 Rapport :</span>
@@ -1423,7 +1423,104 @@ function reportOtherPage(){
   const lateOf=m=>{if(isDone(m.status)||m.status==='annulé')return 0;const lim=m.deliveryDate||deadlineOf(m);return(lim&&lim<today)?diffDays(lim,today):0;};
   let R;
   const kind=reportKind;
-  if(kind==='margin'){
+  const pc=v=>v==null?'—':Math.round(v*100)+' %';
+  const eu0=v=>v==null?'—':Math.round(v).toLocaleString('fr-BE')+' €';
+  const tMs=t=>tourMissions(t);
+  const tRev=t=>sum(tMs(t).map(m=>m.priceSell||0));
+  const tBuy=t=>sum(tMs(t).map(m=>m.priceBuy||0));
+  const inP=t=>{if(!t.startDate)return true;const c=new Date();c.setDate(c.getDate()-f.per);return new Date(t.startDate+'T12:00:00')>=c;};
+  const ownT=db.tours.filter(t=>t.kind==='own'&&inP(t)),ownA=ownT.filter(t=>t.analysis);
+  const tName=t=>(db.trucks.find(x=>x.id===t.truckId)||{}).name||'—';
+  const tourRow=t=>{const a=t.analysis,rev=tRev(t),cost=a?a.cost.total:null,mg=cost!=null?rev-cost:null;return{t,a,rev,cost,mg};};
+  const missingNote=ownT.length-ownA.length?`${ownT.length-ownA.length} tournée(s) en camion propre sans analyse : clique sur « Calculer les analyses manquantes ».`:'';
+  const anaBtn=`<button class="btn primary" onclick="analyzeMissingTours()">🧮 Calculer les analyses manquantes (${db.tours.filter(t=>t.kind==='own'&&!t.analysis).length})</button> <span id="ana-note" style="font-size:12px;color:var(--muted)"></span>`;
+  let extra='';
+    if(kind==='cfo'){
+    // coût par mission : tournée propre → coût du modèle réparti au prorata des points ; affrètement → prix d'achat
+    const own=new Set(db.tours.filter(t=>t.kind==='own').map(t=>t.id));
+    let rev=0,cost=0,n=0,veh=0,revOwn=0,revCh=0,missNoPrice=0,revCostKnown=0;
+    ms.forEach(m=>{
+      veh+=m.cars.length;
+      if(m.priceSell==null){missNoPrice++;return;}
+      rev+=m.priceSell;
+      let c=null;
+      const tour=m.tourId?db.tours.find(x=>x.id===m.tourId):null;
+      if(tour&&tour.kind==='own'){revOwn+=m.priceSell;if(tour.analysis){const tp=sum(tourMissions(tour).map(missionPoints))||1;c=tour.analysis.cost.total*missionPoints(m)/tp;}}
+      else if(m.priceBuy!=null){c=m.priceBuy;revCh+=m.priceSell;}
+      if(c!=null){cost+=c;revCostKnown+=m.priceSell;n++;}
+    });
+    const mg=revCostKnown-cost;
+    const kmL=sum(ownA.map(t=>t.analysis.km_loaded)),kmE=sum(ownA.map(t=>t.analysis.km_empty)),kmT=kmL+kmE;
+    const occ=kmL?sum(ownA.map(t=>t.analysis.occ_loaded*t.analysis.km_loaded))/kmL:null;
+    const peak=ownA.length?sum(ownA.map(t=>t.analysis.peak_pts/TRUCK_CAPACITY))/ownA.length:null;
+    const ownRows=ownA.map(tourRow),ownRev=sum(ownRows.map(r=>r.rev)),ownCost=sum(ownRows.map(r=>r.cost));
+    const loss=ownRows.filter(r=>r.mg!=null&&r.mg<0).length;
+    const toInv=sum(ms.filter(m=>m.status==='livré').map(m=>m.priceSell||0)),invUnpaid=sum(ms.filter(m=>m.status==='facturé').map(m=>m.priceSell||0)),paid=sum(ms.filter(m=>m.status==='payé').map(m=>m.priceSell||0));
+    const byC={};ms.forEach(m=>{if(m.clientId&&m.priceSell)byC[m.clientId]=(byC[m.clientId]||0)+m.priceSell;});
+    const cl=Object.values(byC).sort((a,b)=>b-a),top1=cl[0]||0,top3=cl.slice(0,3).reduce((q,v)=>q+v,0);
+    const lateN=ms.filter(m=>lateOf(m)>0).length;
+    const k=(l,v,sub,col)=>[l,v,sub||'',col||'var(--blue)'];
+    const good=(v,a,b)=>v==null?'var(--blue)':v>=a?'var(--green)':v>=b?'var(--orange)':'var(--red)';
+    extra=[
+      k('Chiffre d\'affaires',eu0(rev),`${ms.length} missions · ${veh} véhicules`),
+      k('Marge brute',eu0(mg),`sur ${n} missions avec coût connu`,mg>=0?'var(--green)':'var(--red)'),
+      k('Taux de marge',pc(revCostKnown?mg/revCostKnown:null),'marge / chiffre d\'affaires',good(revCostKnown?mg/revCostKnown:null,0.2,0.1)),
+      k('CA par véhicule',eu0(veh?rev/veh:null),'prix moyen de vente'),
+      k('Marge par véhicule',eu0(veh&&n?mg/veh:null),''),
+      k('Part du camion propre',pc(rev?revOwn/rev:null),'du chiffre d\'affaires'),
+      k('Part de l\'affrètement',pc(rev?revCh/rev:null),'du chiffre d\'affaires'),
+      k('Occupation (km chargés)',pc(occ),'points transportés / 8, pondéré par les km',good(occ,0.8,0.6)),
+      k('Remplissage max moyen',pc(peak),'pic de chargement / capacité',good(peak,0.9,0.75)),
+      k('Km à vide',pc(kmT?kmE/kmT:null),`${Math.round(kmE).toLocaleString('fr-BE')} km sur ${Math.round(kmT).toLocaleString('fr-BE')} km`,kmT?(kmE/kmT<=0.15?'var(--green)':kmE/kmT<=0.3?'var(--orange)':'var(--red)'):'var(--blue)'),
+      k('Coût par km chargé (propre)',kmL?eur(ownCost/kmL):'—','coût total / km avec chargement'),
+      k('Revenu par km chargé (propre)',kmL?eur(ownRev/kmL):'—',''),
+      k('Marge des tournées propres',eu0(ownRev-ownCost),`${loss} tournée(s) déficitaire(s) sur ${ownRows.length}`,ownRev-ownCost>=0?'var(--green)':'var(--red)'),
+      k('À facturer (livré)',eu0(toInv),'missions livrées non facturées',toInv?'var(--orange)':'var(--green)'),
+      k('Facturé, non payé',eu0(invUnpaid),'encours clients',invUnpaid?'var(--orange)':'var(--green)'),
+      k('Encaissé',eu0(paid),'missions payées'),
+      k('Dépendance client',pc(rev?top1/rev:null),`1er client · 3 premiers : ${pc(rev?top3/rev:null)}`,rev&&top1/rev>0.4?'var(--red)':'var(--blue)'),
+      k('Missions en retard',String(lateN),pc(ms.length?lateN/ms.length:null)+' des missions',lateN?'var(--red)':'var(--green)'),
+      k('Sans prix de vente',String(missNoPrice),'missions à compléter',missNoPrice?'var(--orange)':'var(--green)')];
+    const worst=ownRows.filter(r=>r.mg!=null).sort((a,b)=>a.mg-b.mg).slice(0,8).map(r=>[r.t.name,tName(r.t),eur(r.rev),eur(r.cost),eur(r.mg),r.rev>0?pc(r.mg/r.rev):'—']);
+    R={title:'Tableau de bord financier',cols:['Tournées les moins rentables','Camion','CA','Coût','Marge','Marge %'],rows:worst,foot:null,right:[2,3,4,5],note:(missingNote?missingNote+' ':'')+'Le coût des camions propres est celui du modèle de coût (Règles et coûts), avec les prix du gasoil actuels. L\'occupation et les km à vide ne portent que sur les tournées analysées.',kpis:extra,after:ownT.length-ownA.length||db.tours.some(t=>t.kind==='own'&&!t.analysis)?anaBtn:''};
+  }else if(kind==='owntours'){
+    const rr=ownT.map(tourRow).sort((a,b)=>String(b.t.startDate).localeCompare(String(a.t.startDate)));
+    const rows=rr.map(({t,a,rev,cost,mg})=>[t.name,tName(t),t.startDate?pretty(t.startDate):'—',tMs(t).length,sum(tMs(t).map(m=>m.cars.length)),rev||null,cost,mg,rev>0&&mg!=null?pc(mg/rev):'—',a?a.km:(t.km?Math.round(t.km):null),a&&a.km?cost/a.km:null,a&&a.km&&mg!=null?mg/a.km:null,a?pc(a.occ_loaded):'—',a?pc(a.peak_pts/TRUCK_CAPACITY):'—',a?pc(a.km?a.km_empty/a.km:0):'—']);
+    const A=rr.filter(r=>r.a);
+    R={title:'Camions propres : coûts et rentabilité',cols:['Tournée','Camion','Départ','Missions','Véhicules','CA €','Coût €','Marge €','Marge %','Km','Coût €/km','Marge €/km','Occupation','Remplissage max','Km à vide'],money:[5,6,7,10,11],rows,
+      foot:['Total','','',sum(rr.map(r=>r.t&&tMs(r.t).length)),'',sum(rr.map(r=>r.rev)),sum(A.map(r=>r.cost)),sum(A.map(r=>r.mg)),'',sum(A.map(r=>r.a.km)),'','','','',''],note:(missingNote?missingNote+' ':'')+'Occupation = points transportés / 8, pondéré par les km chargés. Les totaux de coût et de marge ne portent que sur les tournées analysées.',after:anaBtn};
+  }else if(kind==='loaded'){
+    const A=ownA.map(tourRow).sort((a,b)=>String(b.t.startDate).localeCompare(String(a.t.startDate)));
+    const rows=A.map(({t,a,rev,cost,mg})=>[t.name,tName(t),a.km_loaded,rev||null,a.km_loaded?rev/a.km_loaded:null,a.km_loaded?(cost-a.empty_cost)/a.km_loaded:null,a.km_loaded&&mg!=null?(rev-(cost-a.empty_cost))/a.km_loaded:null,pc(a.occ_loaded),Math.round(sum(tMs(t).map(missionPoints))*10)/10,pc(a.peak_pts/TRUCK_CAPACITY),a.days]);
+    const kL=sum(A.map(r=>r.a.km_loaded));
+    R={title:'Camions chargés',cols:['Tournée','Camion','Km chargés','CA €','Revenu €/km chargé','Coût €/km chargé','Marge €/km chargé','Occupation','Points','Remplissage max','Jours'],money:[3,4,5,6],rows,foot:['Total / moyenne','',kL,sum(A.map(r=>r.rev)),kL?sum(A.map(r=>r.rev))/kL:null,'','','','','',sum(A.map(r=>r.a.days))],note:'Coût par km chargé = coût de la tournée sans le retour à vide, divisé par les km avec chargement. '+missingNote,after:anaBtn};
+  }else if(kind==='empty'){
+    const A=ownA.map(tourRow).sort((a,b)=>String(b.t.startDate).localeCompare(String(a.t.startDate)));
+    const rows=A.map(({t,a,rev,cost,mg})=>[t.name,tName(t),a.ret?'oui':'non',a.km,a.km_empty,pc(a.km?a.km_empty/a.km:0),a.empty_cost||null,rev>0&&a.empty_cost?pc(a.empty_cost/rev):'—',mg!=null?mg+a.empty_cost:null,mg]);
+    const E=A.filter(r=>r.a.ret);
+    R={title:'Retours à vide',cols:['Tournée','Camion','Retour inclus','Km total','Km à vide','% à vide','Coût du retour €','Retour / CA','Marge avant retour €','Marge après retour €'],money:[6,8,9],rows,foot:['Total','','',sum(A.map(r=>r.a.km)),sum(A.map(r=>r.a.km_empty)),pc(sum(A.map(r=>r.a.km))?sum(A.map(r=>r.a.km_empty))/sum(A.map(r=>r.a.km)):null),sum(A.map(r=>r.a.empty_cost)),'',sum(A.map(r=>r.mg!=null?r.mg+r.a.empty_cost:0)),sum(A.map(r=>r.mg||0))],
+      note:`${E.length} tournée(s) sur ${A.length} ont été analysées avec le retour au dépôt. Le retour à vide va toujours à l'adresse du dépôt (Règles et coûts → Dépôt) ; coche « Retour à vide au dépôt » dans le panneau camion avant de créer ou d'analyser une tournée. Le coût du retour = carburant, péages, entretien, ferries et chauffeur sur ce trajet. `+missingNote,after:anaBtn};
+  }else if(kind==='compare'){
+    const rows=ownA.map(tourRow).map(({t,a,rev,cost})=>{const allBuy=tMs(t).length&&tMs(t).every(m=>m.priceBuy!=null),buy=allBuy?tBuy(t):null;return[t.name,tName(t),rev||null,cost,buy,buy!=null?buy-cost:null,buy!=null?(cost<=buy?'Camion propre':'Affrètement'):'prix d\'achat manquant'];});
+    R={title:'Camion propre ou affrètement',cols:['Tournée','Camion','CA €','Coût camion propre €','Prix d\'achat (affrètement) €','Économie du camion propre €','Option la moins chère'],money:[2,3,4,5],rows,foot:null,note:'Économie positive : le camion propre coûte moins cher que l\'affrètement des mêmes missions. '+missingNote,after:anaBtn};
+  }else if(kind==='fleet'){
+    const c=new Date();c.setDate(c.getDate()-f.per);const from=c.toISOString().slice(0,10),to=todayIso();
+    let biz=0;for(let d=from;d<=to;d=addDays(d,1))if(isBizCC('BE',d))biz++;
+    const rows=db.trucks.filter(x=>x.active).map(x=>{
+      const tt=ownT.filter(t=>t.truckId===x.id);const days=new Set();
+      tt.forEach(t=>{if(!t.startDate)return;let d=t.startDate;const e=t.endDate||t.startDate;for(let g=0;d<=e&&g<60;g++,d=addDays(d,1))if(d>=from&&d<=to&&isBizCC('BE',d))days.add(d);});
+      const A=tt.filter(t=>t.analysis).map(tourRow),rev=sum(tt.map(tRev)),cost=sum(A.map(r=>r.cost)),km=sum(A.map(r=>r.a.km));
+      return[x.name,x.plate||'',tt.length,days.size,pc(biz?days.size/biz:null),km||null,rev||null,A.length?cost:null,A.length?sum(A.map(r=>r.rev))-cost:null,days.size&&A.length?(sum(A.map(r=>r.rev))-cost)/days.size:null];
+    });
+    R={title:'Utilisation des camions',cols:['Camion','Plaque','Tournées','Jours en tournée','Taux d\'utilisation','Km','CA €','Coût €','Marge €','Marge € / jour'],money:[6,7,8,9],rows,foot:null,note:`Taux d'utilisation = jours ouvrés en tournée / ${biz} jours ouvrés de la période. Coût et marge : tournées analysées seulement. `+missingNote,after:anaBtn};
+  }else if(kind==='costs'){
+    const keys=[['fuel','Carburant'],['toll','Péages'],['maint','Entretien et pneus'],['ferry','Ferries'],['driver','Chauffeur'],['fixed','Coûts fixes du camion']];
+    const tot=sum(ownA.map(t=>t.analysis.cost.total)),km=sum(ownA.map(t=>t.analysis.km));
+    const rows=keys.map(([k,l])=>{const v=sum(ownA.map(t=>t.analysis.cost[k]));return[l,v,pc(tot?v/tot:null),km?v/km:null];});
+    const cc={};ownA.forEach(t=>Object.entries(t.analysis.countries||{}).forEach(([c,k])=>{cc[c]=(cc[c]||0)+k;}));
+    Object.entries(cc).sort((a,b)=>b[1]-a[1]).forEach(([c,k])=>rows.push(['Km en '+ccName(c),null,pc(km?k/km:null),null]));
+    R={title:'Structure des coûts',cols:['Poste','Montant €','Part','€ par km'],money:[1,2+1],rows,foot:['Total',tot,'',km?tot/km:null],note:`Calculé sur ${ownA.length} tournée(s) analysée(s) en camion propre, ${Math.round(km).toLocaleString('fr-BE')} km. `+missingNote,after:anaBtn};
+  }else if(kind==='margin'){
     const rows=ms.filter(m=>m.priceSell!=null||m.priceBuy!=null).sort((a,b)=>String(b.deliveryDate||b.pickupDate).localeCompare(String(a.deliveryDate||a.pickupDate))).map(m=>{
       const mg=(m.priceSell!=null&&m.priceBuy!=null)?m.priceSell-m.priceBuy:null;
       return[m.ref,cname(m.clientId),route(m),m.priceSell,m.priceBuy,mg,mg!=null&&m.priceSell>0?Math.round(mg/m.priceSell*100)+' %':'—'];
@@ -1462,9 +1559,10 @@ function reportOtherPage(){
   }
   _lastReport=R;
   const fmt=(v,i)=>v==null?'—':(R.money&&R.money.includes(i)&&typeof v==='number')?eur(v):esc(v);
-  const num=i=>(R.money&&R.money.includes(i))||(typeof (R.rows[0]||[])[i]==='number');
-  return heading('Rapports',esc(R.title)+' · '+R.rows.length+' ligne'+(R.rows.length>1?'s':''))+reportPicker()+f.html+
-    `<div class="panel">${R.rows.length?`<div class="table-wrap"><table><thead><tr>${R.cols.map((c,i)=>`<th ${num(i)?'style="text-align:right"':''}>${esc(c)}</th>`).join('')}</tr></thead><tbody>
+  const num=i=>(R.money&&R.money.includes(i))||(R.right&&R.right.includes(i))||(typeof (R.rows[0]||[])[i]==='number');
+  const kpiHtml=R.kpis?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-bottom:10px">${R.kpis.map(([l,v,sub,col])=>`<div class="stat" style="padding:12px"><small style="font-size:11.5px;color:#666">${esc(l)}</small><strong style="display:block;font-size:23px;margin-top:5px;color:${col}">${esc(v)}</strong><em style="font-size:10.5px;color:#888">${esc(sub)}</em></div>`).join('')}</div>`:'';
+  return heading('Rapports',esc(R.title)+' · '+R.rows.length+' ligne'+(R.rows.length>1?'s':''))+reportPicker()+f.html+kpiHtml+
+    `<div class="panel">${R.after?`<div style="margin-bottom:10px">${R.after}</div>`:''}${R.rows.length?`<div class="table-wrap"><table><thead><tr>${R.cols.map((c,i)=>`<th ${num(i)?'style="text-align:right"':''}>${esc(c)}</th>`).join('')}</tr></thead><tbody>
     ${R.rows.map(r=>`<tr>${r.map((v,i)=>`<td ${num(i)?'style="text-align:right"':''}>${fmt(v,i)}</td>`).join('')}</tr>`).join('')}
     ${R.foot?`<tr style="font-weight:800;background:#f8fafc">${R.foot.map((v,i)=>`<td ${num(i)?'style="text-align:right"':''}>${fmt(v,i)}</td>`).join('')}</tr>`:''}</tbody></table></div>`:'<div class="empty">Aucune donnée sur cette période.</div>'}
     ${R.note?`<p style="font-size:12px;color:var(--muted)">${esc(R.note)}</p>`:''}</div>`;
@@ -3206,14 +3304,16 @@ async function saveTour(){
   const row={id:crypto.randomUUID(),name,kind,truck_id:kind==='own'?truckId:null,carrier_id:kind==='charter'?carrierId:null,start_date:start,end_date:end,
     return_day:kind==='own'?(val('tf-return')||null):null,km:Math.round(t.realKm??t.kmEst),stops:t.stops.map(x=>({t:x.t,mid:x.m.id})),notes:val('tf-notes')||null};
   setLoading(true);
-  const{error}=await sb.from('tours').insert(row);
+  if(t.sim){try{row.analysis=tourAnalysis(t);}catch(_){}}
+  let{error}=await sb.from('tours').insert(row);
+  if(error&&row.analysis!==undefined&&/analysis/i.test(error.message||'')){delete row.analysis;({error}=await sb.from('tours').insert(row));}
   if(error){setLoading(false);err.innerHTML=`<div class="notice error">Tournée non enregistrée : ${esc(error.message)}</div>`;return;}
   const{error:e2}=await sb.from('missions').update({tour_id:row.id}).in('id',mids);
   if(e2){setLoading(false);err.innerHTML=`<div class="notice error">Missions non rattachées : ${esc(e2.message)}</div>`;return;}
   // statut : « à planifier » devient « attribué » (affecté à une tournée)
   const upgrade=t.ms.filter(m=>m.status==='à planifier').map(m=>m.id);
   if(upgrade.length&&kind!=='draft'){await sb.from('missions').update({status:'attribué'}).in('id',upgrade);upgrade.forEach(id=>{db.missions.find(m=>m.id===id).status='attribué';});}
-  db.tours.push({id:row.id,name,kind,truckId:row.truck_id||'',carrierId:row.carrier_id||'',startDate:start,endDate:end,returnDay:row.return_day||'',km:row.km,stops:row.stops,notes:row.notes||''});
+  db.tours.push({id:row.id,name,kind,truckId:row.truck_id||'',carrierId:row.carrier_id||'',startDate:start,endDate:end,returnDay:row.return_day||'',km:row.km,analysis:row.analysis||null,stops:row.stops,notes:row.notes||''});
   t.ms.forEach(m=>{m.tourId=row.id;});
   mapSelected.clear();
   setLoading(false);closeModal();
@@ -3565,8 +3665,10 @@ async function buildTourPlan(trip,stops,ret){
   stops.forEach(x=>{if(prev===null||k4(prev)!==k4(x)){pn++;prev=x;}idx.push(pn);});
   const stopCc=x=>{const c=String(x.t==='P'?x.m.pickupCountry:x.m.deliveryCountry||'').toUpperCase();return /^[A-Z]{2}$/.test(c)?c:null;};
   const legs=[];let last=null,pendingFerry=null;
+  const a0=li=>stopCc(stops[idx.indexOf(li)])||null,b0=li=>stopCc(stops[idx.lastIndexOf(li+1)>=0?idx.lastIndexOf(li+1):idx.indexOf(li)])||(ret?settings.depot.country:null)||a0(li);
   (trip.legs||[]).forEach((leg,li)=>{
     const pts=decodePoly6(leg.shape),segs=[],ferries=[];
+    if(leg.approx){legs.push({segs:[{cc:null,km:leg.summary.length,sec:leg.summary.time}],ferries:[],endCc:last,approx:true});return;}
     (leg.maneuvers||[]).forEach(mn=>{
       const b=mn.begin_shape_index,e=Math.max(mn.end_shape_index,b);
       const lenKm=mn.length||0,sec=mn.time||0;
@@ -3592,6 +3694,7 @@ async function buildTourPlan(trip,stops,ret){
     legs.push({segs,ferries,endCc:last});
   });
   legs.forEach(l=>l.ferries.forEach(f=>{if(!f.to)f.to=f.from;}));
+  legs.forEach((lg,li)=>{if(!lg.approx)return;const g=lg.segs[0];lg.segs=[{cc:a0(li),km:g.km/2,sec:g.sec/2},{cc:b0(li),km:g.km/2,sec:g.sec/2}];});
   // arrêts : pays de chaque arrêt (fiche mission si dispo, sinon pays détecté en fin de tronçon)
   const stopCcs=stops.map((x,i)=>{
     const li=idx[i]-1;
@@ -3754,6 +3857,100 @@ function optSelect(i){
   setTimeout(()=>{try{mapZoomSel();}catch(_){}} ,300);
 }
 
+// ─── ANALYSE FINANCIÈRE D'UNE TOURNÉE (km chargés / à vide, occupation, coûts) ───
+// Le service public limite chaque requête à 1 500 km : on calcule tronçon par tronçon (camion, puis voiture, puis estimation)
+async function fetchTripLegs(pts){
+  const legs=[];let mode='camion',len=0,time=0;
+  for(let i=1;i<pts.length;i++){
+    const a=pts[i-1],b=pts[i];let leg=null,lm=null;
+    for(const costing of ['truck','auto']){
+      try{
+        const q=encodeURIComponent(JSON.stringify({locations:[{lat:a.lat,lon:a.lng,type:'break'},{lat:b.lat,lon:b.lng,type:'break'}],costing,directions_options:{units:'kilometers'}}));
+        const res=await fetch('https://valhalla1.openstreetmap.de/route?json='+q);
+        if(res.ok){const j=await res.json();if(j&&j.trip&&j.trip.legs&&j.trip.legs[0]){leg=j.trip.legs[0];lm=costing;break;}}
+      }catch(_){}
+    }
+    if(!leg){
+      const km=hav(a,b)*1.25;
+      leg={shape:'',maneuvers:[],approx:true,summary:{length:km,time:km/65*3600}};
+      mode='estimation';
+    }else if(lm==='auto'&&mode==='camion')mode='voiture';
+    len+=leg.summary.length;time+=leg.summary.time;legs.push(leg);
+  }
+  return legs.length?{trip:{legs,summary:{length:len,time}},mode}:null;
+}
+async function routeAndPlan(stops,ret){
+  const k4=x=>x.lat.toFixed(4)+','+x.lng.toFixed(4);
+  const pts=[];stops.forEach(x=>{if(!pts.length||k4(pts[pts.length-1])!==k4(x))pts.push({lat:x.lat,lng:x.lng});});
+  if(ret&&pts.length)pts.push({lat:Number(settings.depot.lat),lng:Number(settings.depot.lng)});
+  if(pts.length<2||pts.length>20)return null;
+  const r=await fetchTripLegs(pts);
+  if(!r)return null;
+  const plan=await buildTourPlan(r.trip,stops,ret);
+  const ccs=new Set();plan.legs.forEach(l=>l.segs.forEach(g=>g.cc&&ccs.add(g.cc)));plan.stopCcs.forEach(c=>c&&ccs.add(c));
+  const y=new Date().getFullYear();
+  for(const cc of ccs)for(const yy of [y-1,y,y+1])await holLoad(cc,yy);
+  return plan;
+}
+function legVarCost(lg){
+  const C=settings.cost,mg=1+(Number(C.speedMargin)||0)/100;let c=0;
+  lg.segs.forEach(g=>{const k=costPerKm(g.cc||'BE');c+=g.km*k.total+g.sec/3600*mg*(Number(C.driverHour)||0);});
+  lg.ferries.forEach(f=>{c+=ferryFor(f).cost;});
+  return c;
+}
+function tourAnalysis(t){
+  const plan=t.plan,sim=t.sim;if(!plan||!sim)return null;
+  const nPts=Math.max(...plan.idx)+1,load=[];let cur=0;
+  for(let p=0;p<nPts;p++){t.stops.forEach((x,i)=>{if(plan.idx[i]===p)cur+=(x.t==='P'?1:-1)*missionPoints(x.m);});load.push(Math.max(0,cur));}
+  let kmL=0,kmE=0,ptsKm=0,costE=0;
+  plan.legs.forEach((lg,li)=>{
+    const km=lg.segs.reduce((q,g)=>q+g.km,0)+lg.ferries.reduce((q,f)=>q+f.km,0),ld=load[li]||0;
+    if(ld>0.001){kmL+=km;ptsKm+=ld*km;}else{kmE+=km;costE+=legVarCost(lg);}
+  });
+  const r1=v=>Math.round(v*10)/10;
+  const countries={};Object.entries(sim.perCc).forEach(([cc,v])=>{countries[cc]=Math.round(v.km);});
+  return{v:1,at:new Date().toISOString(),ret:!!plan.ret,km:Math.round(kmL+kmE),km_loaded:Math.round(kmL),km_empty:Math.round(kmE),
+    occ_loaded:kmL>0?Math.round(ptsKm/(TRUCK_CAPACITY*kmL)*1000)/1000:0,occ_total:(kmL+kmE)>0?Math.round(ptsKm/(TRUCK_CAPACITY*(kmL+kmE))*1000)/1000:0,
+    peak_pts:Math.max(0,...load),days:sim.days,drive_h:r1(sim.driveH),work_h:r1(sim.workH),
+    cost:{fuel:Math.round(sim.cost.fuel),toll:Math.round(sim.cost.toll),maint:Math.round(sim.cost.maint),ferry:Math.round(sim.cost.ferry),driver:Math.round(sim.cost.driver),fixed:Math.round(sim.cost.fixed),total:Math.round(sim.cost.total)},
+    empty_cost:Math.round(costE),countries};
+}
+function tourStopsOf(tour){
+  const out=[];
+  for(const st of (tour.stops||[])){
+    const m=db.missions.find(x=>x.id===st.mid);if(!m)return null;
+    const lat=st.t==='P'?m.pickupLat:m.deliveryLat,lng=st.t==='P'?m.pickupLng:m.deliveryLng;
+    if(lat==null||lng==null)return null;
+    out.push({t:st.t,m,lat,lng});
+  }
+  return out.length>=2?out:null;
+}
+let _anaBusy=false;
+async function analyzeMissingTours(){
+  if(_anaBusy)return;
+  const todo=db.tours.filter(t=>t.kind==='own'&&!t.analysis);
+  if(!todo.length){alert('Toutes les tournées en camion propre ont déjà leur analyse.');return;}
+  _anaBusy=true;let ok=0,ko=0,schemaErr=null;
+  const note=document.getElementById('ana-note');
+  for(let i=0;i<todo.length;i++){
+    const t=todo[i];
+    if(note)note.textContent=`⏳ Analyse ${i+1} / ${todo.length}…`;
+    try{
+      const stops=tourStopsOf(t);if(!stops){ko++;continue;}
+      const ms=tourMissions(t),plan=await routeAndPlan(stops,retOn());if(!plan){ko++;continue;}
+      const sim=simulateTour({ms,stops},plan,t.startDate||tourStart({ms}));
+      const a=tourAnalysis({ms,stops,plan,sim});
+      const{error}=await sb.from('tours').update({analysis:a}).eq('id',t.id);
+      if(error){schemaErr=error.message;break;}
+      t.analysis=a;ok++;
+    }catch(e){ko++;console.warn(e);}
+  }
+  _anaBusy=false;
+  if(schemaErr)alert('Analyse non enregistrée : '+schemaErr+'\n(le script SQL 14 a-t-il été lancé ?)');
+  else alert(`Analyses terminées : ${ok} calculée(s)${ko?`, ${ko} impossible(s) (adresses non géolocalisées ou itinéraire indisponible)`:''}.`);
+  render();
+}
+
 // ─── CALCULS DE TOURNÉE (sans enregistrement) ───
 const hav=(a,b)=>{const R=6371,r=x=>x*Math.PI/180,dl=r(b.lat-a.lat),dn=r(b.lng-a.lng),q=Math.sin(dl/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(q));};
 // Ordre des arrêts : tous les chargements (du plus éloigné vers le plus proche), puis tous les déchargements
@@ -3817,13 +4014,9 @@ async function tourRealKm(){
   try{
     let km=0,mode='camion',trip=null;
     if(pts.length>=2){
-      km=null;
-      for(const costing of ['truck','auto']){
-        const q=encodeURIComponent(JSON.stringify({locations:pts.map(x=>({lat:x.lat,lon:x.lng,type:'break'})),costing,directions_options:{units:'kilometers'}}));
-        const res=await fetch('https://valhalla1.openstreetmap.de/route?json='+q);
-        if(res.ok){const j=await res.json();if(j&&j.trip&&j.trip.summary){km=Math.round(j.trip.summary.length);mode=costing==='truck'?'camion':'voiture';trip=j.trip;break;}}
-      }
-      if(km==null)throw new Error('itinéraire introuvable');
+      const r=await fetchTripLegs(pts);
+      if(!r)throw new Error('itinéraire introuvable');
+      trip=r.trip;km=Math.round(r.trip.summary.length);mode=r.mode;
     }
     let plan=null;
     if(trip){
@@ -3907,7 +4100,7 @@ function truckPanelHtml(t){
         <div class="tp-h" style="margin-top:12px">Alertes</div>${al.map(([c,x])=>`<div class="tp-al ${c}">${esc(x)}</div>`).join('')}</div>
       <div><div class="tp-h">Itinéraire (ordre proposé)</div>
         <ol style="margin:0;padding-left:20px;font-size:12px;line-height:1.6">${t.stops.map(x=>`<li>${x.t==='P'?'⬆ chargement':'⬇ déchargement'} <b>${esc(x.m.ref)}</b> — ${esc(place(x.t==='P'?x.m.pickupCountry:x.m.deliveryCountry,x.t==='P'?x.m.pickupCity:x.m.deliveryCity))}</li>`).join('')}</ol>
-        <div style="font-size:12.5px;margin-top:8px">${t.realKm!=null?`<b>${t.realKm} km</b> routiers (${t.realMode==='camion'?'itinéraire poids lourd':'itinéraire voiture : poids lourd indisponible ici'})`:`≈ <b>${Math.round(t.kmEst)} km</b> estimés`} · missions séparées : ${Math.round(t.directKm)} km<br>
+        <div style="font-size:12.5px;margin-top:8px">${t.realKm!=null?`<b>${t.realKm} km</b> routiers (${t.realMode==='camion'?'itinéraire poids lourd':t.realMode==='estimation'?'estimation : un tronçon est trop long pour le service gratuit':'itinéraire voiture : poids lourd indisponible ici'})`:`≈ <b>${Math.round(t.kmEst)} km</b> estimés`} · missions séparées : ${Math.round(t.directKm)} km<br>
           ${saving>=0?`<span style="color:var(--green)">économie de ${Math.round(saving)} km grâce au regroupement</span>`:`<span style="color:var(--red)">${Math.round(-saving)} km de plus qu'en missions séparées</span>`}</div>
         <label style="display:block;font-size:12px;margin-top:6px"><input type="checkbox" ${tourReturnEmpty?'checked':''} onchange="setRetEmpty(this.checked)"> Retour à vide au dépôt${depotOk()?'':' <span style="color:var(--amber)">(renseigne le dépôt dans Règles et coûts)</span>'}</label>
         ${t.realKm==null?'<button class="btn" id="tp-real-btn" style="margin-top:6px;font-size:11px" onclick="tourRealKm()">📏 Calculer itinéraire, durée et coûts</button>':''}
