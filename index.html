@@ -154,8 +154,8 @@ const CARRIER_TOKEN = new URLSearchParams(window.location.search).get('t');
 const INSPECTION_TOKEN = new URLSearchParams(window.location.search).get('inspection');
 
 // ─── STATE ──────────────────────────────────────────────────────
-const NAV=[["Vue d'ensemble",'⌂'],['Contrôle','◉'],['Planning général','▦'],['Missions','▤'],['Véhicules','▣'],['Clients','◫'],['Sites','◍'],['Transporteurs','▰'],['Documents','▧'],['Carte','◎'],['Planning camions','⇄'],['Affrètement','⇆'],['Finance','€'],['Rapports','📊'],['Résumé','i']];
-let db={clients:[],carriers:[],missions:[],carrierEvents:[],deliveryInspections:[],trucks:[],tours:[],sites:[],carrierDocs:[],profiles:[],selectedIds:[],sort:'ref',direction:1};
+const NAV=[["Vue d'ensemble",'⌂'],['Contrôle','◉'],['Planning général','▦'],['Missions','▤'],['Véhicules','▣'],['Clients','◫'],['Sites','◍'],['Transporteurs','▰'],['Documents','▧'],['Carte','◎'],['Planning camions','⇄'],['Affrètement','⇆'],['Bourse de fret','◈'],['Finance','€'],['Rapports','📊'],['Résumé','i']];
+let db={clients:[],carriers:[],missions:[],carrierEvents:[],deliveryInspections:[],trucks:[],tours:[],sites:[],carrierDocs:[],profiles:[],offers:[],selectedIds:[],sort:'ref',direction:1};
 let current="Vue d'ensemble",search='',filterStatus='Tous les statuts',docSearch='',docFilter='';
 let editingMission=null,detailId=null,currentUser=null;
 let weekOffset=0,filterClient='Tous les clients',filterCarrier='Tous les transporteurs';
@@ -541,6 +541,7 @@ async function loadData(){
     // delivery_inspections : états des lieux véhicules
     try{const ri=await sb.from('delivery_inspections').select('*').order('created_at');db.deliveryInspections=ri.data||[];}
     catch(e){console.warn('delivery_inspections non disponible:',e.message);db.deliveryInspections=[];};
+    try{const ro=await sb.from('freight_offers').select('*').order('created_at',{ascending:false});db.offers=(ro.data||[]).map(offerFromRow);}catch(e){db.offers=[];}
     try{const rd=await sb.from('carrier_documents').select('*').order('created_at',{ascending:false});db.carrierDocs=(rd.data||[]).map(docFromRow);}catch(e){db.carrierDocs=[];}
     try{const rp=await sb.from('profiles').select('*');db.profiles=rp.data||[];}catch(e){db.profiles=[];}
     try{const rs=await sb.from('sites').select('*').order('name');db.sites=(rs.data||[]).map(siteFromRow);}catch(e){db.sites=[];}
@@ -577,6 +578,9 @@ async function loadData(){
       tourId:m.tour_id||'',
       pickupSiteId:m.pickup_site_id||'',deliverySiteId:m.delivery_site_id||'',
       docsChecklist:(m.docs_checklist&&typeof m.docs_checklist==='object')?m.docs_checklist:{},
+      exchangeStatus:m.exchange_status||'',exchangePublishedAt:m.exchange_published_at||'',exchangeSnoozeUntil:m.exchange_snooze_until||'',
+      exchangeMaxPrice:m.exchange_max_price!=null?Number(m.exchange_max_price):null,
+      carrierPlate:m.carrier_plate||'',carrierDriver:m.carrier_driver||'',carrierLoadDate:m.carrier_load_date||'',carrierDeliveryDate:m.carrier_delivery_date||'',
       cars:cars.filter(c=>c.mission_id===m.id).map(c=>({
         id:c.id,make:c.make||'',model:c.model||'',vin:c.vin||'',plate:c.plate||'',
         status:c.status||'à charger',
@@ -700,6 +704,10 @@ function realtimeSetup(){
       if(status==='SUBSCRIBED')console.info('[Realtime] ✓ connecté — carrier_events');
       else if(status==='CHANNEL_ERROR')console.warn('[Realtime] ✗ erreur connexion — carrier_events');
     });
+  // Cloche + notification pour les offres de la bourse de fret
+  if(window._offChannel){try{window._offChannel.unsubscribe();}catch(_){}}
+  window._offChannel=sb.channel('freight-offers-admin-v1')
+    .on('postgres_changes',{event:'*',schema:'public',table:'freight_offers'},p=>handleOfferEvent(p)).subscribe();
   // Cloche + notification quand un transporteur dépose un document (licence / assurance)
   if(window._docChannel){try{window._docChannel.unsubscribe();}catch(_){}}
   window._docChannel=sb.channel('carrier-docs-admin-v1')
@@ -837,6 +845,7 @@ function render(){
   else if(current==='Contrôle')view.innerHTML=controlPage();
   else if(current==='Sites')view.innerHTML=sitesPage();
   else if(current==='Affrètement')view.innerHTML=charterPage();
+  else if(current==='Bourse de fret')view.innerHTML=boursePage();
   else view.innerHTML=financePage();
 }
 
@@ -2056,7 +2065,195 @@ function sendDocReminder(cid,kind){
   showEmailDraft(m.email,m.subject,m.body);
 }
 
-// ─── ESPACE TRANSPORTEUR (connexion avec mot de passe) ───
+// ─── BOURSE DE FRET ───
+const offerFromRow=x=>({id:x.id,missionId:x.mission_id,carrierId:x.carrier_id,price:Number(x.price),comment:x.comment||'',status:x.status||'pending',createdAt:x.created_at||'',updatedAt:x.updated_at||''});
+const offersOf=mid=>db.offers.filter(o=>o.missionId===mid);
+// jours ouvrables écoulés depuis une date (week-ends et jours fériés belges exclus)
+function bdSince(iso){
+  if(!iso)return 0;
+  let d=String(iso).slice(0,10),n=0;const today=todayIso();
+  while(d<today){d=addDays(d,1);if(isBusinessDay(new Date(d+'T12:00:00Z')))n++;}
+  return n;
+}
+const exchangeAlert=m=>m.exchangeStatus==='open'&&bdSince(m.exchangePublishedAt)>=3&&(!m.exchangeSnoozeUntil||m.exchangeSnoozeUntil<=todayIso());
+function exchangeBlock(m){
+  if(!m.exchangeStatus)return '';
+  const offs=offersOf(m.id).filter(o=>o.status!=='withdrawn');
+  const st={open:'📣 Ouvert',sold:'✓ Vendu',withdrawn:'Retiré'}[m.exchangeStatus];
+  return `<div class="detail-block"><h3>Bourse de fret</h3><div class="info-grid"><span>Statut<strong>${st}</strong></span><span>Mise en bourse<strong>${pretty(String(m.exchangePublishedAt||'').slice(0,10))}</strong></span>
+    <span>Offres reçues<strong>${offs.length}</strong></span><span>Prix maximum<strong>${m.exchangeMaxPrice!=null?eur(m.exchangeMaxPrice):'—'}</strong></span></div>
+    <p><button class="btn" onclick="closeDetail();bourseTab='${m.exchangeStatus}';setView('Bourse de fret')">Ouvrir la bourse</button></p></div>`;
+}
+let bourseTab='open';
+function lotCard(m){
+  const offers=offersOf(m.id).filter(o=>o.status!=='withdrawn').sort((a,b)=>a.price-b.price);
+  const age=m.exchangePublishedAt?bdSince(m.exchangePublishedAt):0,al=exchangeAlert(m),open=m.exchangeStatus==='open';
+  const best=open?offers.find(o=>o.status==='pending'&&!carrierCompliance(o.carrierId).blocked):null;
+  const veh=m.cars.map(c=>esc(c.make+' '+c.model)).join(', ');
+  return `<div class="panel" style="${al?'border-color:#e0850c;background:#fffbf3':''}">
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">
+      <div style="flex:1;min-width:260px"><strong style="font-size:15px;cursor:pointer" onclick="openDetail('${esc(m.id)}')">${esc(m.ref)}</strong> <span style="font-size:12px;color:var(--muted)">${esc(getClient(m).name||'')}</span>
+        <div style="font-size:13px;margin-top:2px">${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}${m.distanceKm?' · '+m.distanceKm+' km':''}</div>
+        <div style="font-size:12px;color:#536a7d">${m.cars.length} véhicule${m.cars.length>1?'s':''} : ${veh} · ${fmtPts(missionPoints(m))} pts</div>
+        <div style="font-size:12.5px;margin-top:4px">Prix de vente : <b>${eur(m.priceSell)}</b>${m.exchangeMaxPrice!=null?` · prix d'achat maximum : <b>${eur(m.exchangeMaxPrice)}</b>`:''}</div></div>
+      <div style="text-align:right;font-size:12px;color:var(--muted)">Mise en bourse le ${pretty(String(m.exchangePublishedAt||'').slice(0,10))}<br><b style="color:${al?'#e0850c':'inherit'}">${age} jour${age>1?'s':''} ouvrable${age>1?'s':''}${al?' ⚠':''}</b></div></div>
+    ${offers.length?`<div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>Transporteur</th><th>Offre</th><th>Marge</th><th>Documents</th><th>Commentaire</th><th>Statut</th><th></th></tr></thead><tbody>
+      ${offers.map(o=>{const c=db.carriers.find(x=>x.id===o.carrierId)||{name:'—'},comp=carrierCompliance(o.carrierId),mg=m.priceSell!=null?m.priceSell-o.price:null,over=m.exchangeMaxPrice!=null&&o.price>m.exchangeMaxPrice;
+        return `<tr style="${best&&best.id===o.id?'background:#e7f4e7':''}"><td><strong>${esc(c.name)}</strong>${best&&best.id===o.id?' <span title="Meilleure offre d\'un transporteur en règle">⭐</span>':''}<small>${esc(c.country||'')}</small></td>
+          <td style="font-weight:800;${over?'color:var(--red)':''}">${eur(o.price)}${over?'<small style="color:var(--red)">au-dessus du maximum</small>':''}</td>
+          <td style="color:${mg==null?'inherit':(mg>=0?'var(--green)':'var(--red)')};font-weight:700">${mg!=null?eur(mg)+(m.priceSell>0?' ('+(mg/m.priceSell*100).toFixed(0)+' %)':''):'—'}</td>
+          <td><span style="background:${DOC_LEVEL[comp.level].c};color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700">${DOC_LEVEL[comp.level].t}</span></td>
+          <td style="font-size:12px">${esc(o.comment||'')}</td>
+          <td>${{pending:'En attente',accepted:'✓ Acceptée — attend le camion',confirmed:'✓ Transport confirmé',rejected:'Refusée',withdrawn:'Retirée'}[o.status]}</td>
+          <td style="white-space:nowrap">${open&&o.status==='pending'?`<button class="btn primary" onclick="acceptOffer('${esc(o.id)}')">Accepter</button> <button class="btn" onclick="rejectOffer('${esc(o.id)}')">Refuser</button>`:''}</td></tr>`;}).join('')}</tbody></table></div>`
+      :`<div style="font-size:12px;color:var(--muted);margin-top:10px">${open?'Aucune offre pour le moment.':''}</div>`}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+      ${open?`<button class="btn" onclick="setLotMax('${esc(m.id)}')">Prix d'achat maximum</button><button class="btn" onclick="planLot('${esc(m.id)}')">🚛 Planifier sur un camion</button>${al?`<button class="btn" onclick="snoozeLot('${esc(m.id)}')">Laisser en bourse (3 j)</button>`:''}<button class="btn" onclick="withdrawLot('${esc(m.id)}')">Retirer de la bourse</button>`:''}
+      ${m.exchangeStatus==='withdrawn'?`<button class="btn primary" onclick="publishToExchange(['${esc(m.id)}'])">📣 Remettre en bourse</button>`:''}</div></div>`;
+}
+function boursePage(){
+  const by=st=>db.missions.filter(m=>m.exchangeStatus===st).sort((a,b)=>String(a.exchangePublishedAt).localeCompare(String(b.exchangePublishedAt)));
+  const lots={open:by('open'),sold:by('sold'),withdrawn:by('withdrawn')};
+  const tab=(k,l)=>`<button class="btn ${bourseTab===k?'primary':''}" onclick="bourseTab='${k}';render()">${l} (${lots[k].length})</button>`;
+  const sold=lots.sold,both=sold.filter(m=>marginOf(m)!==null),marge=both.reduce((q,m)=>q+marginOf(m),0);
+  return heading('Bourse de fret','Lots mis en vente aux transporteurs : offres de prix, choix, confirmation du camion.',
+    `<button class="btn primary" onclick="openPublishLots()">＋ Mettre des lots en bourse</button>`)+
+  `<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">${tab('open','Lots ouverts')}${tab('sold','Vendus')}${tab('withdrawn','Retirés')}
+    ${bourseTab==='sold'&&both.length?`<span style="font-size:12.5px;margin-left:10px">Marge des lots vendus : <b style="color:var(--green)">${eur(marge)}</b></span>`:''}</div>`+
+  (lots[bourseTab].map(lotCard).join('')||'<div class="panel"><div class="empty">Aucun lot dans cet onglet.</div></div>');
+}
+function openPublishLots(){
+  const elig=db.missions.filter(m=>!DONE_STATUSES.includes(m.status)&&!m.tourId&&!m.carrierId&&m.exchangeStatus!=='open');
+  document.getElementById('modal-content').innerHTML=`<div class="modal-header"><div><h2>Mettre des lots en bourse</h2><p>Missions sans camion ni transporteur. Les transporteurs ne verront que les pays, villes et marques/modèles.</p></div><button class="x" onclick="closeModal()">×</button></div>
+  <div class="table-wrap"><table><thead><tr><th></th><th>Mission</th><th>Trajet</th><th>Véhicules</th><th>Vente</th><th>Achat max (€)</th></tr></thead><tbody>
+  ${elig.map(m=>`<tr><td><input type="checkbox" class="pl-chk" data-id="${esc(m.id)}"></td><td><b>${esc(m.ref)}</b><small>${esc(getClient(m).name||'')}</small></td><td style="font-size:12px">${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}</td><td>${m.cars.map(c=>esc(c.make+' '+c.model)).join(', ')}</td><td>${eur(m.priceSell)}</td><td><input type="number" id="pl-max-${esc(m.id)}" step="1" min="0" style="width:90px" value="${m.priceSell!=null?Math.round(m.priceSell*0.9):''}"></td></tr>`).join('')||'<tr><td colspan="6" class="empty">Aucune mission disponible.</td></tr>'}</tbody></table></div>
+  <div style="font-size:11.5px;color:var(--muted);margin-top:6px">« Achat max » proposé : 90 % du prix de vente (marge minimale de 10 %). Modifiable ; une offre au-dessus est signalée en rouge.</div>
+  <div id="form-error"></div><div class="modal-footer"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn primary" onclick="publishChecked()">📣 Mettre en bourse</button></div>`;
+  document.getElementById('modal').classList.add('open');
+}
+async function publishChecked(){
+  const ids=[...document.querySelectorAll('.pl-chk:checked')].map(e=>e.dataset.id);
+  if(!ids.length){document.getElementById('form-error').innerHTML='<div class="notice error">Coche au moins un lot.</div>';return;}
+  const max={};ids.forEach(id=>{max[id]=parseNum(document.getElementById('pl-max-'+id).value);});
+  await publishToExchange(ids,max);closeModal();
+}
+async function publishToExchange(ids,maxMap={}){
+  setLoading(true);const now=new Date().toISOString();let fail=0;
+  for(const id of ids){
+    const m=db.missions.find(x=>x.id===id);if(!m)continue;
+    const mx=maxMap[id]!==undefined?maxMap[id]:(m.exchangeMaxPrice??null);
+    const{error}=await sb.from('missions').update({exchange_status:'open',exchange_published_at:now,exchange_snooze_until:null,exchange_max_price:mx}).eq('id',id);
+    if(error){fail++;console.error(error);continue;}
+    Object.assign(m,{exchangeStatus:'open',exchangePublishedAt:now,exchangeSnoozeUntil:'',exchangeMaxPrice:mx});
+  }
+  setLoading(false);
+  if(fail)alert('Certains lots n\'ont pas pu être mis en bourse (la base est-elle à jour ?).');
+  bourseTab='open';render();
+}
+async function withdrawLot(mid){
+  if(!confirm('Retirer ce lot de la bourse ? Les offres en attente restent visibles mais ne peuvent plus être acceptées.'))return;
+  const{error}=await sb.from('missions').update({exchange_status:'withdrawn'}).eq('id',mid);
+  if(error){alert('Erreur : '+error.message);return;}
+  db.missions.find(m=>m.id===mid).exchangeStatus='withdrawn';render();
+}
+async function setLotMax(mid){
+  const m=db.missions.find(x=>x.id===mid);
+  const v=prompt('Prix d\'achat maximum accepté pour ce lot (€) — vide = aucun :',m.exchangeMaxPrice??'');
+  if(v===null)return;
+  const n=parseNum(v);
+  const{error}=await sb.from('missions').update({exchange_max_price:n}).eq('id',mid);
+  if(error){alert('Erreur : '+error.message);return;}
+  m.exchangeMaxPrice=n;render();
+}
+async function snoozeLot(mid){
+  const until=addBusinessDays(todayIso(),3);
+  const{error}=await sb.from('missions').update({exchange_snooze_until:until}).eq('id',mid);
+  if(error){alert('Erreur : '+error.message);return;}
+  db.missions.find(m=>m.id===mid).exchangeSnoozeUntil=until;render();
+}
+function planLot(mid){
+  mapFilter.group='Sans tournée';mapSelected=new Set([mid]);
+  setView('Carte');
+  setTimeout(()=>{if(_map&&_mapItems[mid])mapSelect(mid);},500);
+}
+async function rejectOffer(oid){
+  const o=db.offers.find(x=>x.id===oid);if(!o||!confirm('Refuser cette offre ?'))return;
+  const{error}=await sb.from('freight_offers').update({status:'rejected',decided_at:new Date().toISOString()}).eq('id',oid);
+  if(error){alert('Erreur : '+error.message);return;}
+  o.status='rejected';render();
+}
+async function acceptOffer(oid){
+  const o=db.offers.find(x=>x.id===oid);if(!o)return;
+  const m=db.missions.find(x=>x.id===o.missionId),c=db.carriers.find(x=>x.id===o.carrierId);if(!m||!c)return;
+  if(!confirmCarrierCompliance(o.carrierId))return;
+  if(m.exchangeMaxPrice!=null&&o.price>m.exchangeMaxPrice&&!confirm('Cette offre dépasse ton prix d\'achat maximum ('+eur(m.exchangeMaxPrice)+'). Accepter quand même ?'))return;
+  if(!confirm('Accepter l\'offre de '+c.name+' : '+eur(o.price)+' ?\n\nLes autres offres seront refusées et un e-mail sera préparé pour le transporteur.'))return;
+  setLoading(true);const now=new Date().toISOString();
+  const others=db.offers.filter(x=>x.missionId===m.id&&x.id!==oid&&x.status==='pending').map(x=>x.id);
+  const e1=(await sb.from('freight_offers').update({status:'accepted',decided_at:now,updated_at:now}).eq('id',oid)).error;
+  if(e1){setLoading(false);alert('Erreur : '+e1.message);return;}
+  if(others.length)await sb.from('freight_offers').update({status:'rejected',decided_at:now}).in('id',others);
+  const upd={carrier_id:o.carrierId,price_buy:o.price,exchange_status:'sold'};
+  if(['à planifier','attribué'].includes(m.status))upd.status='attribué';
+  const e2=(await sb.from('missions').update(upd).eq('id',m.id)).error;
+  setLoading(false);
+  if(e2){alert('Offre acceptée mais mission non mise à jour : '+e2.message);return;}
+  o.status='accepted';db.offers.forEach(x=>{if(others.includes(x.id))x.status='rejected';});
+  Object.assign(m,{carrierId:o.carrierId,priceBuy:o.price,exchangeStatus:'sold'});if(upd.status)m.status=upd.status;
+  render();
+  sendAcceptanceMail(o);
+}
+// E-mail « offre acceptée » dans la langue du pays du transporteur (à faire relire par un locuteur natif)
+const BOURSE_MAIL={
+ fr:{subj:'Offre acceptée — {ref}',body:'Bonjour {carrier},\n\nVotre offre de {price} pour le transport {ref} ({route}) est acceptée.\nMerci de vous connecter à votre espace transporteur et d\'indiquer la plaque du camion, le nom du chauffeur ainsi que vos dates prévues de chargement et de livraison :\n{link}\n\nCordialement'},
+ en:{subj:'Offer accepted — {ref}',body:'Dear {carrier},\n\nYour offer of {price} for the transport {ref} ({route}) has been accepted.\nPlease log in to your carrier space and enter the truck plate, the driver\'s name and your planned loading and delivery dates:\n{link}\n\nKind regards'},
+ nl:{subj:'Aanbod aanvaard — {ref}',body:'Beste {carrier},\n\nUw aanbod van {price} voor transport {ref} ({route}) is aanvaard.\nGelieve in te loggen op uw transporteursruimte en de nummerplaat van de vrachtwagen, de naam van de chauffeur en uw geplande laad- en leverdatum in te voeren:\n{link}\n\nMet vriendelijke groeten'},
+ de:{subj:'Angebot angenommen — {ref}',body:'Guten Tag {carrier},\n\nIhr Angebot über {price} für den Transport {ref} ({route}) wurde angenommen.\nBitte melden Sie sich in Ihrem Frachtführer-Bereich an und tragen Sie das Kennzeichen des Fahrzeugs, den Namen des Fahrers sowie Ihre geplanten Lade- und Lieferdaten ein:\n{link}\n\nMit freundlichen Grüßen'},
+ es:{subj:'Oferta aceptada — {ref}',body:'Estimado/a {carrier}:\n\nSu oferta de {price} para el transporte {ref} ({route}) ha sido aceptada.\nAcceda a su espacio de transportista e indique la matrícula del camión, el nombre del conductor y las fechas previstas de carga y entrega:\n{link}\n\nUn cordial saludo'},
+ it:{subj:'Offerta accettata — {ref}',body:'Gentile {carrier},\n\nLa vostra offerta di {price} per il trasporto {ref} ({route}) è stata accettata.\nVi preghiamo di accedere al vostro spazio trasportatore e di indicare la targa del camion, il nome dell\'autista e le date previste di carico e consegna:\n{link}\n\nCordiali saluti'},
+ pt:{subj:'Oferta aceite — {ref}',body:'Caro(a) {carrier},\n\nA sua oferta de {price} para o transporte {ref} ({route}) foi aceite.\nInicie sessão no seu espaço de transportador e indique a matrícula do camião, o nome do motorista e as datas previstas de carga e entrega:\n{link}\n\nCom os melhores cumprimentos'},
+ pl:{subj:'Oferta zaakceptowana — {ref}',body:'Szanowni Państwo, {carrier},\n\nPaństwa oferta w wysokości {price} na transport {ref} ({route}) została zaakceptowana.\nProsimy o zalogowanie się w panelu przewoźnika i podanie numeru rejestracyjnego pojazdu, imienia i nazwiska kierowcy oraz planowanych dat załadunku i dostawy:\n{link}\n\nZ poważaniem'},
+ ro:{subj:'Ofertă acceptată — {ref}',body:'Stimate {carrier},\n\nOferta dumneavoastră de {price} pentru transportul {ref} ({route}) a fost acceptată.\nVă rugăm să vă autentificați în spațiul de transportator și să indicați numărul de înmatriculare al camionului, numele șoferului și datele prevăzute de încărcare și livrare:\n{link}\n\nCu stimă'},
+ cs:{subj:'Nabídka přijata — {ref}',body:'Dobrý den, {carrier},\n\nVaše nabídka ve výši {price} na přepravu {ref} ({route}) byla přijata.\nPřihlaste se prosím do svého prostoru dopravce a uveďte registrační značku vozidla, jméno řidiče a plánované datum nakládky a dodání:\n{link}\n\nS pozdravem'},
+ sk:{subj:'Ponuka prijatá — {ref}',body:'Dobrý deň, {carrier},\n\nVaša ponuka vo výške {price} na prepravu {ref} ({route}) bola prijatá.\nPrihláste sa prosím do svojho priestoru dopravcu a uveďte evidenčné číslo vozidla, meno vodiča a plánovaný dátum nakládky a dodania:\n{link}\n\nS pozdravom'},
+ hu:{subj:'Ajánlat elfogadva — {ref}',body:'Tisztelt {carrier}!\n\nA(z) {ref} ({route}) fuvarra tett {price} összegű ajánlatát elfogadtuk.\nKérjük, jelentkezzen be a fuvarozói felületére, és adja meg a jármű rendszámát, a sofőr nevét, valamint a tervezett felrakodási és kiszállítási dátumot:\n{link}\n\nÜdvözlettel'},
+ bg:{subj:'Офертата е приета — {ref}',body:'Уважаеми {carrier},\n\nВашата оферта от {price} за превоз {ref} ({route}) е приета.\nМоля, влезте във вашето пространство за превозвачи и въведете регистрационния номер на камиона, името на шофьора и планираните дати за товарене и доставка:\n{link}\n\nС уважение'},
+ sl:{subj:'Ponudba sprejeta — {ref}',body:'Spoštovani {carrier},\n\nVaša ponudba v višini {price} za prevoz {ref} ({route}) je sprejeta.\nPrijavite se v svoj prostor prevoznika in vnesite registrsko številko tovornjaka, ime voznika ter načrtovana datuma nakladanja in dostave:\n{link}\n\nLep pozdrav'},
+ hr:{subj:'Ponuda prihvaćena — {ref}',body:'Poštovani {carrier},\n\nVaša ponuda od {price} za prijevoz {ref} ({route}) je prihvaćena.\nMolimo prijavite se u svoj prostor prijevoznika i unesite registarsku oznaku kamiona, ime vozača te planirane datume utovara i isporuke:\n{link}\n\nSrdačan pozdrav'},
+ sr:{subj:'Ponuda prihvaćena — {ref}',body:'Poštovani {carrier},\n\nVaša ponuda od {price} za prevoz {ref} ({route}) je prihvaćena.\nMolimo vas da se prijavite u svoj prostor prevoznika i unesete registarsku oznaku kamiona, ime vozača i planirane datume utovara i isporuke:\n{link}\n\nSrdačan pozdrav'},
+ lt:{subj:'Pasiūlymas priimtas — {ref}',body:'Gerb. {carrier},\n\nJūsų {price} pasiūlymas dėl pervežimo {ref} ({route}) priimtas.\nPrisijunkite prie savo vežėjo erdvės ir nurodykite sunkvežimio valstybinį numerį, vairuotojo vardą bei planuojamas pakrovimo ir pristatymo datas:\n{link}\n\nSu pagarba'},
+ lv:{subj:'Piedāvājums pieņemts — {ref}',body:'Cienījamie {carrier},\n\nJūsu piedāvājums {price} apmērā pārvadājumam {ref} ({route}) ir pieņemts.\nLūdzu, pieslēdzieties savam pārvadātāja vidē un norādiet kravas automašīnas numuru, vadītāja vārdu un plānotos iekraušanas un piegādes datumus:\n{link}\n\nAr cieņu'},
+ et:{subj:'Pakkumine aktsepteeritud — {ref}',body:'Lugupeetud {carrier},\n\nTeie pakkumine {price} veo {ref} ({route}) kohta on aktsepteeritud.\nPalun logige sisse oma vedaja keskkonda ning sisestage veoki registreerimisnumber, juhi nimi ning plaanitud laadimis- ja tarnekuupäevad:\n{link}\n\nLugupidamisega'},
+};
+function buildAcceptanceMail(c,m,o){
+  const lang=detectLang(c.country),T=BOURSE_MAIL[lang]||BOURSE_MAIL.en,link=window.location.origin+window.location.pathname;
+  const route=`${place(m.pickupCountry,m.pickupCity)} → ${place(m.deliveryCountry,m.deliveryCity)}`;
+  const price=new Intl.NumberFormat(BOURSE_MAIL[lang]?lang:'en',{style:'currency',currency:'EUR'}).format(o.price);
+  const f=t=>t.replace(/\{carrier\}/g,c.name).replace(/\{ref\}/g,m.ref).replace(/\{route\}/g,route).replace(/\{price\}/g,price).replace(/\{link\}/g,link);
+  return{lang:BOURSE_MAIL[lang]?lang:'en',email:c.email||'',subject:f(T.subj),body:f(T.body)};
+}
+function sendAcceptanceMail(o){
+  const m=db.missions.find(x=>x.id===o.missionId),c=db.carriers.find(x=>x.id===o.carrierId);if(!m||!c)return;
+  if(!c.email){alert('Offre acceptée. Ajoute l\'adresse e-mail du transporteur pour lui écrire (Transporteurs → Modifier).');return;}
+  const mm=buildAcceptanceMail(c,m,o);showEmailDraft(mm.email,mm.subject,mm.body);
+}
+async function handleOfferEvent(p){
+  const row=p.new;if(!row)return;
+  const o=offerFromRow(row),i=db.offers.findIndex(x=>x.id===o.id),prev=i>=0?db.offers[i]:null;
+  if(i>=0)db.offers[i]=o;else db.offers.unshift(o);
+  const m=db.missions.find(x=>x.id===o.missionId),c=db.carriers.find(x=>x.id===o.carrierId);
+  const ref=m?m.ref:'';
+  if(o.status==='confirmed'&&(!prev||prev.status!=='confirmed')){
+    await loadData();
+    showToast('✅ Transport confirmé',esc(ref+' — '+(c?c.name:'')+' a encodé le camion et les dates'),'success',o.missionId);
+  }else if(o.status==='pending'&&(!prev||prev.price!==o.price)){
+    showToast(prev?'💶 Offre modifiée':'💶 Nouvelle offre',esc(ref+' — '+(c?c.name:'transporteur')+' : '+eur(o.price)),'info',null);
+  }
+  render();
+}
+
+// ─── ESPACE TRANSPORTEUR (connexion avec mot de passe) : bourse de fret, transports, documents ───
+let csTab='bourse',csLots=[],csOffers=[],csTransports=[];
 async function initCarrierSpace(){
   const host=document.getElementById('carrier-space');
   document.getElementById('app-shell').style.display='none';
@@ -2067,32 +2264,107 @@ async function initCarrierSpace(){
     sb.from('carriers').select('*').eq('id',cid).maybeSingle(),
     sb.from('carrier_documents').select('*').eq('carrier_id',cid).order('created_at',{ascending:false})]);
   db.carriers=c?[mapPartner(c)]:[];db.carrierDocs=(docs||[]).map(docFromRow);
+  await csLoadBourse();
   renderCarrierSpace();
 }
+// Le transporteur ne reçoit que : pays, villes, marques et modèles des lots à vendre (pas de client, pas de prix de vente)
+async function csLoadBourse(){
+  const cid=currentProfile.carrier_id;
+  try{
+    const[{data:lots},{data:offs}]=await Promise.all([
+      sb.from('missions').select('id,ref,pickup_country,pickup_city,delivery_country,delivery_city,exchange_published_at,cars(make,model)').eq('exchange_status','open').order('exchange_published_at',{ascending:false}),
+      sb.from('freight_offers').select('*').eq('carrier_id',cid)]);
+    csLots=lots||[];csOffers=(offs||[]).map(offerFromRow);
+    const ids=csOffers.filter(o=>['accepted','confirmed'].includes(o.status)).map(o=>o.missionId);
+    if(ids.length){const{data:tr}=await sb.from('missions').select('id,ref,pickup_country,pickup_city,delivery_country,delivery_city,carrier_token,carrier_plate,carrier_driver,carrier_load_date,carrier_delivery_date,cars(make,model)').in('id',ids);csTransports=tr||[];}
+    else csTransports=[];
+  }catch(e){csLots=[];csOffers=[];csTransports=[];}
+}
 const CS_T={
-  fr:{hello:'Espace transporteur',docs:'Mes documents',license:'Licence de transport',insurance:'Assurance',valid:'Valable jusqu\'au',file:'Document (PDF)',send:'Envoyer',pending:'En attente de validation',none:'Aucun document',logout:'Déconnexion',bourse:'Bourse de fret',soon:'Bientôt disponible : les lots à vendre et vos offres de prix.',hint:'Déposez ici votre licence et votre assurance en cours de validité. Sans documents valides, nous ne pouvons pas vous confier de transports.',ok:'Document envoyé : il sera validé par notre équipe.',lv:{ok:'Valide',yellow:'Échéance < 2 mois',orange:'Échéance < 1 mois',red:'Échéance < 15 jours',blocked:'EXPIRÉ',missing:'Manquant'}},
-  en:{hello:'Carrier space',docs:'My documents',license:'Transport licence',insurance:'Insurance',valid:'Valid until',file:'Document (PDF)',send:'Upload',pending:'Awaiting validation',none:'No document',logout:'Log out',bourse:'Freight exchange',soon:'Coming soon: loads for sale and your price offers.',hint:'Upload your valid transport licence and insurance here. Without valid documents we cannot assign transports to you.',ok:'Document sent: our team will validate it.',lv:{ok:'Valid',yellow:'Expires < 2 months',orange:'Expires < 1 month',red:'Expires < 15 days',blocked:'EXPIRED',missing:'Missing'}}
+  fr:{hello:'Espace transporteur',docs:'Mes documents',bourse:'Bourse de fret',transports:'Mes transports',license:'Licence de transport',insurance:'Assurance',valid:'Valable jusqu\'au',file:'Document (PDF)',send:'Envoyer',pending:'En attente de validation',none:'Aucun document',logout:'Déconnexion',hint:'Déposez ici votre licence et votre assurance en cours de validité. Sans documents valides, nous ne pouvons pas vous confier de transports.',ok:'Document envoyé : il sera validé par notre équipe.',
+    lv:{ok:'Valide',yellow:'Échéance < 2 mois',orange:'Échéance < 1 mois',red:'Échéance < 15 jours',blocked:'EXPIRÉ',missing:'Manquant'},
+    lots:'Lots à vendre',noLots:'Aucun lot à vendre pour le moment.',vehicles:'Véhicules',yourOffer:'Votre prix (€, hors TVA)',comment:'Commentaire (facultatif)',offer:'Proposer ce prix',update:'Modifier mon offre',withdraw:'Retirer mon offre',published:'Mis en vente le',blockedMsg:'Vos documents sont expirés ou manquants : vous ne pouvez pas faire d\'offre tant qu\'ils ne sont pas renouvelés (onglet « Mes documents »).',
+    st:{pending:'Votre offre est envoyée',rejected:'Offre non retenue',withdrawn:'Offre retirée'},priceErr:'Indiquez un prix valide.',
+    noTr:'Aucun transport pour le moment.',accepted:'Votre offre est acceptée',plate:'Plaque du camion',driver:'Nom du chauffeur',loadDate:'Date de chargement prévue',delDate:'Date de livraison prévue',confirm:'Confirmer le transport',confirmed:'Transport confirmé',portal:'Ouvrir le portail de suivi (photos, CMR)',fill:'Merci d\'indiquer les informations du camion.',dateErr:'La livraison ne peut pas précéder le chargement.',allErr:'Complétez tous les champs.'},
+  en:{hello:'Carrier space',docs:'My documents',bourse:'Freight exchange',transports:'My transports',license:'Transport licence',insurance:'Insurance',valid:'Valid until',file:'Document (PDF)',send:'Upload',pending:'Awaiting validation',none:'No document',logout:'Log out',hint:'Upload your valid transport licence and insurance here. Without valid documents we cannot assign transports to you.',ok:'Document sent: our team will validate it.',
+    lv:{ok:'Valid',yellow:'Expires < 2 months',orange:'Expires < 1 month',red:'Expires < 15 days',blocked:'EXPIRED',missing:'Missing'},
+    lots:'Loads for sale',noLots:'No load for sale at the moment.',vehicles:'Vehicles',yourOffer:'Your price (€, excl. VAT)',comment:'Comment (optional)',offer:'Submit this price',update:'Update my offer',withdraw:'Withdraw my offer',published:'Listed on',blockedMsg:'Your documents are expired or missing: you cannot make offers until they are renewed (« My documents » tab).',
+    st:{pending:'Your offer has been sent',rejected:'Offer not selected',withdrawn:'Offer withdrawn'},priceErr:'Enter a valid price.',
+    noTr:'No transport at the moment.',accepted:'Your offer has been accepted',plate:'Truck plate',driver:'Driver name',loadDate:'Planned loading date',delDate:'Planned delivery date',confirm:'Confirm the transport',confirmed:'Transport confirmed',portal:'Open the tracking portal (photos, CMR)',fill:'Please enter the truck details.',dateErr:'Delivery cannot be before loading.',allErr:'Please fill in all fields.'}
 };
+const csT=()=>{const c=db.carriers[0]||{country:''};return CS_T[detectLang(c.country)==='fr'?'fr':'en'];};
+function csVeh(cars){const g={};(cars||[]).forEach(c=>{const k=(c.make||'')+' '+(c.model||'');g[k]=(g[k]||0)+1;});return Object.entries(g).map(([k,n])=>esc(k.trim())+(n>1?' ×'+n:'')).join(', ');}
+function csBourseHtml(T){
+  const c=db.carriers[0];
+  if(carrierCompliance(c.id).blocked)return `<div class="panel"><div class="tp-al red">${esc(T.blockedMsg)}</div></div>`;
+  return `<div class="panel"><div class="panel-title"><h2>${esc(T.lots)} (${csLots.length})</h2></div>
+  ${csLots.map(l=>{
+    const o=csOffers.find(x=>x.missionId===l.id),active=o&&o.status==='pending';
+    return `<div style="border-top:1px solid var(--line);padding:14px 0">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline"><strong>${esc(l.ref)}</strong><span style="font-size:11.5px;color:var(--muted)">${esc(T.published)} ${pretty(String(l.exchange_published_at||'').slice(0,10))}</span></div>
+      <div style="margin-top:4px;font-size:14px">⬆ ${esc(place(l.pickup_country,l.pickup_city))} &nbsp;→&nbsp; ⬇ ${esc(place(l.delivery_country,l.delivery_city))}</div>
+      <div style="font-size:12.5px;color:#536a7d">${esc(T.vehicles)} : ${csVeh(l.cars)}</div>
+      ${o&&o.status!=='pending'?`<div style="font-size:12px;color:var(--muted);margin-top:4px">${esc(T.st[o.status]||'')}${o.status==='withdrawn'||o.status==='rejected'?' ('+eur(o.price)+')':''}</div>`:''}
+      ${active?`<div style="font-size:12.5px;color:var(--green);margin-top:4px">✓ ${esc(T.st.pending)} : <b>${eur(o.price)}</b></div>`:''}
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:8px"><div class="field"><label>${esc(T.yourOffer)}</label><input type="number" id="cs-price-${esc(l.id)}" min="1" step="1" value="${active?o.price:''}" style="width:130px"></div>
+        <div class="field" style="flex:1;min-width:160px"><label>${esc(T.comment)}</label><input id="cs-com-${esc(l.id)}" value="${active?esc(o.comment):''}"></div>
+        <button class="btn primary" onclick="csSubmitOffer('${esc(l.id)}')">${esc(active?T.update:T.offer)}</button>${active?`<button class="btn" onclick="csWithdrawOffer('${esc(o.id)}')">${esc(T.withdraw)}</button>`:''}</div>
+      <div id="cs-err-${esc(l.id)}" style="font-size:12px;color:var(--red);margin-top:4px"></div></div>`;}).join('')||`<div style="color:var(--muted);font-size:13px;padding:8px 0">${esc(T.noLots)}</div>`}</div>`;
+}
+function csTransportsHtml(T){
+  return `<div class="panel"><div class="panel-title"><h2>${esc(T.transports)}</h2></div>
+  ${csTransports.map(t=>{
+    const o=csOffers.find(x=>x.missionId===t.id),done=o&&o.status==='confirmed',link=window.location.origin+window.location.pathname+'?t='+t.carrier_token;
+    return `<div style="border-top:1px solid var(--line);padding:14px 0"><div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><strong>${esc(t.ref)}</strong><span style="font-size:12px;color:var(--green);font-weight:700">${esc(done?T.confirmed:T.accepted)}${o?' · '+eur(o.price):''}</span></div>
+      <div style="margin-top:4px">⬆ ${esc(place(t.pickup_country,t.pickup_city))} → ⬇ ${esc(place(t.delivery_country,t.delivery_city))}</div><div style="font-size:12.5px;color:#536a7d">${esc(T.vehicles)} : ${csVeh(t.cars)}</div>
+      ${done?`<div style="font-size:13px;margin-top:6px">🚛 <b>${esc(t.carrier_plate||'')}</b> · ${esc(t.carrier_driver||'')} · ${pretty(t.carrier_load_date)} → ${pretty(t.carrier_delivery_date)}</div><p style="margin:8px 0 0"><a class="btn primary" href="${esc(link)}" target="_blank">${esc(T.portal)}</a></p>`
+      :`<div style="font-size:12.5px;margin:6px 0">${esc(T.fill)}</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end"><div class="field"><label>${esc(T.plate)}</label><input id="cs-plate-${esc(t.id)}" style="width:130px"></div><div class="field"><label>${esc(T.driver)}</label><input id="cs-driver-${esc(t.id)}"></div><div class="field"><label>${esc(T.loadDate)}</label><input type="date" id="cs-ld-${esc(t.id)}"></div><div class="field"><label>${esc(T.delDate)}</label><input type="date" id="cs-dd-${esc(t.id)}"></div><button class="btn primary" onclick="csConfirmTransport('${esc(t.id)}','${esc(o.id)}')">${esc(T.confirm)}</button></div><div id="cs-err-${esc(t.id)}" style="font-size:12px;color:var(--red);margin-top:4px"></div>`}</div>`;}).join('')||`<div style="color:var(--muted);font-size:13px;padding:8px 0">${esc(T.noTr)}</div>`}</div>`;
+}
+function csDocsHtml(T){
+  return `<div class="panel"><div class="panel-title"><h2>${esc(T.docs)}</h2></div><p style="font-size:13px;color:var(--muted);margin-top:0">${esc(T.hint)}</p>
+  ${DOC_KINDS.map(([k])=>{const st=docStatus(db.carrierDocs,k),all=db.carrierDocs.filter(d=>d.kind===k);
+    return `<div style="border-top:1px solid var(--line);padding:12px 0"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><strong>${esc(T[k])}</strong> ${docChip(st,T)}</div>
+      ${all.map(d=>`<div style="font-size:12px;color:#536a7d;margin-top:4px">${esc(d.fileName)} · ${esc(T.valid)} ${pretty(d.validUntil)} ${d.verified?'<span style="color:var(--green)">✓</span>':'<span style="color:var(--amber)">⏳ '+esc(T.pending)+'</span>'}</div>`).join('')||`<div style="font-size:12px;color:var(--muted);margin-top:4px">${esc(T.none)}</div>`}
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:10px"><div class="field"><label>${esc(T.file)}</label><input type="file" id="cs-file-${k}" accept="application/pdf"></div><div class="field"><label>${esc(T.valid)}</label><input type="date" id="cs-valid-${k}"></div><button class="btn primary" onclick="carrierSpaceUpload('${k}')">${esc(T.send)}</button></div></div>`;}).join('')}
+  <div id="cs-msg" style="margin-top:8px;font-size:13px"></div></div>`;
+}
 function renderCarrierSpace(){
-  const c=db.carriers[0]||{name:'—',country:''};
-  const T=CS_T[detectLang(c.country)]||(detectLang(c.country)==='fr'?CS_T.fr:CS_T.en);
-  const host=document.getElementById('carrier-space');
-  host.innerHTML=`<div style="background:var(--navy);color:#fff;padding:16px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap"><div style="font-weight:800;font-size:18px">auto<span style="color:#5ab0e8">dispatch</span></div><div style="opacity:.8;font-size:13px">${esc(T.hello)} · <b>${esc(c.name)}</b></div><div style="flex:1"></div><button class="btn" onclick="logout()">${esc(T.logout)}</button></div>
-  <div style="max-width:760px;margin:0 auto;padding:22px 16px">
-    <div class="panel"><div class="panel-title"><h2>${esc(T.docs)}</h2></div><p style="font-size:13px;color:var(--muted);margin-top:0">${esc(T.hint)}</p>
-    ${DOC_KINDS.map(([k])=>{const st=docStatus(db.carrierDocs,k),all=db.carrierDocs.filter(d=>d.kind===k);
-      return `<div style="border-top:1px solid var(--line);padding:12px 0"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><strong>${esc(T[k])}</strong> ${docChip(st,T)}</div>
-        ${all.map(d=>`<div style="font-size:12px;color:#536a7d;margin-top:4px">${esc(d.fileName)} · ${esc(T.valid)} ${pretty(d.validUntil)} ${d.verified?'<span style="color:var(--green)">✓</span>':'<span style="color:var(--amber)">⏳ '+esc(T.pending)+'</span>'}</div>`).join('')||`<div style="font-size:12px;color:var(--muted);margin-top:4px">${esc(T.none)}</div>`}
-        <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:10px"><div class="field"><label>${esc(T.file)}</label><input type="file" id="cs-file-${k}" accept="application/pdf"></div><div class="field"><label>${esc(T.valid)}</label><input type="date" id="cs-valid-${k}"></div><button class="btn primary" onclick="carrierSpaceUpload('${k}')">${esc(T.send)}</button></div></div>`;}).join('')}
-    <div id="cs-msg" style="margin-top:8px;font-size:13px"></div></div>
-    <div class="panel"><div class="panel-title"><h2>${esc(T.bourse)}</h2></div><p style="color:var(--muted);font-size:13px;margin:0">${esc(T.soon)}</p></div>
-  </div>`;
+  const c=db.carriers[0]||{name:'—',country:''},T=csT();
+  const tab=(k,l,n)=>`<button class="btn ${csTab===k?'primary':''}" onclick="csTab='${k}';renderCarrierSpace()">${esc(l)}${n?` (${n})`:''}</button>`;
+  const todo=csTransports.filter(t=>{const o=csOffers.find(x=>x.missionId===t.id);return o&&o.status==='accepted';}).length;
+  document.getElementById('carrier-space').innerHTML=`<div style="background:var(--navy);color:#fff;padding:16px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap"><div style="font-weight:800;font-size:18px">auto<span style="color:#5ab0e8">dispatch</span></div><div style="opacity:.8;font-size:13px">${esc(T.hello)} · <b>${esc(c.name)}</b></div><div style="flex:1"></div><button class="btn" onclick="logout()">${esc(T.logout)}</button></div>
+  <div style="max-width:820px;margin:0 auto;padding:18px 16px"><div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">${tab('bourse',T.bourse,csLots.length)}${tab('transports',T.transports,todo)}${tab('docs',T.docs)}</div>
+  ${csTab==='bourse'?csBourseHtml(T):csTab==='transports'?csTransportsHtml(T):csDocsHtml(T)}</div>`;
 }
 async function carrierSpaceUpload(kind){
-  const c=db.carriers[0],T=CS_T[detectLang(c.country)]||(detectLang(c.country)==='fr'?CS_T.fr:CS_T.en),msg=document.getElementById('cs-msg');
+  const c=db.carriers[0],T=csT(),msg=document.getElementById('cs-msg');
   msg.textContent='⏳';
   try{await uploadDocFile(c.id,kind,document.getElementById('cs-file-'+kind).files[0],document.getElementById('cs-valid-'+kind).value,'carrier');renderCarrierSpace();document.getElementById('cs-msg').innerHTML=`<span style="color:var(--green)">✓ ${esc(T.ok)}</span>`;}
   catch(e){msg.innerHTML=`<span style="color:var(--red)">⚠ ${esc(e.message||String(e))}</span>`;}
+}
+async function csSubmitOffer(mid){
+  const T=csT(),c=db.carriers[0],err=document.getElementById('cs-err-'+mid);
+  const price=parseNum(document.getElementById('cs-price-'+mid).value),comment=document.getElementById('cs-com-'+mid).value.trim();
+  if(!(price>0)){err.textContent=T.priceErr;return;}
+  const{error}=await sb.from('freight_offers').upsert({mission_id:mid,carrier_id:c.id,price,comment:comment||null,status:'pending',updated_at:new Date().toISOString()},{onConflict:'mission_id,carrier_id'});
+  if(error){err.textContent=error.message;return;}
+  await csLoadBourse();renderCarrierSpace();
+}
+async function csWithdrawOffer(oid){
+  const{error}=await sb.from('freight_offers').update({status:'withdrawn',updated_at:new Date().toISOString()}).eq('id',oid);
+  if(error){alert(error.message);return;}
+  await csLoadBourse();renderCarrierSpace();
+}
+async function csConfirmTransport(mid,oid){
+  const T=csT(),err=document.getElementById('cs-err-'+mid);
+  const plate=document.getElementById('cs-plate-'+mid).value.trim().toUpperCase(),driver=document.getElementById('cs-driver-'+mid).value.trim(),ld=document.getElementById('cs-ld-'+mid).value,dd=document.getElementById('cs-dd-'+mid).value;
+  if(!plate||!driver||!ld||!dd){err.textContent=T.allErr;return;}
+  if(dd<ld){err.textContent=T.dateErr;return;}
+  const{error}=await sb.from('missions').update({carrier_plate:plate,carrier_driver:driver,carrier_load_date:ld,carrier_delivery_date:dd}).eq('id',mid);
+  if(error){err.textContent=error.message;return;}
+  const{error:e2}=await sb.from('freight_offers').update({status:'confirmed',updated_at:new Date().toISOString()}).eq('id',oid);
+  if(e2){err.textContent=e2.message;return;}
+  await csLoadBourse();renderCarrierSpace();
 }
 
 // ─── DOCUMENTS DE TRANSPORT : CMR toujours, documents douaniers hors UE ───
@@ -2242,18 +2514,22 @@ function controlPage(){
   const trucks=db.trucks.filter(x=>x.active).map(x=>({x,km:db.tours.filter(t=>t.kind==='own'&&t.truckId===x.id&&t.startDate>=monday&&t.startDate<=sunday).reduce((q,t)=>q+(t.km||0),0)}));
   const lowTours=db.tours.filter(t=>t.kind!=='draft'&&(t.endDate||t.startDate)>=today).map(t=>({t,pts:tourPts(t)})).filter(o=>o.pts<TRUCK_CAPACITY*0.75);
   const docAl=db.carriers.map(c=>({c,comp:carrierCompliance(c.id)})).filter(o=>o.comp.level!=='ok').sort((a,b)=>DOC_RANK[b.comp.level]-DOC_RANK[a.comp.level]);
+  const bourseAl=act.filter(exchangeAlert);
+  const offersWaiting=db.missions.filter(m=>m.exchangeStatus==='open'&&offersOf(m.id).some(o=>o.status==='pending'));
   const row=(m,extra)=>`<div class="recent-row" style="cursor:pointer" onclick="openDetail('${esc(m.id)}')"><strong>${esc(m.ref)}<small>${esc(getClient(m).name||'—')}</small></strong><span>${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}</span><span>${extra||''}</span><span style="font-size:12px">${esc(execInfo(m).label)}</span></div>`;
   const panel=(title,color,list,fmt,hint)=>`<div class="panel"><div class="panel-title"><h2 style="color:${color}">${title} <span style="font-size:13px">(${list.length})</span></h2>${hint?`<small>${hint}</small>`:''}</div>
     ${list.slice(0,8).map(fmt).join('')||'<div style="color:var(--green);font-size:13px;padding:6px 0">✓ Rien à signaler</div>'}${list.length>8?`<div style="font-size:12px;color:var(--muted);padding:6px 0">… et ${list.length-8} autre(s)</div>`:''}</div>`;
   const tile=(label,n,col)=>`<div class="stat" style="${n?'border-color:'+col+';background:'+col+'12':''}"><small style="${n?'color:'+col+';font-weight:800':''}">${label}</small><strong style="color:${n?col:'var(--green)'};font-size:30px;margin-top:8px;display:block">${n}</strong></div>`;
   return heading('Contrôle','Tableau de bord du dispatcher : ce qui demande une action aujourd\'hui.')+
-  `<div class="grid stats" style="grid-template-columns:repeat(7,minmax(0,1fr));margin-bottom:12px">
-    ${tile('Docs transporteurs',docAl.length,'#7a3b8f')}${tile('En retard',late.length,'#c0392b')}${tile('À risque (≤ 2 j)',risk.length,'#e0850c')}${tile('Sans camion ni transporteur',unplanned.length,'#2675a9')}
+  `<div class="grid stats" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:12px">
+    ${tile('Bourse ≥ 3 j ouvrables',bourseAl.length,'#d2308f')}${tile('Offres à traiter',offersWaiting.length,'#2675a9')}${tile('Docs transporteurs',docAl.length,'#7a3b8f')}${tile('En retard',late.length,'#c0392b')}${tile('À risque (≤ 2 j)',risk.length,'#e0850c')}${tile('Sans camion ni transporteur',unplanned.length,'#2675a9')}
     ${tile('Documents manquants',docs.length,'#9a6b18')}${tile('Non géolocalisées',nogeo.length,'#8094a6')}${tile('Prix manquants',noprice.length,'#8094a6')}</div>
+  ${panel('📣 Bourse de fret : invendus depuis 3 jours ouvrables','#d2308f',bourseAl,m=>`<div class="recent-row"><strong>${esc(m.ref)}<small>${esc(getClient(m).name||'—')}</small></strong><span>${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}</span><span>${bdSince(m.exchangePublishedAt)} j ouvrables · ${offersOf(m.id).filter(o=>o.status==='pending').length} offre(s)</span><span><button class="btn primary" onclick="planLot('${esc(m.id)}')">🚛 Planifier sur un camion</button> <button class="btn" onclick="snoozeLot('${esc(m.id)}')">Laisser en bourse (3 j)</button></span></div>`,'Décide : planifier sur un camion ou laisser en bourse')}
+  ${panel('💶 Offres de transporteurs à traiter','#2675a9',offersWaiting,m=>{const best=offersOf(m.id).filter(o=>o.status==='pending').sort((a,b)=>a.price-b.price)[0];return `<div class="recent-row" style="cursor:pointer" onclick="bourseTab='open';setView('Bourse de fret')"><strong>${esc(m.ref)}<small>${esc(getClient(m).name||'—')}</small></strong><span>${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}</span><span>${offersOf(m.id).filter(o=>o.status==='pending').length} offre(s) · meilleure : <b>${eur(best.price)}</b> (${esc((db.carriers.find(c=>c.id===best.carrierId)||{}).name||'—')})</span><span></span></div>`;},'Ouvre la bourse pour accepter ou refuser')}
   ${panel('📑 Licences et assurances des transporteurs','#7a3b8f',docAl,o=>`<div class="recent-row"><strong>${esc(o.c.name)}<small>${esc(o.c.email||'sans e-mail')}</small></strong><span>${o.comp.sts.map(st=>DOC_KINDS.find(k=>k[0]===st.k)[1]+' : '+docChip(st)).join(' &nbsp; ')}</span><span></span><span>${o.comp.sts.filter(st=>st.level!=='ok').map(st=>`<button class="btn" onclick="sendDocReminder('${esc(o.c.id)}','${st.k}')">✉ Rappel ${st.k==='license'?'licence':'assurance'}</button>`).join(' ')}</span></div>`,'Échéance à 2 mois (jaune), 1 mois (orange), 15 jours (rouge), expiré ou manquant (bloqué)')}
   ${panel('⚠ En retard','#c0392b',late,m=>row(m,`<b style="color:#c0392b">${-left(m)} j de retard</b>`),'Date limite de livraison dépassée')}
   ${panel('⏱ À risque','#e0850c',risk,m=>row(m,`<b style="color:#e0850c">${left(m)} j restant${left(m)>1?'s':''}</b>`),'Date limite dans 2 jours ou moins')}
-  ${panel('🚛 À planifier (sans camion ni transporteur)','#2675a9',unplanned,m=>row(m,left(m)==null?'':(left(m)<0?'<b style="color:#c0392b">en retard</b>':left(m)+' j restants')),'À placer sur un camion, à affréter, ou à mettre en bourse de fret')}
+  ${panel('🚛 À planifier (sans camion ni transporteur)','#2675a9',unplanned,m=>row(m,(left(m)==null?'':(left(m)<0?'<b style="color:#c0392b">en retard</b>':left(m)+' j restants'))+` <button class="btn" onclick="event.stopPropagation();publishToExchange(['${esc(m.id)}'])">📣 En bourse</button>`),'À placer sur un camion, à affréter, ou à mettre en bourse de fret')}
   ${panel('📄 Documents de transport manquants','#9a6b18',docs,m=>row(m,docsMissing(m).map(d=>esc(d[1])).join(', ')),'Chargement dans les 5 jours ou sans date')}
   <div class="panel"><div class="panel-title"><h2>🚚 Camions : objectif hebdomadaire</h2><small>${TOUR_KM_MIN.toLocaleString('fr-BE')}–${TOUR_KM_MAX.toLocaleString('fr-BE')} km par semaine</small></div>
     ${trucks.map(({x,km})=>`<div class="recent-row"><strong>${esc(x.name)}<small>${esc(x.plate||'')}</small></strong><span style="color:${km>=TOUR_KM_MIN?'var(--green)':'var(--amber)'};font-weight:700">${Math.round(km).toLocaleString('fr-BE')} km cette semaine</span><span>${km>=TOUR_KM_MIN?'✓ objectif atteint':'sous l\'objectif : '+Math.round(TOUR_KM_MIN-km)+' km à planifier'}</span><span></span></div>`).join('')||'<div style="color:var(--muted);font-size:13px;padding:6px 0">Aucun camion : créez-en dans « Planning camions ».</div>'}
@@ -2282,6 +2558,7 @@ function execInfo(m){
   if(t&&t.kind==='own'){const tr=db.trucks.find(x=>x.id===t.truckId)||{};return{mode:'own',label:'🚛 '+(tr.name||'camion propre'),truck:tr,tour:t};}
   if((t&&t.kind==='charter')||m.carrierId)return{mode:'charter',label:'🤝 '+(car.name||'transporteur'),carrier:car,tour:t};
   if(t)return{mode:'draft',label:'Brouillon '+t.name,tour:t};
+  if(m.exchangeStatus==='open')return{mode:'exchange',label:'📣 En bourse'};
   return{mode:'none',label:'À attribuer'};
 }
 function tourBlock(m){
@@ -2300,7 +2577,7 @@ function tourBlock(m){
   }else if(e.mode==='draft'){
     body=row('Mode','Brouillon (non affecté)')+row('Tournée',esc(t.name));
   }else{
-    body=row('Mode','Non planifiée');
+    body=row('Mode',m.exchangeStatus==='open'?'📣 En bourse de fret':'Non planifiée');
   }
   return `<div class="detail-block"><h3>Exécution du transport</h3><div class="info-grid">${body}</div>${t?`<p><button class="btn" onclick="openTourDetail('${esc(t.id)}')">Ouvrir la tournée</button></p>`:''}</div>`;
 }
@@ -3570,6 +3847,7 @@ function openDetail(id){
   ${deadlineBlock(m)}
   ${tourBlock(m)}
   ${docsBlock(m)}
+  ${exchangeBlock(m)}
   <div class="detail-block"><h3>Transporteur</h3><div class="info-grid"><span>Société<strong>${esc(getCarrier(m).name||'À attribuer')}</strong></span><span>E-mail<strong>${esc(getCarrier(m).email||'—')}</strong></span></div>${portalLink?`<div style="margin-top:12px;padding:11px;background:#edf6fc;border:1px solid #d0e8f5;border-radius:7px;font-size:11px"><div style="font-size:10px;font-weight:800;letter-spacing:1px;color:var(--blue);margin-bottom:6px">🔗 LIEN PORTAIL TRANSPORTEUR</div><div style="word-break:break-all;color:#1e6592;margin-bottom:8px">${esc(portalLink)}</div><button class="btn soft" style="font-size:11px" onclick="copyPortalLink('${esc(m.id)}')">Copier le lien</button> <a href="${esc(portalLink)}" target="_blank" class="btn" style="font-size:11px;text-decoration:none">Ouvrir le portail ↗</a></div>`:'<p style="font-size:12px;color:var(--muted)">Aucun lien portail — affecte un transporteur depuis le Planning général.</p>'}</div>
   <div class="detail-block"><h3>Notifications client</h3>
   ${(()=>{
