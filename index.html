@@ -149,9 +149,9 @@ const SUPABASE_URL  = 'https://srmesytesdspwdtumnfj.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNybWVzeXRlc2RzcHdkdHVtbmZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1ODMyMDEsImV4cCI6MjEwNjE1OTIwMX0.NpngBYSzBUNf7_OI516YhmtwzvPGPewlPRTPwbPwYoI';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 // ─── JOURNAL D'AUDIT : trace automatique des écritures importantes (ne bloque jamais l'application) ───
-const AUDIT_TABLES={missions:'Mission',tours:'Tournée',freight_offers:'Offre de la bourse',carrier_documents:'Document transporteur',carriers:'Transporteur',clients:'Client',sites:'Site',trucks:'Camion',app_settings:'Réglage'};
+const AUDIT_TABLES={missions:'Mission',tours:'Tournée',freight_offers:'Offre de la bourse',invoices:'Facture',carrier_documents:'Document transporteur',carriers:'Transporteur',clients:'Client',sites:'Site',trucks:'Camion',app_settings:'Réglage'};
 const AUDIT_NOISE=new Set(['id','distance_km','pickup_lat','pickup_lng','delivery_lat','delivery_lng','delivery_token','updated_at','docs_checklist','order_date','exchange_snooze_until','exchange_published_at']);
-const AUDIT_KEEP=['status','carrier_id','price_sell','price_buy','tour_id','pickup_date','delivery_date','exchange_status','exchange_max_price','carrier_plate','carrier_driver','name','kind','start_date','end_date','price','key','verified','valid_until','truck_id','active'];
+const AUDIT_KEEP=['status','carrier_id','price_sell','price_buy','tour_id','pickup_date','delivery_date','exchange_status','exchange_max_price','carrier_plate','carrier_driver','name','kind','start_date','end_date','price','key','verified','valid_until','truck_id','active','number','total'];
 let _auditOff=false;
 const _sbRaw=sb.from.bind(sb);
 Object.defineProperty(sb,'from',{configurable:true,writable:true,value:function(table){
@@ -212,8 +212,8 @@ const CARRIER_TOKEN = new URLSearchParams(window.location.search).get('t');
 const INSPECTION_TOKEN = new URLSearchParams(window.location.search).get('inspection');
 
 // ─── STATE ──────────────────────────────────────────────────────
-const NAV=[["Vue d'ensemble",'⌂'],['Contrôle','◉'],['Planning général','▦'],['Missions','▤'],['Véhicules','▣'],['Clients','◫'],['Sites','◍'],['Transporteurs','▰'],['Documents','▧'],['Carte','◎'],['Planning camions','⇄'],['Règles et coûts','⚙'],['Exceptions et journal','⚑'],['Affrètement','⇆'],['Bourse de fret','◈'],['Finance','€'],['Rapports','📊'],['Résumé','i']];
-let db={clients:[],carriers:[],missions:[],carrierEvents:[],deliveryInspections:[],trucks:[],tours:[],sites:[],carrierDocs:[],profiles:[],offers:[],selectedIds:[],sort:'ref',direction:1};
+const NAV=[["Vue d'ensemble",'⌂'],['Contrôle','◉'],['Planning général','▦'],['Missions','▤'],['Véhicules','▣'],['Clients','◫'],['Sites','◍'],['Transporteurs','▰'],['Documents','▧'],['Carte','◎'],['Planning camions','⇄'],['Règles et coûts','⚙'],['Exceptions et journal','⚑'],['Affrètement','⇆'],['Bourse de fret','◈'],['Finance','€'],['Facturation','🧾'],['Rapports','📊'],['Résumé','i']];
+let db={invoices:[],clients:[],carriers:[],missions:[],carrierEvents:[],deliveryInspections:[],trucks:[],tours:[],sites:[],carrierDocs:[],profiles:[],offers:[],selectedIds:[],sort:'ref',direction:1};
 let current="Vue d'ensemble",search='',filterStatus='Tous les statuts',docSearch='',docFilter='';
 let editingMission=null,detailId=null,currentUser=null;
 let weekOffset=0,filterClient='Tous les clients',filterCarrier='Tous les transporteurs';
@@ -601,6 +601,7 @@ async function loadData(){
     try{const ri=await sb.from('delivery_inspections').select('*').order('created_at');db.deliveryInspections=ri.data||[];}
     catch(e){console.warn('delivery_inspections non disponible:',e.message);db.deliveryInspections=[];};
     await loadSettings();
+    try{const ri=await sb.from('invoices').select('*').order('created_at',{ascending:false});db.invoices=(ri.data||[]).map(invFromRow);}catch(e){db.invoices=[];}
     try{const ro=await sb.from('freight_offers').select('*').order('created_at',{ascending:false});db.offers=(ro.data||[]).map(offerFromRow);}catch(e){db.offers=[];}
     try{const rd=await sb.from('carrier_documents').select('*').order('created_at',{ascending:false});db.carrierDocs=(rd.data||[]).map(docFromRow);}catch(e){db.carrierDocs=[];}
     try{const rp=await sb.from('profiles').select('*');db.profiles=rp.data||[];}catch(e){db.profiles=[];}
@@ -908,6 +909,7 @@ function render(){
   else if(current==='Sites')view.innerHTML=sitesPage();
   else if(current==='Affrètement')view.innerHTML=charterPage();
   else if(current==='Bourse de fret')view.innerHTML=boursePage();
+  else if(current==='Facturation')view.innerHTML=invoicingPage();
   else view.innerHTML=financePage();
 }
 
@@ -1444,7 +1446,7 @@ async function runXlsxImport(){
 // ─── RAPPORTS ───────────────────────────────────────────────────────────────
 // ─── RAPPORTS : choix du rapport, filtres communs, tableau et export Excel ───
 let reportKind='overview',_lastReport=null;
-const REPORT_LIST=[['overview','📊 Vue d\'ensemble'],['cfo','🧭 Tableau de bord financier (CFO)'],['owntours','🚛 Camions propres : coûts et rentabilité'],['loaded','📦 Camions chargés : km, occupation, rentabilité'],['empty','↩ Retours à vide'],['compare','⚖ Camion propre ou affrètement'],['fleet','🚚 Utilisation des camions'],['costs','⛽ Structure des coûts'],['margin','💶 Marge par mission'],['client','🏢 Chiffre d\'affaires par client'],['carrier','🚛 Performance des transporteurs'],['score','🏅 Fiche de performance (score)'],['late','⚠ Missions en retard'],['lanes','🛣 Prix par trajet (pays → pays)'],['tours','🗺 Tournées et remplissage'],['docs','📄 Documents des transporteurs'],['vehicles','🚗 Véhicules transportés']];
+const REPORT_LIST=[['overview','📊 Vue d\'ensemble'],['cfo','🧭 Tableau de bord financier (CFO)'],['owntours','🚛 Camions propres : coûts et rentabilité'],['loaded','📦 Camions chargés : km, occupation, rentabilité'],['empty','↩ Retours à vide'],['compare','⚖ Camion propre ou affrètement'],['fleet','🚚 Utilisation des camions'],['costs','⛽ Structure des coûts'],['aging','🧾 Balance âgée (créances clients)'],['margin','💶 Marge par mission'],['client','🏢 Chiffre d\'affaires par client'],['carrier','🚛 Performance des transporteurs'],['score','🏅 Fiche de performance (score)'],['late','⚠ Missions en retard'],['lanes','🛣 Prix par trajet (pays → pays)'],['tours','🗺 Tournées et remplissage'],['docs','📄 Documents des transporteurs'],['vehicles','🚗 Véhicules transportés']];
 function reportPicker(){
   return `<div class="panel" style="margin-bottom:10px;padding:12px 16px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <span style="font-size:13px;font-weight:600;color:#555">📑 Rapport :</span>
@@ -1493,7 +1495,16 @@ function reportOtherPage(){
   const missingNote=ownT.length-ownA.length?`${ownT.length-ownA.length} tournée(s) en camion propre sans analyse : clique sur « Calculer les analyses manquantes ».`:'';
   const anaBtn=`<button class="btn primary" onclick="analyzeMissingTours()">🧮 Calculer les analyses manquantes (${db.tours.filter(t=>t.kind==='own'&&!t.analysis).length})</button> <span id="ana-note" style="font-size:12px;color:var(--muted)"></span>`;
   let extra='';
-      if(kind==='score'){
+        if(kind==='aging'){
+    const today=todayIso(),by={};
+    db.invoices.filter(i=>i.status==='issued').forEach(i=>{
+      const d=i.dueDate<today?diffDays(i.dueDate,today):-1,b=d<0?0:d<=30?1:d<=60?2:d<=90?3:4;
+      const o=by[i.clientId]=by[i.clientId]||{name:(i.client||{}).name||'—',v:[0,0,0,0,0]};o.v[b]+=i.total;
+    });
+    const rows=Object.values(by).map(o=>[o.name,...o.v,o.v.reduce((q,v)=>q+v,0)]).sort((a,b)=>b[6]-a[6]);
+    const tot=[0,0,0,0,0,0].map((_,k)=>sum(rows.map(r=>r[k+1])));
+    R={title:'Balance âgée',cols:['Client','Non échu €','1–30 j €','31–60 j €','61–90 j €','> 90 j €','Total €'],money:[1,2,3,4,5,6],rows,foot:['Total',...tot],note:'Factures émises non payées, classées selon le retard par rapport à l\'échéance.'};
+  }else if(kind==='score'){
     const lanes={};ms.forEach(m=>{if(m.priceBuy>0&&m.distanceKm>0){const k=(ccLabel(m.pickupCountry)||'?')+'>'+(ccLabel(m.deliveryCountry)||'?');(lanes[k]=lanes[k]||[]).push(m.priceBuy/m.distanceKm);}});
     const laneAvg=Object.fromEntries(Object.entries(lanes).map(([k,a])=>[k,a.reduce((q,v)=>q+v,0)/a.length]));
     const by={};ms.filter(m=>m.carrierId).forEach(m=>{const o=by[m.carrierId]=by[m.carrierId]||{n:0,d:0,late:0,idx:[]};o.n++;if(isDone(m.status))o.d++;if(lateOf(m)>0)o.late++;
@@ -2835,6 +2846,7 @@ const SETTINGS_DEFAULTS={
     BE:{th:'> 7,5 t',w:'veille 16:00-24:00, fer 00:00-24:00',q:'src',note:'Anneaux de Bruxelles/Anvers : heures de pointe 06–09 et 16–21.'},
     NL:{th:'—',w:'',q:'src',note:'Pas d\'interdiction générale de week-end ; interdiction en cas de verglas / faible visibilité ; heures de pointe dans le Randstad.'},
     ES:{th:'—',w:'',q:'est',note:'Restrictions régionales et pour les matières dangereuses (dim./fériés 08:00–24:00). À renseigner selon l\'itinéraire.'}},
+  company:{name:'',vat:'',street:'',postal:'',city:'',country:'BE',email:'',phone:'',iban:'',bic:'',payDays:30,vatRate:21,footer:''},
   depot:{name:'',street:'',postal:'',city:'',country:'BE',lat:null,lng:null},
   cost:{consumption:32,adblue:5,maintenance:0.12,driverHour:26,fixedDay:120,speedMargin:10,handlingMin:60,maxDrive:9}
 };
@@ -2966,12 +2978,30 @@ function costTableHtml(){
   ${rows.map(r=>`<tr><td>${esc(r.cc)} · ${esc(ccName(r.cc))}</td><td>${fuelNet(r.cc).toFixed(3)}${fuelGross(r.cc)==null?' <small style="color:var(--amber)">moy. UE</small>':''}</td><td>${r.fuel.toFixed(3)}</td><td>${r.toll.toFixed(3)}</td><td>${r.maint.toFixed(3)}</td><td><b>${r.total.toFixed(3)} €</b></td></tr>`).join('')}</tbody></table>`;
 }
 function rulesPage(){
-  const tabs=[['depot','🏠 Dépôt'],['drive','⏱ Conduite'],['cost','💶 Coût au km'],['fuel','⛽ Gasoil'],['tolls','🛣 Péages'],['ferries','⛴ Ferries'],['bans','🚫 Interdictions'],['holidays','📅 Jours fériés']];
+  const tabs=[['company','🏢 Société'],['depot','🏠 Dépôt'],['drive','⏱ Conduite'],['cost','💶 Coût au km'],['fuel','⛽ Gasoil'],['tolls','🛣 Péages'],['ferries','⛴ Ferries'],['bans','🚫 Interdictions'],['holidays','📅 Jours fériés']];
   const head=heading('Règles et coûts','Temps de conduite, jours fériés, interdictions de rouler, gasoil, péages et ferries : tout ce qui sert à calculer une tournée.')+
     `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${tabs.map(([k,l])=>`<button class="btn ${rulesTab===k?'primary':''}" onclick="rulesTab='${k}';render()">${l}</button>`).join('')}</div>`;
   const note=`<span id="rules-save-note" style="font-size:12px;color:var(--muted);margin-left:8px"></span>`;
   const saveBar=key=>`<div style="display:flex;gap:8px;align-items:center;margin-top:12px"><button class="btn primary" onclick="sSave('${key}')">Enregistrer</button><button class="btn" onclick="sReset('${key}')">Valeurs par défaut</button>${note}</div>`;
   const inp=(path,val,type,w)=>`<input value="${esc(val??'')}" ${type==='num'?'type="number" step="0.001"':''} style="width:${w||90}px;padding:3px 6px" onchange="sUpd('${path}',this.value,'${type||'text'}')">`;
+  if(rulesTab==='company'){
+    const c=settings.company;
+    return head+`<div class="panel"><div class="panel-title"><h2>Ma société (en-tête des factures)</h2><small>Ces informations figurent sur chaque facture</small></div>
+    <div class="form-grid"><div class="field wide"><label>Nom de la société</label>${inp('company.name',c.name,'text',320)}</div>
+    <div class="field"><label>N° de TVA</label>${inp('company.vat',c.vat,'text',160)}</div>
+    <div class="field"><label>Pays</label><select onchange="sUpd('company.country',this.value)">${COUNTRIES.map(([k,n])=>`<option value="${k}" ${c.country===k?'selected':''}>${k} · ${esc(n)}</option>`).join('')}</select></div>
+    <div class="field wide"><label>Rue et numéro</label>${inp('company.street',c.street,'text',320)}</div>
+    <div class="field"><label>Code postal</label>${inp('company.postal',c.postal,'text',120)}</div>
+    <div class="field"><label>Ville</label>${inp('company.city',c.city,'text',200)}</div>
+    <div class="field"><label>E-mail</label>${inp('company.email',c.email,'text',240)}</div>
+    <div class="field"><label>Téléphone</label>${inp('company.phone',c.phone,'text',160)}</div>
+    <div class="field"><label>IBAN</label>${inp('company.iban',c.iban,'text',240)}</div>
+    <div class="field"><label>BIC</label>${inp('company.bic',c.bic,'text',140)}</div>
+    <div class="field"><label>Délai de paiement (jours)</label>${inp('company.payDays',c.payDays,'num',80)}</div>
+    <div class="field"><label>TVA belge par défaut (%)</label>${inp('company.vatRate',c.vatRate,'num',80)}</div>
+    <div class="field wide"><label>Mention de bas de facture (conditions, intérêts de retard…)</label><input value="${esc(c.footer||'')}" style="width:100%;padding:6px" onchange="sUpd('company.footer',this.value)"></div></div>
+    ${saveBar('company')}</div>`;
+  }
   if(rulesTab==='depot'){
     const d=settings.depot;
     return head+`<div class="panel"><div class="panel-title"><h2>Adresse du dépôt (retour à vide)</h2><small>Le camion rentre toujours ici après la dernière livraison</small></div>
@@ -4361,6 +4391,194 @@ function initMapView(){
   setupDrawing();applyDrawMode();
   refreshSelectionUI();
 }
+
+// ─── FACTURATION : factures depuis les missions livrées, PDF, paiements, relances ───
+const invFromRow=x=>({id:x.id,number:x.number,clientId:x.client_id||'',issueDate:x.issue_date,dueDate:x.due_date,status:x.status,paidDate:x.paid_date||'',vatRate:Number(x.vat_rate),vatMention:x.vat_mention||'',subtotal:Number(x.subtotal),vatAmount:Number(x.vat_amount),total:Number(x.total),lines:Array.isArray(x.lines)?x.lines:[],client:x.client_snapshot||{},company:x.company_snapshot||{},notes:x.notes||'',createdAt:x.created_at||''});
+let invTab='todo',_invCtx=null;
+const r2=v=>Math.round((Number(v)||0)*100)/100;
+const invoicedMids=()=>{const set=new Set();db.invoices.filter(i=>i.status!=='cancelled').forEach(i=>i.lines.forEach(l=>l.mid&&set.add(l.mid)));return set;};
+const invOverdueDays=i=>i.status==='issued'&&i.dueDate<todayIso()?diffDays(i.dueDate,todayIso()):0;
+function vatRegimeFor(client){
+  const co=settings.company||{},cc=ccLabel(client.country)||'',home=co.country||'BE';
+  if(cc===home||!cc)return{rate:Number(co.vatRate)||21,mention:'',label:'TVA nationale'};
+  if(EU27.has(cc)&&client.vat)return{rate:0,mention:home==='BE'?'Autoliquidation — TVA due par le cocontractant (art. 44 Directive 2006/112/CE ; art. 21 §2 CTVA).':'Reverse charge — VAT due by the customer (Art. 44 Directive 2006/112/EC).',label:'Autoliquidation intracommunautaire'};
+  if(EU27.has(cc))return{rate:Number(co.vatRate)||21,mention:'',label:'Client UE sans n° de TVA : TVA nationale (à vérifier)'};
+  return{rate:0,mention:home==='BE'?'Prestation de services hors champ de la TVA belge (art. 21 §2 CTVA / art. 44 Directive 2006/112/CE).':'Service outside the scope of VAT (Art. 44 Directive 2006/112/EC).',label:'Client hors UE'};
+}
+function nextInvoiceNumber(issueIso){
+  const y=issueIso.slice(0,4);let mx=0;
+  db.invoices.forEach(i=>{const m=String(i.number).match(/^(\d{4})-(\d+)$/);if(m&&m[1]===y)mx=Math.max(mx,Number(m[2]));});
+  return y+'-'+String(mx+1).padStart(4,'0');
+}
+function invMissionLine(m){
+  const cars=m.cars.map(c=>`${c.make||''} ${c.model||''}${c.vin?' (VIN '+c.vin+')':''}`.trim()).join(', ');
+  return `Transport ${m.ref} — ${cars} — ${place(m.pickupCountry,m.pickupCity)} → ${place(m.deliveryCountry,m.deliveryCity)}${m.deliveryDate?' ('+pretty(m.deliveryDate)+')':''}`;
+}
+function invoicingPage(){
+  const today=todayIso(),inv=db.invoices;
+  const open=inv.filter(i=>i.status==='issued'),od=open.filter(i=>invOverdueDays(i)>0);
+  const done=invoicedMids();
+  const todo=db.missions.filter(m=>['livré','à facturer'].includes(m.status)&&!done.has(m.id));
+  const todoAmt=todo.reduce((q,m)=>q+(m.priceSell||0),0);
+  const cut=addDays(today,-90),paid90=inv.filter(i=>i.status==='paid'&&i.paidDate>=cut).reduce((q,i)=>q+i.total,0);
+  const kpi=(l,v,sub,c)=>`<div class="stat"><small>${l}</small><strong style="color:${c};font-size:24px;margin-top:8px;display:block">${v}</strong><em>${sub}</em></div>`;
+  const head=heading('Facturation','Factures à partir des missions livrées, PDF, paiements et relances.')+
+   `<div class="grid stats" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:12px">
+    ${kpi('À facturer',eur(todoAmt),todo.length+' mission(s) livrée(s)',todo.length?'var(--amber)':'var(--green)')}
+    ${kpi('Facturé, non payé',eur(open.reduce((q,i)=>q+i.total,0)),open.length+' facture(s) ouverte(s)','var(--blue)')}
+    ${kpi('En retard de paiement',eur(od.reduce((q,i)=>q+i.total,0)),od.length+' facture(s)',od.length?'var(--red)':'var(--green)')}
+    ${kpi('Encaissé (90 jours)',eur(paid90),'factures payées','var(--green)')}</div>
+    <div style="display:flex;gap:6px;margin-bottom:12px">${[['todo','À facturer'],['list','Factures'],['rem','Relances ('+od.length+')']].map(([k,l])=>`<button class="btn ${invTab===k?'primary':''}" onclick="invTab='${k}';render()">${l}</button>`).join('')}</div>`;
+  const co=settings.company||{};
+  const warn=(!co.name||!co.iban)?`<div class="notice error" style="margin-bottom:10px">Renseigne d'abord ta société (nom, TVA, IBAN) dans ⚙ Règles et coûts → 🏢 Société : ces informations figurent sur les factures.</div>`:'';
+  if(invTab==='todo'){
+    const by={};todo.forEach(m=>{(by[m.clientId||'—']=by[m.clientId||'—']||[]).push(m);});
+    const blocks=Object.entries(by).map(([cid,ms])=>{
+      const c=db.clients.find(x=>x.id===cid)||{name:'Sans client'};
+      const miss=!c.vat?'<span style="color:var(--amber);font-size:11.5px"> · n° de TVA du client absent</span>':'';
+      return `<div class="panel" style="margin-bottom:10px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px"><b>${esc(c.name)}</b>${miss}<span style="flex:1"></span>
+        <button class="btn" onclick="document.querySelectorAll('.inv-chk[data-c=\\'${esc(cid)}\\']').forEach(x=>x.checked=true)">Tout cocher</button>
+        <button class="btn primary" onclick="invStart('${esc(cid)}')" ${cid==='—'?'disabled':''}>🧾 Créer la facture</button></div>
+        <div class="table-wrap"><table><tbody>${ms.sort((a,b)=>String(a.deliveryDate).localeCompare(String(b.deliveryDate))).map(m=>`<tr><td style="width:30px"><input class="inv-chk" data-c="${esc(cid)}" data-id="${esc(m.id)}" type="checkbox" ${m.priceSell>0?'checked':'disabled'}></td><td><b>${esc(m.ref)}</b></td><td>${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}</td><td>${m.deliveryDate?pretty(m.deliveryDate):'—'}</td><td style="text-align:right">${m.priceSell>0?eur(m.priceSell):'<span style="color:var(--red)">prix de vente manquant</span>'}</td></tr>`).join('')}</tbody></table></div></div>`;
+    }).join('');
+    return head+warn+(blocks||'<div class="panel"><div class="empty">✓ Aucune mission livrée en attente de facturation.</div></div>');
+  }
+  if(invTab==='rem'){
+    const rows=od.sort((a,b)=>invOverdueDays(b)-invOverdueDays(a));
+    return head+`<div class="panel">${rows.length?`<div class="table-wrap"><table><thead><tr><th>Facture</th><th>Client</th><th>Échéance</th><th>Retard</th><th style="text-align:right">Montant</th><th>Niveau</th><th></th></tr></thead><tbody>${rows.map(i=>{const d=invOverdueDays(i),lv=d>=30?3:d>=15?2:1;return `<tr><td><b>${esc(i.number)}</b></td><td>${esc((i.client||{}).name||'—')}</td><td>${pretty(i.dueDate)}</td><td style="color:var(--red);font-weight:700">${d} j</td><td style="text-align:right">${eur(i.total)}</td><td>${['','Rappel courtois','2e relance','Mise en demeure'][lv]}</td><td><button class="btn" onclick="invReminder('${esc(i.id)}')">✉ Préparer la relance</button></td></tr>`;}).join('')}</tbody></table></div>`:'<div class="empty">✓ Aucune facture en retard de paiement.</div>'}</div>`;
+  }
+  const list=[...inv].sort((a,b)=>String(b.number).localeCompare(String(a.number)));
+  const chip=i=>i.status==='paid'?'<span class="badge green">Payée</span>':i.status==='cancelled'?'<span class="badge">Annulée</span>':(invOverdueDays(i)>0?`<span class="badge amber" style="background:#f9dede;color:var(--red)">En retard ${invOverdueDays(i)} j</span>`:'<span class="badge blue">À payer</span>');
+  return head+warn+`<div class="panel">${list.length?`<div class="table-wrap"><table><thead><tr><th>N°</th><th>Client</th><th>Date</th><th>Échéance</th><th style="text-align:right">HT</th><th style="text-align:right">TVA</th><th style="text-align:right">TTC</th><th>Statut</th><th></th></tr></thead><tbody>${list.map(i=>`<tr><td><b>${esc(i.number)}</b></td><td>${esc((i.client||{}).name||'—')}</td><td>${pretty(i.issueDate)}</td><td>${pretty(i.dueDate)}</td><td style="text-align:right">${eur(i.subtotal)}</td><td style="text-align:right">${eur(i.vatAmount)}</td><td style="text-align:right"><b>${eur(i.total)}</b></td><td>${chip(i)}</td>
+    <td style="white-space:nowrap"><button class="btn" onclick="invoicePdf('${esc(i.id)}')">⬇ PDF</button> <button class="btn" onclick="invMail('${esc(i.id)}')">✉</button> ${i.status==='issued'?`<button class="btn primary" onclick="invPaid('${esc(i.id)}')">✓ Payée</button> <button class="btn danger" onclick="invCancel('${esc(i.id)}')">✕</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Aucune facture pour le moment.</div>'}</div>`;
+}
+function invStart(cid){
+  const ids=[...document.querySelectorAll(`.inv-chk[data-c="${cid}"]:checked`)].map(x=>x.dataset.id);
+  if(!ids.length){alert('Coche au moins une mission.');return;}
+  const co=settings.company||{};
+  if(!co.name){alert('Renseigne d\'abord ta société dans Règles et coûts → Société.');return;}
+  const c=db.clients.find(x=>x.id===cid);
+  const reg=vatRegimeFor(c),issue=todayIso();
+  _invCtx={cid,mids:ids,lines:ids.map(id=>{const m=db.missions.find(x=>x.id===id);return{mid:id,desc:invMissionLine(m),qty:1,unit:m.priceSell};}),rate:reg.rate,mention:reg.mention,label:reg.label,issue,due:addDays(issue,Number(co.payDays)||30),notes:''};
+  invRenderForm();
+}
+function invRenderForm(){
+  const x=_invCtx,c=db.clients.find(k=>k.id===x.cid),co=settings.company;
+  const num=nextInvoiceNumber(x.issue);
+  document.getElementById('modal-content').innerHTML=`<div class="modal-header"><div><h2>Nouvelle facture ${esc(num)}</h2><p>${esc(c.name)}${c.vat?' · TVA '+esc(c.vat):' · <span style="color:var(--amber)">pas de n° de TVA</span>'} · régime proposé : ${esc(x.label)}</p></div><button class="x" onclick="closeModal()">×</button></div>
+  <div style="max-height:44vh;overflow:auto"><table style="min-width:0"><thead><tr><th>Description</th><th style="width:60px">Qté</th><th style="width:110px">Prix HT</th><th></th></tr></thead><tbody>${x.lines.map((l,i)=>`<tr><td><textarea style="width:100%;min-height:44px;font-size:12px" onchange="_invCtx.lines[${i}].desc=this.value">${esc(l.desc)}</textarea></td><td><input type="number" value="${l.qty}" step="1" min="0" style="width:56px" onchange="_invCtx.lines[${i}].qty=parseNum(this.value);invTotals()"></td><td><input type="number" step="0.01" value="${l.unit}" style="width:104px" onchange="_invCtx.lines[${i}].unit=parseNum(this.value);invTotals()"></td><td><button class="btn danger" onclick="_invCtx.lines.splice(${i},1);invRenderForm()">✕</button></td></tr>`).join('')}</tbody></table></div>
+  <button class="btn" style="margin-top:6px" onclick="_invCtx.lines.push({mid:null,desc:'',qty:1,unit:0});invRenderForm()">＋ Ligne libre (frais, péage…)</button>
+  <div class="form-grid" style="margin-top:12px"><div class="field"><label>Date de facture</label><input type="date" value="${x.issue}" onchange="_invCtx.issue=this.value;invRenderForm()"></div>
+  <div class="field"><label>Échéance</label><input type="date" value="${x.due}" onchange="_invCtx.due=this.value"></div>
+  <div class="field"><label>TVA (%)</label><input type="number" step="0.5" value="${x.rate}" onchange="_invCtx.rate=parseNum(this.value);invTotals()"></div>
+  <div class="field wide"><label>Mention de TVA (autoliquidation, hors champ…)</label><input value="${esc(x.mention)}" onchange="_invCtx.mention=this.value"></div>
+  <div class="field wide"><label>Note (facultatif)</label><input value="${esc(x.notes)}" onchange="_invCtx.notes=this.value"></div></div>
+  <div id="inv-tot" style="text-align:right;font-size:13px;margin-top:10px"></div>
+  <p style="font-size:11px;color:var(--muted)">Le régime de TVA est une proposition automatique (national, autoliquidation UE, hors UE) : fais-le valider par ton comptable.</p>
+  <div id="form-error"></div><div class="modal-footer"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn primary" onclick="invSave()">Créer la facture</button></div>`;
+  document.getElementById('modal').classList.add('open');invTotals();
+}
+function invCalc(x){const sub=r2(x.lines.reduce((q,l)=>q+(Number(l.qty)||0)*(Number(l.unit)||0),0)),vat=r2(sub*(Number(x.rate)||0)/100);return{sub,vat,tot:r2(sub+vat)};}
+function invTotals(){const el=document.getElementById('inv-tot');if(!el)return;const t=invCalc(_invCtx);el.innerHTML=`Total HT <b>${eur(t.sub)}</b> · TVA ${_invCtx.rate} % <b>${eur(t.vat)}</b> · Total TTC <b style="font-size:16px">${eur(t.tot)}</b>`;}
+async function invSave(){
+  const x=_invCtx,err=document.getElementById('form-error'),c=db.clients.find(k=>k.id===x.cid),co=settings.company;
+  if(!x.lines.length||x.lines.some(l=>!String(l.desc).trim())){err.innerHTML='<div class="notice error">Chaque ligne doit avoir une description.</div>';return;}
+  if(x.due<x.issue){err.innerHTML='<div class="notice error">L\'échéance est avant la date de facture.</div>';return;}
+  const t=invCalc(x),number=nextInvoiceNumber(x.issue);
+  const row={id:crypto.randomUUID(),number,client_id:x.cid,issue_date:x.issue,due_date:x.due,status:'issued',vat_rate:Number(x.rate)||0,vat_mention:x.mention||null,subtotal:t.sub,vat_amount:t.vat,total:t.tot,
+    lines:x.lines.map(l=>({mid:l.mid,desc:l.desc,qty:Number(l.qty)||0,unit:Number(l.unit)||0})),
+    client_snapshot:{name:c.name,vat:c.vat,street:c.street,postal:c.postal,city:c.city,country:c.country,email:c.billingEmail||c.email},company_snapshot:{...co},notes:x.notes||null};
+  setLoading(true);
+  const{error}=await sb.from('invoices').insert(row);
+  if(error){setLoading(false);err.innerHTML=`<div class="notice error">Facture non enregistrée : ${esc(error.message)}${/invoices/i.test(error.message)?'<br>(le script SQL 16 a-t-il été lancé ?)':''}</div>`;return;}
+  const mids=x.lines.map(l=>l.mid).filter(Boolean);
+  if(mids.length){await sb.from('missions').update({status:'facturé'}).in('id',mids);mids.forEach(id=>{const m=db.missions.find(k=>k.id===id);if(m)m.status='facturé';});}
+  const inv=invFromRow({...row,created_at:new Date().toISOString()});
+  db.invoices.unshift(inv);
+  setLoading(false);closeModal();invTab='list';render();
+  setTimeout(()=>{if(confirm('Facture '+number+' créée. Télécharger le PDF maintenant ?'))invoicePdf(inv.id);},100);
+}
+async function invPaid(id){
+  const i=db.invoices.find(x=>x.id===id);if(!i)return;
+  const d=prompt('Date de paiement (AAAA-MM-JJ) :',todayIso());if(!d)return;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){alert('Format de date invalide.');return;}
+  setLoading(true);
+  const{error}=await sb.from('invoices').update({status:'paid',paid_date:d}).eq('id',id);
+  if(error){setLoading(false);alert('Erreur : '+error.message);return;}
+  const mids=i.lines.map(l=>l.mid).filter(Boolean);
+  if(mids.length){await sb.from('missions').update({status:'payé'}).in('id',mids);mids.forEach(k=>{const m=db.missions.find(z=>z.id===k);if(m)m.status='payé';});}
+  i.status='paid';i.paidDate=d;setLoading(false);render();
+}
+async function invCancel(id){
+  const i=db.invoices.find(x=>x.id===id);if(!i)return;
+  if(!confirm('Annuler la facture '+i.number+' ? Les missions redeviennent « à facturer ». (Le numéro n\'est pas réutilisé.)'))return;
+  setLoading(true);
+  const{error}=await sb.from('invoices').update({status:'cancelled'}).eq('id',id);
+  if(error){setLoading(false);alert('Erreur : '+error.message);return;}
+  const mids=i.lines.map(l=>l.mid).filter(Boolean);
+  if(mids.length){await sb.from('missions').update({status:'à facturer'}).in('id',mids);mids.forEach(k=>{const m=db.missions.find(z=>z.id===k);if(m)m.status='à facturer';});}
+  i.status='cancelled';setLoading(false);render();
+}
+function invMailLang(i){const cc=ccLabel((i.client||{}).country)||'BE';return['BE','FR','LU','CH','MC'].includes(cc)?'fr':'en';}
+function invMail(id){
+  const i=db.invoices.find(x=>x.id===id);if(!i)return;
+  const fr=invMailLang(i)==='fr',co=i.company||{};
+  const subj=fr?`Facture ${i.number} — ${co.name||''}`:`Invoice ${i.number} — ${co.name||''}`;
+  const body=fr?`Bonjour,\n\nVeuillez trouver ci-joint la facture ${i.number} d'un montant de ${eur(i.total)}, à régler avant le ${pretty(i.dueDate)}.\n${co.iban?'IBAN : '+co.iban+(co.bic?' · BIC : '+co.bic:'')+'\n':''}Communication : ${i.number}\n\nCordialement,\n${co.name||''}`
+    :`Hello,\n\nPlease find attached invoice ${i.number} for ${eur(i.total)}, payable by ${pretty(i.dueDate)}.\n${co.iban?'IBAN: '+co.iban+(co.bic?' · BIC: '+co.bic:'')+'\n':''}Reference: ${i.number}\n\nBest regards,\n${co.name||''}`;
+  invoicePdf(id);
+  alert(fr?'Le PDF vient d\'être téléchargé : joins-le au brouillon d\'e-mail qui va s\'ouvrir.':'The PDF has just been downloaded: attach it to the e-mail draft that is about to open.');
+  location.href='mailto:'+encodeURIComponent((i.client||{}).email||'')+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(body);
+}
+function invReminder(id){
+  const i=db.invoices.find(x=>x.id===id);if(!i)return;
+  const d=invOverdueDays(i),fr=invMailLang(i)==='fr',co=i.company||{};
+  const lv=d>=30?3:d>=15?2:1;
+  const subj=fr?(lv===3?`Mise en demeure — facture ${i.number}`:lv===2?`2e relance — facture ${i.number}`:`Rappel — facture ${i.number}`):(lv===3?`Final notice — invoice ${i.number}`:lv===2?`Second reminder — invoice ${i.number}`:`Reminder — invoice ${i.number}`);
+  const body=fr?[
+    `Bonjour,\n\nSauf erreur de notre part, la facture ${i.number} du ${pretty(i.issueDate)} (${eur(i.total)}, échue le ${pretty(i.dueDate)}) n'a pas encore été réglée.`,
+    `Sauf erreur de notre part, la facture ${i.number} (${eur(i.total)}) reste impayée ${d} jours après son échéance du ${pretty(i.dueDate)}. Nous vous demandons de procéder au paiement dans les meilleurs délais.`,
+    `La facture ${i.number} (${eur(i.total)}), échue le ${pretty(i.dueDate)}, reste impayée malgré nos rappels. Nous vous mettons en demeure de la régler sous 8 jours, à défaut de quoi nous nous réservons le droit d'appliquer les intérêts et indemnités prévus par nos conditions et d'engager le recouvrement.`][lv-1]+`\n${co.iban?'\nIBAN : '+co.iban+(co.bic?' · BIC : '+co.bic:'')+'\n':''}Communication : ${i.number}\n\nCordialement,\n${co.name||''}`
+   :[
+    `Hello,\n\nOur records show that invoice ${i.number} dated ${pretty(i.issueDate)} (${eur(i.total)}, due ${pretty(i.dueDate)}) has not been paid yet.`,
+    `Invoice ${i.number} (${eur(i.total)}) is still unpaid ${d} days after its due date of ${pretty(i.dueDate)}. Please arrange payment as soon as possible.`,
+    `Invoice ${i.number} (${eur(i.total)}), due ${pretty(i.dueDate)}, remains unpaid despite our reminders. We hereby give you formal notice to pay within 8 days, failing which we reserve the right to apply interest and costs and to start collection proceedings.`][lv-1]+`\n${co.iban?'\nIBAN: '+co.iban+(co.bic?' · BIC: '+co.bic:'')+'\n':''}Reference: ${i.number}\n\nBest regards,\n${co.name||''}`;
+  location.href='mailto:'+encodeURIComponent((i.client||{}).email||'')+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(body);
+}
+function invoicePdf(id){
+  const i=db.invoices.find(x=>x.id===id);if(!i||!window.jspdf){alert('PDF indisponible.');return;}
+  const{jsPDF}=window.jspdf,doc=new jsPDF({unit:'mm',format:'a4'}),co=i.company||{},cl=i.client||{};
+  const f=n=>{const[a,b]=Number(n||0).toFixed(2).split('.');return a.replace(/\B(?=(\d{3})+(?!\d))/g,' ')+','+b+' €';};
+  const T=(t,x,y,o)=>doc.text(String(t==null?'':t),x,y,o);
+  let y=18;doc.setFont('helvetica','bold');doc.setFontSize(15);T(co.name||'',15,y);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);
+  [co.street,[co.postal,co.city].filter(Boolean).join(' '),co.country?ccName(co.country):'',co.vat?'TVA : '+co.vat:'',[co.email,co.phone].filter(Boolean).join(' · ')].filter(Boolean).forEach(t=>{y+=4.6;T(t,15,y);});
+  doc.setFont('helvetica','bold');doc.setFontSize(20);T('FACTURE',195,20,{align:'right'});
+  doc.setFontSize(10);T('N° '+i.number,195,28,{align:'right'});doc.setFont('helvetica','normal');
+  T('Date : '+pretty(i.issueDate),195,34,{align:'right'});T('Échéance : '+pretty(i.dueDate),195,39,{align:'right'});
+  let cy=52;doc.setFont('helvetica','bold');doc.setFontSize(10);T('Facturé à',115,cy);doc.setFont('helvetica','normal');doc.setFontSize(9.5);
+  [cl.name,cl.street,[cl.postal,cl.city].filter(Boolean).join(' '),cl.country?ccName(ccLabel(cl.country)||cl.country):'',cl.vat?'TVA : '+cl.vat:''].filter(Boolean).forEach(t=>{cy+=5;T(t,115,cy);});
+  y=Math.max(y,cy)+12;
+  const head=()=>{doc.setFillColor(238,243,248);doc.rect(15,y-4.5,180,7,'F');doc.setFont('helvetica','bold');doc.setFontSize(9);T('Description',17,y);T('Qté',140,y,{align:'right'});T('Prix HT',166,y,{align:'right'});T('Total HT',193,y,{align:'right'});y+=7;doc.setFont('helvetica','normal');};
+  head();
+  i.lines.forEach(l=>{
+    const w=doc.splitTextToSize(String(l.desc),118),h=4.4*w.length+3;
+    if(y+h>262){doc.addPage();y=20;head();}
+    doc.setFontSize(9);doc.text(w,17,y);T(l.qty,140,y,{align:'right'});T(f(l.unit),166,y,{align:'right'});T(f(l.qty*l.unit),193,y,{align:'right'});
+    y+=h;doc.setDrawColor(225);doc.line(15,y-2.2,195,y-2.2);
+  });
+  if(y>235){doc.addPage();y=20;}
+  y+=4;doc.setFontSize(10);T('Total HT',150,y,{align:'right'});T(f(i.subtotal),193,y,{align:'right'});
+  y+=6;T('TVA '+i.vatRate+' %',150,y,{align:'right'});T(f(i.vatAmount),193,y,{align:'right'});
+  y+=7;doc.setFont('helvetica','bold');doc.setFontSize(12);T('Total TTC',150,y,{align:'right'});T(f(i.total),193,y,{align:'right'});doc.setFont('helvetica','normal');
+  y+=10;doc.setFontSize(9);
+  if(i.vatMention){const w=doc.splitTextToSize(i.vatMention,180);doc.text(w,15,y);y+=4.4*w.length+2;}
+  const pay=[`Paiement avant le ${pretty(i.dueDate)}.`,co.iban?'IBAN : '+co.iban+(co.bic?'   BIC : '+co.bic:''):'','Communication : '+i.number,i.notes||''].filter(Boolean);
+  pay.forEach(t=>{const w=doc.splitTextToSize(t,180);doc.text(w,15,y);y+=4.4*w.length;});
+  if(co.footer){doc.setFontSize(8);doc.setTextColor(110);const w=doc.splitTextToSize(co.footer,180);doc.text(w,15,284-4*w.length);doc.setTextColor(0);}
+  doc.save('Facture_'+String(i.number).replace(/[^\w-]/g,'_')+'.pdf');
+}
+
 
 function financePage(){
   const kpiStyle=(color)=>`color:${color};font-size:26px;margin-top:9px;display:block`;
