@@ -5680,20 +5680,13 @@ async function initCarrierPortal(){
   setLoading(true);
   try{
     // Récupère la mission par son token (anon, pas d'auth)
-    const {data:missions,error}=await sb.from('missions')
-      .select('*, clients(name), carriers(name)')
-      .eq('carrier_token',CARRIER_TOKEN);
+    const {data:pk,error}=await sb.rpc('portal_get',{p_token:CARRIER_TOKEN});
     if(error)throw error;
-    if(!missions||!missions.length){renderPortalError('Lien invalide ou expiré.');setLoading(false);return;}
-    portalMission=missions[0];
-    const [{data:cars},{data:events},{data:docs}]=await Promise.all([
-      sb.from('cars').select('*').eq('mission_id',portalMission.id),
-      sb.from('carrier_events').select('*').eq('mission_id',portalMission.id),
-      sb.from('documents').select('*').eq('mission_id',portalMission.id)
-    ]);
-    portalCars=cars||[];
-    portalEvents=events||[];
-    portalDocs=docs||[];
+    if(!pk||!pk.mission){renderPortalError('Lien invalide ou expiré.');setLoading(false);return;}
+    portalMission=pk.mission;
+    portalCars=pk.cars||[];
+    portalEvents=pk.events||[];
+    portalDocs=pk.docs||[];
     renderCarrierPortal();
   }catch(e){
     renderPortalError('Erreur : '+e.message);
@@ -5903,12 +5896,9 @@ async function portalUploadVideo(carId,eventType,input){
       xhr.send(rawFile);
     });
     // Enregistrer dans carrier_events
-    const{error:evErr}=await sb.from('carrier_events')
-      .insert({mission_id:portalMission.id,car_id:carId,event_type:eventType,photo_url:null,video_url:publicUrl,notes:'video'});
-    if(evErr)console.warn('[portalUploadVideo] carrier_events:',evErr.message);
-    // Rafraîchir les events du portail
-    const{data:evts}=await sb.from('carrier_events').select('*').eq('mission_id',portalMission.id);
-    portalEvents=evts||[];
+    const{data:evV,error:evErr}=await sb.rpc('portal_add_event',{p_token:CARRIER_TOKEN,p_car_id:carId,p_event_type:eventType,p_photo_url:null,p_notes:'video',p_video_url:publicUrl});
+    if(evErr)console.warn('[portalUploadVideo] portal_add_event:',evErr.message);
+    else if(evV)portalEvents.push(evV);
     if(progLabel)progLabel.textContent='✓ Vidéo envoyée !';
     if(progBar)progBar.style.width='100%';
     if(progBar)progBar.style.background='var(--green)';
@@ -5965,9 +5955,7 @@ async function portalUploadPhoto(carId,eventType,input,photoKey){
     const {error:uploadErr}=await sb.storage.from('carrier-photos').upload(path,file,{contentType:'image/jpeg'});
     if(uploadErr)throw uploadErr;
     const {data:{publicUrl}}=sb.storage.from('carrier-photos').getPublicUrl(path);
-    const {data:ev,error:evErr}=await sb.from('carrier_events')
-      .insert({mission_id:portalMission.id,car_id:carId,event_type:eventType,photo_url:publicUrl,notes:photoKey})
-      .select().single();
+    const {data:ev,error:evErr}=await sb.rpc('portal_add_event',{p_token:CARRIER_TOKEN,p_car_id:carId,p_event_type:eventType,p_photo_url:publicUrl,p_notes:photoKey});
     if(evErr)throw evErr;
     portalEvents.push(ev);
     renderCarrierPortal();
@@ -5978,9 +5966,7 @@ async function portalUploadPhoto(carId,eventType,input,photoKey){
 
 async function portalSkipPhoto(carId,eventType,photoKey){
   try{
-    const {data:ev,error}=await sb.from('carrier_events')
-      .insert({mission_id:portalMission.id,car_id:carId,event_type:eventType,photo_url:null,notes:photoKey})
-      .select().single();
+    const {data:ev,error}=await sb.rpc('portal_add_event',{p_token:CARRIER_TOKEN,p_car_id:carId,p_event_type:eventType,p_photo_url:null,p_notes:photoKey});
     if(error)throw error;
     portalEvents.push(ev);
     renderCarrierPortal();
@@ -6032,18 +6018,9 @@ async function _doPortalConfirm(carId,eventType){
 
   try{
     const newStatus=eventType==='loading'?'chargé':'livré';
-    const {error}=await sb.from('cars').update({status:newStatus}).eq('id',carId);
+    const {error}=await sb.rpc('portal_confirm',{p_token:CARRIER_TOKEN,p_car_id:carId,p_phase:eventType});
     if(error)throw error;
     const car=portalCars.find(c=>c.id===carId);
-    const evPayload={
-      mission_id:portalMission.id,
-      car_id:carId,
-      event_type:'confirmed_'+eventType,
-      photo_url:null,
-      notes:`${car?car.make+' '+car.model:'Véhicule'} — confirmed at ${new Date().toISOString()}`
-    };
-    const {error:evErr}=await sb.from('carrier_events').insert(evPayload);
-    if(evErr)console.warn('[_doPortalConfirm] carrier_events insert:',evErr.message);
     if(car)car.status=newStatus;
     renderCarrierPortal();
   }catch(e){
@@ -6108,7 +6085,8 @@ async function initInspectionPage(token){
   portal.innerHTML=`<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f0f4f8"><div style="font-size:32px">⏳</div></div>`;
 
   // Charger la mission via delivery_token
-  const{data,error}=await sb.from('missions').select('*').eq('delivery_token',token).single();
+  const{data:ik,error}=await sb.rpc('inspection_get',{p_token:token});
+  const data=ik&&ik.mission?ik.mission:null;
   if(error||!data){
     portal.innerHTML=`<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px">
       <div style="max-width:360px;text-align:center;background:white;border-radius:12px;padding:32px;box-shadow:0 4px 20px rgba(0,0,0,.1)">
@@ -6119,10 +6097,7 @@ async function initInspectionPage(token){
     return;
   }
   // Charger les voitures + photos de chargement en parallèle
-  const[{data:cars},{data:loadingPhotos}]=await Promise.all([
-    sb.from('cars').select('*').eq('mission_id',data.id),
-    sb.from('carrier_events').select('photo_url,video_url,notes,car_id').eq('mission_id',data.id).eq('event_type','loading')
-  ]);
+  const cars=ik.cars||[],loadingPhotos=ik.loading_events||[];
   inspState.mission={...data,cars:cars||[]};
   const allLoadingEvts=loadingPhotos||[];
   inspState.loadingPhotos=allLoadingEvts.filter(e=>e.photo_url);
@@ -6144,7 +6119,7 @@ async function initInspectionPage(token){
     }catch(_){signerDisplay=data.inspection_signer||'—';}
 
     // Charger les dommages enregistrés
-    const{data:existingDmg}=await sb.from('delivery_inspections').select('*').eq('mission_id',data.id).order('created_at',{ascending:true});
+    const existingDmg=ik.damages||[];
     const dmgList=existingDmg||[];
 
     const dmgHtml=dmgList.length
@@ -6601,7 +6576,7 @@ async function _autoUploadDamagePhoto(d){
     const res=await fetch(d.photoDataUrl);
     const blob=await res.blob();
     const fname=`inspections/${missionId}/car${d.carIdx||0}_${d.zone}_${d.ts?new Date(d.ts).getTime():Date.now()}.jpg`;
-    const{error}=await sb.storage.from('carrier-photos').upload(fname,blob,{contentType:'image/jpeg',upsert:true});
+    const{error}=await sb.storage.from('carrier-photos').upload(fname,blob,{contentType:'image/jpeg'});
     if(!error){
       const{data:urlData}=sb.storage.from('carrier-photos').getPublicUrl(fname);
       d.photoUrl=urlData?.publicUrl||null;  // stocké sur l'objet damage pour réutilisation au submit
@@ -6789,22 +6764,13 @@ async function submitInspection(){
         const res=await fetch(d.photoDataUrl);
         const blob=await res.blob();
         const fname=`inspections/${missionId}/car${d.carIdx||0}_${d.zone}_${Date.now()}.jpg`;
-        const{error:upErr}=await sb.storage.from('carrier-photos').upload(fname,blob,{contentType:'image/jpeg',upsert:true});
+        const{error:upErr}=await sb.storage.from('carrier-photos').upload(fname,blob,{contentType:'image/jpeg'});
         if(!upErr){
           const{data:urlData}=sb.storage.from('carrier-photos').getPublicUrl(fname);
           photoUrl=urlData?.publicUrl||null;
         }
       }
-      await sb.from('delivery_inspections').insert({
-        mission_id:missionId,
-        car_id:d.carId||null,
-        zone:d.zone,
-        description:d.description||null,
-        photo_url:photoUrl,
-        lat:d.lat||null,
-        lng:d.lng||null,
-        created_at:d.ts,
-      });
+      await sb.rpc('inspection_add_damage',{p_token:INSPECTION_TOKEN,p_car_id:d.carId||null,p_zone:d.zone,p_description:d.description||null,p_photo_url:photoUrl,p_lat:d.lat||null,p_lng:d.lng||null,p_ts:d.ts?new Date(d.ts).toISOString():null});
     }
 
     // 2. Upload signature client
@@ -6813,7 +6779,7 @@ async function submitInspection(){
       const res=await fetch(inspState.sigClientDataUrl);
       const blob=await res.blob();
       const fname=`inspections/${missionId}/sig_client_${carId||'x'}_${Date.now()}.png`;
-      const{error:sigErr}=await sb.storage.from('carrier-photos').upload(fname,blob,{contentType:'image/png',upsert:true});
+      const{error:sigErr}=await sb.storage.from('carrier-photos').upload(fname,blob,{contentType:'image/png'});
       if(!sigErr){const{data:u}=sb.storage.from('carrier-photos').getPublicUrl(fname);sigClientUrl=u?.publicUrl||null;}
     }
 
@@ -6823,7 +6789,7 @@ async function submitInspection(){
       const res=await fetch(inspState.sigDriverDataUrl);
       const blob=await res.blob();
       const fname=`inspections/${missionId}/sig_driver_${carId||'x'}_${Date.now()}.png`;
-      const{error:sigErr}=await sb.storage.from('carrier-photos').upload(fname,blob,{contentType:'image/png',upsert:true});
+      const{error:sigErr}=await sb.storage.from('carrier-photos').upload(fname,blob,{contentType:'image/png'});
       if(!sigErr){const{data:u}=sb.storage.from('carrier-photos').getPublicUrl(fname);sigDriverUrl=u?.publicUrl||null;}
     }
 
@@ -6855,7 +6821,7 @@ async function submitInspection(){
       const pdfRes=await fetch(pdfDataUrl);
       const pdfBlob=await pdfRes.blob();
       const pdfFname=`inspections/${missionId}/rapport_${carId||'x'}_${Date.now()}.pdf`;
-      const{error:pdfUpErr}=await sb.storage.from('carrier-photos').upload(pdfFname,pdfBlob,{contentType:'application/pdf',upsert:true});
+      const{error:pdfUpErr}=await sb.storage.from('carrier-photos').upload(pdfFname,pdfBlob,{contentType:'application/pdf'});
       if(!pdfUpErr){
         const{data:pdfUrlData}=sb.storage.from('carrier-photos').getPublicUrl(pdfFname);
         inspectionPdfUrl=pdfUrlData?.publicUrl||null;
