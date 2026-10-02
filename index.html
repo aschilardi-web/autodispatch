@@ -171,6 +171,7 @@ function auditWatch(table,op,payload,b){
 }
 function auditRecord(table,op,payload,filt){
   if(_auditOff)return;
+  if(typeof currentProfile!=='undefined'&&currentProfile&&currentProfile.role==='carrier')return;   // les actions des transporteurs sont tracées côté serveur
   const rows=Array.isArray(payload)?payload:[payload||{}];
   let ids=(op==='delete'||op==='update')?[].concat(filt.id!==undefined?filt.id:(filt.mission_id!==undefined?[]:[])):rows.map(r=>r&&r.id).filter(Boolean);
   if(table==='app_settings')ids=rows.map(r=>r&&r.key).filter(Boolean);
@@ -2607,16 +2608,11 @@ async function initCarrierSpace(){
 }
 // Le transporteur ne reçoit que : pays, villes, marques et modèles des lots à vendre (pas de client, pas de prix de vente)
 async function csLoadBourse(){
-  const cid=currentProfile.carrier_id;
   try{
-    const[{data:lots},{data:offs}]=await Promise.all([
-      sb.from('missions').select('id,ref,pickup_country,pickup_city,delivery_country,delivery_city,exchange_published_at,cars(make,model)').eq('exchange_status','open').order('exchange_published_at',{ascending:false}),
-      sb.from('freight_offers').select('*').eq('carrier_id',cid)]);
-    csLots=lots||[];csOffers=(offs||[]).map(offerFromRow);
-    const ids=csOffers.filter(o=>['accepted','confirmed'].includes(o.status)).map(o=>o.missionId);
-    if(ids.length){const{data:tr}=await sb.from('missions').select('id,ref,pickup_country,pickup_city,delivery_country,delivery_city,carrier_token,carrier_plate,carrier_driver,carrier_load_date,carrier_delivery_date,cars(make,model)').in('id',ids);csTransports=tr||[];}
-    else csTransports=[];
-  }catch(e){csLots=[];csOffers=[];csTransports=[];}
+    const{data,error}=await sb.rpc('carrier_space_get');
+    if(error)throw error;
+    csLots=data.lots||[];csOffers=(data.offers||[]).map(offerFromRow);csTransports=data.transports||[];
+  }catch(e){console.warn('carrier_space_get :',e.message);csLots=[];csOffers=[];csTransports=[];}
 }
 const CS_T={
   fr:{hello:'Espace transporteur',docs:'Mes documents',bourse:'Bourse de fret',transports:'Mes transports',license:'Licence de transport',insurance:'Assurance',valid:'Valable jusqu\'au',file:'Document (PDF)',send:'Envoyer',pending:'En attente de validation',none:'Aucun document',logout:'Déconnexion',hint:'Déposez ici votre licence et votre assurance en cours de validité. Sans documents valides, nous ne pouvons pas vous confier de transports.',ok:'Document envoyé : il sera validé par notre équipe.',
@@ -2703,12 +2699,12 @@ async function csSubmitOffer(mid){
   const T=csT(),c=db.carriers[0],err=document.getElementById('cs-err-'+mid);
   const price=parseNum(document.getElementById('cs-price-'+mid).value),comment=document.getElementById('cs-com-'+mid).value.trim();
   if(!(price>0)){err.textContent=T.priceErr;return;}
-  const{error}=await sb.from('freight_offers').upsert({mission_id:mid,carrier_id:c.id,price,comment:comment||null,status:'pending',updated_at:new Date().toISOString()},{onConflict:'mission_id,carrier_id'});
+  const{error}=await sb.rpc('carrier_submit_offer',{p_mission:mid,p_price:price,p_comment:comment||null});
   if(error){err.textContent=error.message;return;}
   await csLoadBourse();renderCarrierSpace();
 }
 async function csWithdrawOffer(oid){
-  const{error}=await sb.from('freight_offers').update({status:'withdrawn',updated_at:new Date().toISOString()}).eq('id',oid);
+  const{error}=await sb.rpc('carrier_withdraw_offer',{p_offer:oid});
   if(error){alert(error.message);return;}
   await csLoadBourse();renderCarrierSpace();
 }
@@ -2717,10 +2713,8 @@ async function csConfirmTransport(mid,oid){
   const plate=document.getElementById('cs-plate-'+mid).value.trim().toUpperCase(),driver=document.getElementById('cs-driver-'+mid).value.trim(),ld=document.getElementById('cs-ld-'+mid).value,dd=document.getElementById('cs-dd-'+mid).value;
   if(!plate||!driver||!ld||!dd){err.textContent=T.allErr;return;}
   if(dd<ld){err.textContent=T.dateErr;return;}
-  const{error}=await sb.from('missions').update({carrier_plate:plate,carrier_driver:driver,carrier_load_date:ld,carrier_delivery_date:dd}).eq('id',mid);
+  const{error}=await sb.rpc('carrier_confirm_transport',{p_mission:mid,p_plate:plate,p_driver:driver,p_load:ld,p_deliv:dd});
   if(error){err.textContent=error.message;return;}
-  const{error:e2}=await sb.from('freight_offers').update({status:'confirmed',updated_at:new Date().toISOString()}).eq('id',oid);
-  if(e2){err.textContent=e2.message;return;}
   await csLoadBourse();renderCarrierSpace();
 }
 
