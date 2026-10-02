@@ -155,7 +155,7 @@ const CARRIER_TOKEN = new URLSearchParams(window.location.search).get('t');
 const INSPECTION_TOKEN = new URLSearchParams(window.location.search).get('inspection');
 
 // ─── STATE ──────────────────────────────────────────────────────
-const NAV=[["Vue d'ensemble",'⌂'],['Contrôle','◉'],['Planning général','▦'],['Missions','▤'],['Véhicules','▣'],['Clients','◫'],['Sites','◍'],['Transporteurs','▰'],['Documents','▧'],['Carte','◎'],['Planning camions','⇄'],['Affrètement','⇆'],['Bourse de fret','◈'],['Finance','€'],['Rapports','📊'],['Résumé','i']];
+const NAV=[["Vue d'ensemble",'⌂'],['Contrôle','◉'],['Planning général','▦'],['Missions','▤'],['Véhicules','▣'],['Clients','◫'],['Sites','◍'],['Transporteurs','▰'],['Documents','▧'],['Carte','◎'],['Planning camions','⇄'],['Règles et coûts','⚙'],['Affrètement','⇆'],['Bourse de fret','◈'],['Finance','€'],['Rapports','📊'],['Résumé','i']];
 let db={clients:[],carriers:[],missions:[],carrierEvents:[],deliveryInspections:[],trucks:[],tours:[],sites:[],carrierDocs:[],profiles:[],offers:[],selectedIds:[],sort:'ref',direction:1};
 let current="Vue d'ensemble",search='',filterStatus='Tous les statuts',docSearch='',docFilter='';
 let editingMission=null,detailId=null,currentUser=null;
@@ -513,6 +513,7 @@ async function initApp(){
   document.getElementById('user-info').textContent=currentUser?.email||'';
   await loadData();
   boot();
+  autoRefreshFuel();   // actualise le gasoil s'il date de plus d'un mois
   realtimeSetup(); // Option 3 : écoute les événements transporteur en temps réel
 }
 
@@ -542,6 +543,7 @@ async function loadData(){
     // delivery_inspections : états des lieux véhicules
     try{const ri=await sb.from('delivery_inspections').select('*').order('created_at');db.deliveryInspections=ri.data||[];}
     catch(e){console.warn('delivery_inspections non disponible:',e.message);db.deliveryInspections=[];};
+    await loadSettings();
     try{const ro=await sb.from('freight_offers').select('*').order('created_at',{ascending:false});db.offers=(ro.data||[]).map(offerFromRow);}catch(e){db.offers=[];}
     try{const rd=await sb.from('carrier_documents').select('*').order('created_at',{ascending:false});db.carrierDocs=(rd.data||[]).map(docFromRow);}catch(e){db.carrierDocs=[];}
     try{const rp=await sb.from('profiles').select('*');db.profiles=rp.data||[];}catch(e){db.profiles=[];}
@@ -843,6 +845,7 @@ function render(){
   else if(current==='Rapports')view.innerHTML=reportsPage();
   else if(current==='Carte'){view.innerHTML=mapPage();setTimeout(initMapView,0);}
   else if(current==='Planning camions')view.innerHTML=toursPage();
+  else if(current==='Règles et coûts'){view.innerHTML=rulesPage();if(rulesTab==='holidays')setTimeout(holShow,0);}
   else if(current==='Contrôle')view.innerHTML=controlPage();
   else if(current==='Sites')view.innerHTML=sitesPage();
   else if(current==='Affrètement')view.innerHTML=charterPage();
@@ -2445,6 +2448,279 @@ async function csConfirmTransport(mid,oid){
   const{error:e2}=await sb.from('freight_offers').update({status:'confirmed',updated_at:new Date().toISOString()}).eq('id',oid);
   if(e2){err.textContent=e2.message;return;}
   await csLoadBourse();renderCarrierSpace();
+}
+
+// ─── RÈGLES ET COÛTS : conduite, gasoil, péages, ferries, interdictions de rouler, jours fériés ───
+const EUROPE_CC=['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','CH','GB','NO','IS','LI','RS','BA','ME','MK','AL','TR','UA','MD','AD','MC','SM'];
+const ccName=c=>(COUNTRIES.find(([k])=>k===c)||[c,c])[1];
+const VAT_RATE={AT:20,BE:21,BG:20,CY:19,CZ:21,DE:19,DK:25,EE:24,ES:21,FI:25.5,FR:20,GR:24,HR:25,HU:27,IE:23,IT:22,LT:21,LU:17,LV:21,MT:18,NL:21,PL:23,PT:23,RO:21,SE:25,SI:22,SK:23};
+const SETTINGS_DEFAULTS={
+  fuel:{date:'2026-09-28',updatedAt:'2026-10-02T00:00:00Z',auto:true,source:'Commission européenne — Weekly Oil Bulletin (prix TTC)',
+    prices:{AT:2.259,BE:2.43,BG:1.928,CY:2.023,CZ:2.076,DE:2.437,DK:2.542,EE:2.239,ES:1.934,FI:2.523,FR:2.371,GR:2.216,HR:2.036,HU:1.932,IE:2.123,IT:2.351,LT:2.253,LU:2.095,LV:2.132,MT:1.21,NL:2.526,PL:2.06,PT:2.186,RO:2.104,SE:2.135,SI:2.011,SK:1.978,EU:2.237}},
+  tolls:{
+    DE:{rate:0.348,system:'Toll Collect (classe CO₂ 1, 40 t)',q:'src',note:'0,303 à 0,348 €/km selon la classe CO₂'},
+    AT:{rate:0.5724,system:'GO-Maut',q:'src',note:'2026, hors TVA, 4 essieux et plus, classe CO₂ 1'},
+    BE:{rate:0.194,system:'Viapass',q:'src',note:'0,194 à 0,267 €/km selon la classe'},
+    NL:{rate:0.20,system:'Vrachtwagenheffing (depuis le 1/7/2026)',q:'src',note:'≈ 0,175 à 0,20 €/km'},
+    FR:{rate:0.26,system:'Concessions autoroutières',q:'src',note:'moyenne ; varie selon l\'exploitant'},
+    IT:{rate:0.22,system:'Concessions autoroutières',q:'src',note:'0,16 à 0,27 €/km selon le concessionnaire'},
+    CH:{rate:1.20,system:'RPLP / LSVA III',q:'src',note:'≈ 345 CHF pour 300 km (40 t Euro VI) ; toutes les routes'},
+    LI:{rate:1.20,system:'RPLP / LSVA (union douanière suisse)',q:'est',note:'comme la Suisse'},
+    PL:{rate:0.30,system:'e-TOLL',q:'est',note:'hausse de 40 % le 1/2/2026 : à vérifier'},
+    CZ:{rate:0.20,system:'MýtoCZ',q:'est',note:'à vérifier'},SK:{rate:0.20,system:'Mýto SK',q:'est',note:'à vérifier'},
+    HU:{rate:0.28,system:'HU-GO',q:'est',note:'+35 % en 2026 : à vérifier'},SI:{rate:0.20,system:'DarsGo',q:'est',note:'à vérifier'},
+    HR:{rate:0.18,system:'Péage autoroutier',q:'est',note:'à vérifier'},RO:{rate:0.12,system:'TollRo (km depuis le 1/7/2026)',q:'est',note:'à vérifier'},
+    BG:{rate:0.12,system:'BGTOLL',q:'est',note:'à vérifier'},ES:{rate:0.07,system:'Concessions (moyenne réelle)',q:'est',note:'beaucoup d\'autovías gratuites ; à vérifier'},
+    PT:{rate:0.10,system:'Concessions (moyenne réelle)',q:'est',note:'à vérifier'},DK:{rate:0.15,system:'Taxe km CO₂ (depuis 2025)',q:'est',note:'à vérifier'},
+    SE:{rate:0.02,system:'Eurovignette (temps)',q:'est',note:'équivalent par km'},LU:{rate:0.02,system:'Eurovignette (temps)',q:'est',note:'équivalent par km'},
+    GR:{rate:0.12,system:'Péages autoroutiers',q:'est',note:'à vérifier'},IE:{rate:0.08,system:'Péages',q:'est',note:'à vérifier'},
+    GB:{rate:0.02,system:'HGV Levy (temps)',q:'est',note:'équivalent par km ; ponts à péage en plus'},NO:{rate:0.10,system:'Péages',q:'est',note:'à vérifier'}},
+  tollDefault:0.08,
+  ferries:[
+    {id:'f1',name:'Puttgarden – Rødby',a:'DE',b:'DK',hours:0.75,cost:180,q:'est',note:'Scandlines. Suppléments carburant/ETS en plus (≈ 2,21 €/m linéaire, août 2026, source Scandlines).'},
+    {id:'f2',name:'Rostock – Gedser',a:'DE',b:'DK',hours:1.75,cost:170,q:'est',note:'Scandlines. Suppléments ≈ 5,48 €/m linéaire (août 2026, source Scandlines).'},
+    {id:'f3',name:'Travemünde / Rostock – Trelleborg',a:'DE',b:'SE',hours:7.5,cost:520,q:'est',note:'TT-Line / Stena'},
+    {id:'f4',name:'Kiel – Göteborg',a:'DE',b:'SE',hours:14,cost:700,q:'est',note:'Stena Line'},
+    {id:'f5',name:'Kiel – Oslo',a:'DE',b:'NO',hours:20,cost:950,q:'est',note:'Color Line'},
+    {id:'f6',name:'Świnoujście – Ystad',a:'PL',b:'SE',hours:7,cost:520,q:'est',note:'Unity Line / Polferries'},
+    {id:'f7',name:'Calais – Douvres',a:'FR',b:'GB',hours:1.5,cost:170,q:'est',note:'DFDS / P&O. Tarifs variables selon contrat.'},
+    {id:'f8',name:'Calais – Folkestone (Eurotunnel)',a:'FR',b:'GB',hours:0.6,cost:230,q:'est',note:'LeShuttle Freight, ≈ 35 min. Tarif sur contrat.'},
+    {id:'f9',name:'Cherbourg – Rosslare / Dublin',a:'FR',b:'IE',hours:18,cost:800,q:'est',note:''},
+    {id:'f10',name:'Gênes / Livourne – Sardaigne',a:'IT',b:'IT',hours:11,cost:650,q:'est',note:''},
+    {id:'f11',name:'Ancône / Bari / Venise – Patras',a:'IT',b:'GR',hours:20,cost:800,q:'est',note:''},
+    {id:'f12',name:'Algésiras – Tanger Med',a:'ES',b:'MA',hours:1.5,cost:350,q:'est',note:''},
+    {id:'f13',name:'Tallinn – Helsinki',a:'EE',b:'FI',hours:2.5,cost:280,q:'est',note:''}],
+  bans:{
+    AT:{th:'> 7,5 t',w:'sam 15:00-24:00, dim 00:00-22:00, fer 00:00-22:00',q:'src',note:'Interdiction nocturne 22:00–05:00 chaque nuit (camions bruyants). Extras A12/A13 en été.'},
+    DE:{th:'> 7,5 t',w:'dim 00:00-22:00, fer 00:00-22:00',q:'src',note:'Samedis de juillet–août 07:00–20:00 sur les routes concernées. Exceptions : produits frais.'},
+    FR:{th:'> 7,5 t',w:'sam 22:00-24:00, dim 00:00-22:00, veille 22:00-24:00, fer 00:00-22:00',q:'src',note:'« Samedis noirs » (hiver / été) à dates variables.'},
+    IT:{th:'> 7,5 t',w:'dim 09:00-22:00, fer 09:00-22:00',q:'src',note:'Été : 07:00–22:00. Restrictions de samedi en été (dates variables).'},
+    CH:{th:'> 3,5 t',w:'lun 22:00-24:00, mar 22:00-24:00, mer 22:00-24:00, jeu 22:00-24:00, ven 22:00-24:00, sam 22:00-24:00, dim 00:00-24:00, fer 00:00-24:00',q:'src',note:'Nuit 22:00–05:00 du lundi au samedi (début de journée 00:00–05:00 non listé).'},
+    LI:{th:'> 3,5 t',w:'dim 00:00-24:00, fer 00:00-24:00',q:'src',note:'Comme la Suisse.'},
+    HU:{th:'> 7,5 t',w:'sam 22:00-24:00, dim 00:00-22:00, fer 06:00-22:00',q:'src',note:'Été (juil.–août) : samedi 15:00–22:00 en plus.'},
+    CZ:{th:'> 7,5 t (> 3,5 t avec remorque)',w:'dim 13:00-22:00',q:'src',note:'Été : vendredi 17–21, samedi 07–13 sur autoroutes et routes principales.'},
+    SK:{th:'> 7,5 t (> 3,5 t avec remorque)',w:'dim 00:00-22:00, fer 00:00-22:00',q:'src',note:'Été : samedi 07:00–19:00.'},
+    SI:{th:'> 7,5 t',w:'dim 08:00-21:00, fer 08:00-21:00',q:'src',note:'À vérifier : certaines sources indiquent 08:00–22:00.'},
+    HR:{th:'> 7,5 t (remorques > 14 m)',w:'sam 15:00-23:00, dim 14:00-23:00',q:'src',note:'Selon les périodes ; Pâques inclus. À vérifier.'},
+    LU:{th:'> 7,5 t',w:'sam 21:30-24:00, dim 00:00-21:45, fer 00:00-21:45',q:'src',note:''},
+    PL:{th:'> 12 t',w:'dim 08:00-22:00, fer 08:00-22:00',q:'src',note:'Été (26 juin–30 août) : vendredi 18–22 et samedi 08–14 en plus.'},
+    RO:{th:'> 7,5 t',w:'dim 06:00-22:00',q:'src',note:'Routes nationales sélectionnées seulement.'},
+    BG:{th:'> 12 t',w:'fer 00:00-24:00, veille 16:00-20:00',q:'src',note:'Vendredis/veilles de jours fériés 16:00–20:00.'},
+    BE:{th:'> 7,5 t',w:'veille 16:00-24:00, fer 00:00-24:00',q:'src',note:'Anneaux de Bruxelles/Anvers : heures de pointe 06–09 et 16–21.'},
+    NL:{th:'—',w:'',q:'src',note:'Pas d\'interdiction générale de week-end ; interdiction en cas de verglas / faible visibilité ; heures de pointe dans le Randstad.'},
+    ES:{th:'—',w:'',q:'est',note:'Restrictions régionales et pour les matières dangereuses (dim./fériés 08:00–24:00). À renseigner selon l\'itinéraire.'}},
+  cost:{consumption:32,adblue:5,maintenance:0.12,driverHour:26,fixedDay:120,speedMargin:10,handlingMin:60,maxDrive:9}
+};
+let settings=JSON.parse(JSON.stringify(SETTINGS_DEFAULTS));
+async function loadSettings(){
+  try{
+    const{data}=await sb.from('app_settings').select('*');
+    (data||[]).forEach(x=>{if(SETTINGS_DEFAULTS[x.key]!==undefined)settings[x.key]=x.value;});
+  }catch(_){}
+}
+async function saveSetting(key){
+  const{error}=await sb.from('app_settings').upsert({key,value:settings[key],updated_at:new Date().toISOString()});
+  if(error){alert('Réglage non enregistré : '+error.message+'\n(le script SQL 13 a-t-il été lancé ?)');return false;}
+  return true;
+}
+function sUpd(path,v,type){
+  const p=path.split('.');let o=settings;
+  for(let i=0;i<p.length-1;i++){if(o[p[i]]===undefined)o[p[i]]={};o=o[p[i]];}
+  o[p[p.length-1]]=type==='num'?(parseNum(v)):type==='bool'?!!v:v;
+  const t=document.getElementById('rules-save-note');if(t)t.textContent='● modifications non enregistrées';
+  if(type==='num'||type==='bool')rulesCalc();
+}
+async function sSave(key){
+  if(await saveSetting(key)){const t=document.getElementById('rules-save-note');if(t)t.innerHTML='<span style="color:var(--green)">✓ enregistré</span>';}
+}
+function sReset(key){
+  if(!confirm('Revenir aux valeurs proposées par défaut pour cet onglet ? (n\'oublie pas d\'enregistrer ensuite)'))return;
+  settings[key]=JSON.parse(JSON.stringify(SETTINGS_DEFAULTS[key]));render();
+}
+const qChip=q=>q==='src'?'<span style="background:#e7f4e7;color:#24784d;border-radius:8px;padding:1px 6px;font-size:10px;font-weight:700">sourcé</span>':'<span style="background:#fff4df;color:#9a6b18;border-radius:8px;padding:1px 6px;font-size:10px;font-weight:700">estimé — à vérifier</span>';
+// ── Carburant ──
+const fuelAvg=()=>settings.fuel.prices.EU||2.2;
+function fuelGross(cc){return settings.fuel.prices[cc]!=null&&settings.fuel.prices[cc]!==''?settings.fuel.prices[cc]:null;}
+function fuelNet(cc){const g=fuelGross(cc);const vat=VAT_RATE[cc]??21;return (g!=null?g:fuelAvg())/(1+vat/100);}   // le transporteur récupère la TVA
+const tollRate=cc=>settings.tolls[cc]&&settings.tolls[cc].rate!=null?settings.tolls[cc].rate:settings.tollDefault;
+// Coût au km (variable) dans un pays : carburant HT + AdBlue + péage + entretien/pneus
+function costPerKm(cc){
+  const c=settings.cost,fuel=fuelNet(cc)*c.consumption/100*(1+c.adblue/100);
+  return{fuel,toll:tollRate(cc),maint:c.maintenance,total:fuel+tollRate(cc)+c.maintenance};
+}
+async function refreshDieselPrices(silent){
+  try{
+    const{data,error}=await sb.functions.invoke('diesel-prices',{body:{}});
+    if(error){let m=error.message;try{const j=await error.context.json();if(j&&j.error)m=j.error;}catch(_){}throw new Error(m);}
+    if(!data||data.error)throw new Error((data&&data.error)||'réponse vide');
+    settings.fuel={...settings.fuel,date:data.date,updatedAt:new Date().toISOString(),source:data.source||settings.fuel.source,prices:{...settings.fuel.prices,...data.prices}};
+    await saveSetting('fuel');
+    if(!silent){alert('✓ Prix du gasoil actualisés (bulletin du '+pretty(data.date)+').');render();}
+    else showToast('⛽ Prix du gasoil actualisés','Bulletin de la Commission européenne du '+esc(pretty(data.date)),'info',null);
+    return true;
+  }catch(e){
+    if(!silent)alert('Actualisation impossible : '+e.message+'\n(la fonction « diesel-prices » est-elle déployée ?)');
+    else console.warn('Gasoil non actualisé :',e.message);
+    return false;
+  }
+}
+// actualisation automatique : une fois par mois, à l'ouverture de l'application par l'administrateur
+async function autoRefreshFuel(){
+  const f=settings.fuel;if(f.auto===false)return;
+  const age=f.updatedAt?Math.round((Date.now()-new Date(f.updatedAt).getTime())/86400000):999;
+  if(age>=28)await refreshDieselPrices(true);
+}
+// ── Jours fériés (API Nager.Date, conservés dans le navigateur) ──
+const HOL_MEM={};
+function holKey(cc,y){return 'ad_hol_'+cc+'_'+y;}
+function holGet(cc,y){
+  const k=holKey(cc,y);
+  if(HOL_MEM[k])return HOL_MEM[k];
+  try{const t=localStorage.getItem(k);if(t){HOL_MEM[k]=JSON.parse(t);return HOL_MEM[k];}}catch(_){}
+  return null;
+}
+async function holLoad(cc,y){
+  const c=holGet(cc,y);if(c)return c;
+  try{
+    const r=await fetch(`https://date.nager.at/api/v3/PublicHolidays/${y}/${cc}`);
+    const list=r.status===200?await r.json():[];
+    const out=list.filter(h=>h.global!==false).map(h=>({d:h.date,l:h.localName,n:h.name}));
+    HOL_MEM[holKey(cc,y)]=out;
+    try{localStorage.setItem(holKey(cc,y),JSON.stringify(out));}catch(_){}
+    return out;
+  }catch(_){return null;}
+}
+function isHolidayCC(cc,iso){
+  const h=holGet(cc,Number(iso.slice(0,4)));
+  if(!h)return cc==='BE'?holidaysBE(Number(iso.slice(0,4))).has(iso):false;
+  return h.some(x=>x.d===iso);
+}
+// ── Interdictions de rouler : lecture des fenêtres « sam 15:00-24:00, dim 00:00-22:00, fer …, veille … » ──
+const DOW_KEY=['dim','lun','mar','mer','jeu','ven','sam'];
+function parseWindows(str){
+  const out=[];
+  String(str||'').split(',').forEach(t=>{
+    const m=t.trim().match(/^(lun|mar|mer|jeu|ven|sam|dim|fer|veille)\s+(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})$/i);
+    if(m)out.push({k:m[1].toLowerCase(),f:Number(m[2])+Number(m[3])/60,t:Number(m[4])+Number(m[5])/60});
+  });
+  return out;
+}
+// heures d'interdiction un jour donné dans un pays (0 à 24)
+function banHours(cc,iso){
+  const b=settings.bans[cc];if(!b||!b.w)return 0;
+  const dow=DOW_KEY[new Date(iso+'T12:00:00Z').getUTCDay()];
+  const hol=isHolidayCC(cc,iso),eve=isHolidayCC(cc,addDays(iso,1));
+  let hrs=0;
+  parseWindows(b.w).forEach(w=>{if(w.k===dow||(w.k==='fer'&&hol)||(w.k==='veille'&&eve))hrs+=Math.max(0,w.t-w.f);});
+  return Math.min(24,hrs);
+}
+const banBlocksDay=(cc,iso)=>banHours(cc,iso)>=12;   // jour considéré comme non roulable à partir de 12 h d'interdiction
+// ── Page ──
+let rulesTab='drive',holCC='FR',holYear=new Date().getFullYear();
+function rulesCalc(){
+  const el=document.getElementById('cost-table');if(el)el.innerHTML=costTableHtml();
+}
+function costTableHtml(){
+  const rows=EUROPE_CC.map(cc=>({cc,...costPerKm(cc)})).sort((a,b)=>a.total-b.total);
+  return `<table><thead><tr><th>Pays</th><th>Gasoil HT (€/L)</th><th>Carburant (€/km)</th><th>Péage (€/km)</th><th>Entretien/pneus (€/km)</th><th><b>Coût au km</b></th></tr></thead><tbody>
+  ${rows.map(r=>`<tr><td>${esc(r.cc)} · ${esc(ccName(r.cc))}</td><td>${fuelNet(r.cc).toFixed(3)}${fuelGross(r.cc)==null?' <small style="color:var(--amber)">moy. UE</small>':''}</td><td>${r.fuel.toFixed(3)}</td><td>${r.toll.toFixed(3)}</td><td>${r.maint.toFixed(3)}</td><td><b>${r.total.toFixed(3)} €</b></td></tr>`).join('')}</tbody></table>`;
+}
+function rulesPage(){
+  const tabs=[['drive','⏱ Conduite'],['cost','💶 Coût au km'],['fuel','⛽ Gasoil'],['tolls','🛣 Péages'],['ferries','⛴ Ferries'],['bans','🚫 Interdictions'],['holidays','📅 Jours fériés']];
+  const head=heading('Règles et coûts','Temps de conduite, jours fériés, interdictions de rouler, gasoil, péages et ferries : tout ce qui sert à calculer une tournée.')+
+    `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${tabs.map(([k,l])=>`<button class="btn ${rulesTab===k?'primary':''}" onclick="rulesTab='${k}';render()">${l}</button>`).join('')}</div>`;
+  const note=`<span id="rules-save-note" style="font-size:12px;color:var(--muted);margin-left:8px"></span>`;
+  const saveBar=key=>`<div style="display:flex;gap:8px;align-items:center;margin-top:12px"><button class="btn primary" onclick="sSave('${key}')">Enregistrer</button><button class="btn" onclick="sReset('${key}')">Valeurs par défaut</button>${note}</div>`;
+  const inp=(path,val,type,w)=>`<input value="${esc(val??'')}" ${type==='num'?'type="number" step="0.001"':''} style="width:${w||90}px;padding:3px 6px" onchange="sUpd('${path}',this.value,'${type||'text'}')">`;
+  if(rulesTab==='drive'){
+    const c=settings.cost;
+    return head+`<div class="panel"><div class="panel-title"><h2>Règles de conduite européennes</h2><small>Règlement (CE) n° 561/2006, modifié par le règlement (UE) 2020/1054 — camions de plus de 3,5 t</small></div>
+    <div class="table-wrap"><table><tbody>
+    <tr><td><b>Conduite journalière</b></td><td>9 h maximum, portée à <b>10 h deux fois par semaine</b></td></tr>
+    <tr><td><b>Conduite hebdomadaire</b></td><td>56 h maximum ; <b>90 h</b> maximum sur deux semaines consécutives</td></tr>
+    <tr><td><b>Pause</b></td><td>45 min après 4 h 30 de conduite (ou 15 min puis 30 min)</td></tr>
+    <tr><td><b>Repos journalier</b></td><td>11 h ; réduit à 9 h maximum trois fois entre deux repos hebdomadaires ; ou fractionné 3 h + 9 h</td></tr>
+    <tr><td><b>Repos hebdomadaire</b></td><td>45 h (régulier) ; réduit à 24 h au minimum, à compenser ; au plus 6 périodes de 24 h entre deux repos hebdomadaires</td></tr>
+    <tr><td><b>Repos hebdomadaire régulier</b></td><td><b>Interdit dans le véhicule</b> (logement adapté aux frais de l'employeur)</td></tr>
+    <tr><td><b>Retour du chauffeur</b></td><td>Au moins une fois toutes les 4 semaines au centre d'exploitation ou au domicile</td></tr>
+    <tr><td><b>Deux repos réduits consécutifs</b></td><td>Hors de l'État d'attache : compensation par un repos de plus de 45 h</td></tr>
+    <tr><td><b>Dépassements exceptionnels</b></td><td>+ 1 h (ou + 2 h pour un repos hebdomadaire régulier) pour rejoindre le domicile ou le centre d'exploitation</td></tr>
+    <tr><td><b>Ferry / train</b></td><td>Le repos peut être interrompu deux fois au plus (1 h au total) pour l'embarquement, avec couchette — voir l'article 9 du règlement</td></tr></tbody></table></div>
+    <p style="font-size:12px;color:var(--muted)">Sources : <a href="https://transport.ec.europa.eu/transport-modes/road/social-provisions/driving-time-and-rest-periods_en" target="_blank">Commission européenne</a> · <a href="https://www.legislation.gov.uk/eur/2020/1054/introduction" target="_blank">règlement 2020/1054</a>. Hors UE : accord AETR (Suisse…), règles du Royaume-Uni voisines. Les règles s'appliquent au conducteur, pas au pays traversé.</p></div>
+    <div class="panel"><div class="panel-title"><h2>Paramètres utilisés pour les calculs</h2></div>
+    <div class="form-grid"><div class="field"><label>Conduite maximale par jour (h)</label>${inp('cost.maxDrive',c.maxDrive,'num')}</div>
+    <div class="field"><label>Marge sur le temps de route (%)</label>${inp('cost.speedMargin',c.speedMargin,'num')}</div>
+    <div class="field"><label>Temps par chargement / déchargement (min)</label>${inp('cost.handlingMin',c.handlingMin,'num')}</div></div>${saveBar('cost')}</div>`;
+  }
+  if(rulesTab==='cost'){
+    const c=settings.cost;
+    return head+`<div class="panel"><div class="panel-title"><h2>Modèle de coût du camion</h2><small>Valeurs de départ à ajuster à ta réalité</small></div>
+    <div class="form-grid"><div class="field"><label>Consommation (L / 100 km)</label>${inp('cost.consumption',c.consumption,'num')}</div>
+    <div class="field"><label>AdBlue (% du coût du gasoil)</label>${inp('cost.adblue',c.adblue,'num')}</div>
+    <div class="field"><label>Entretien et pneus (€/km)</label>${inp('cost.maintenance',c.maintenance,'num')}</div>
+    <div class="field"><label>Coût du chauffeur (€ / heure travaillée)</label>${inp('cost.driverHour',c.driverHour,'num')}</div>
+    <div class="field"><label>Coûts fixes du camion (€ / jour)</label>${inp('cost.fixedDay',c.fixedDay,'num')}</div></div>
+    <p style="font-size:12px;color:var(--muted)">Les coûts fixes couvrent l'amortissement ou le leasing, l'assurance et les taxes ; le chauffeur et les coûts fixes dépendent du temps, le reste du nombre de km dans chaque pays.</p>${saveBar('cost')}</div>
+    <div class="panel"><div class="panel-title"><h2>Coût au km dans chaque pays</h2><small>gasoil HT du pays + AdBlue + péage + entretien</small></div><div class="table-wrap" id="cost-table">${costTableHtml()}</div></div>`;
+  }
+  if(rulesTab==='fuel'){
+    const f=settings.fuel,age=f.updatedAt?Math.round((Date.now()-new Date(f.updatedAt).getTime())/86400000):null;
+    return head+`<div class="panel"><div class="panel-title"><h2>Prix du gasoil par pays</h2><small>${esc(f.source)} · bulletin du ${pretty(f.date)} · actualisé il y a ${age==null?'—':age+' jour(s)'}</small></div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><button class="btn primary" onclick="refreshDieselPrices(false)">↻ Actualiser maintenant (Commission européenne)</button>
+      <label style="font-size:12.5px"><input type="checkbox" ${f.auto!==false?'checked':''} onchange="sUpd('fuel.auto',this.checked,'bool')"> Actualiser automatiquement chaque mois (à l'ouverture de l'application)</label></div>
+    <div class="table-wrap"><table><thead><tr><th>Pays</th><th>Prix TTC (€/L)</th><th>TVA (%)</th><th>Prix HT (€/L)</th></tr></thead><tbody>
+    ${EUROPE_CC.map(cc=>`<tr><td>${esc(cc)} · ${esc(ccName(cc))}</td><td>${inp('fuel.prices.'+cc,settings.fuel.prices[cc]??'','num',90)}</td><td>${VAT_RATE[cc]??'—'}</td><td>${fuelGross(cc)!=null?fuelNet(cc).toFixed(3):'<small style="color:var(--amber)">non renseigné : moyenne UE '+(fuelAvg()/1.21).toFixed(3)+'</small>'}</td></tr>`).join('')}</tbody></table></div>
+    <p style="font-size:12px;color:var(--muted)">Les prix de la Commission sont des prix à la pompe <b>TTC</b> pour les 27 pays de l'UE. Un transporteur récupère la TVA : les calculs utilisent le prix <b>HT</b>. Hors UE (Suisse, Norvège, Royaume-Uni, Balkans, Turquie…) : à saisir à la main, sinon la moyenne UE est utilisée.</p>${saveBar('fuel')}</div>`;
+  }
+  if(rulesTab==='tolls'){
+    return head+`<div class="panel"><div class="panel-title"><h2>Péages routiers pour un 40 t, 5 essieux, Euro VI</h2><small>€ par km, hors TVA — équivalent par km pour les vignettes</small></div>
+    <div class="table-wrap"><table><thead><tr><th>Pays</th><th>€/km</th><th>Système</th><th>Fiabilité</th><th>Note</th></tr></thead><tbody>
+    ${EUROPE_CC.map(cc=>{const t=settings.tolls[cc]||{rate:null,system:'',q:'est',note:'non renseigné : valeur par défaut'};return `<tr><td>${esc(cc)} · ${esc(ccName(cc))}</td><td>${inp('tolls.'+cc+'.rate',t.rate??'','num',80)}</td><td style="font-size:12px">${esc(t.system||'')}</td><td>${qChip(t.q)}</td><td style="font-size:12px;color:var(--muted)">${esc(t.note||'')}</td></tr>`;}).join('')}</tbody></table></div>
+    <div class="form-grid" style="margin-top:8px"><div class="field"><label>€/km par défaut (pays sans valeur)</label>${inp('tollDefault',settings.tollDefault,'num',80)}</div></div>
+    <p style="font-size:12px;color:var(--muted)">Barèmes 2026 vérifiés (Allemagne, Autriche, Belgique, Pays-Bas, France, Italie, Suisse) d'après <a href="https://impargo.de/en/blog/truck-toll-europe" target="_blank">Impargo</a>, <a href="https://transconnect.com/en/blog/174-in-germany-286-in-austria-what-500-kilometres-of-tolls-really-cost-in-2026" target="_blank">TransConnect</a> et <a href="https://trans.info/en/higher-tolls-2026-445921" target="_blank">Trans.info</a>. Les valeurs « estimé » sont à corriger avec tes factures réelles.</p>${saveBar('tolls')}</div>`;
+  }
+  if(rulesTab==='ferries'){
+    return head+`<div class="panel"><div class="panel-title"><h2>Ferries et tunnels</h2><small>Coût et durée pour un camion avec remorque (≈ 16,5 m)</small></div>
+    <div class="table-wrap"><table><thead><tr><th>Traversée</th><th>De</th><th>Vers</th><th>Durée (h)</th><th>Coût (€)</th><th>Fiabilité</th><th>Note</th></tr></thead><tbody>
+    ${settings.ferries.map((f,i)=>`<tr><td>${inp('ferries.'+i+'.name',f.name,'text',230)}</td><td>${inp('ferries.'+i+'.a',f.a,'text',44)}</td><td>${inp('ferries.'+i+'.b',f.b,'text',44)}</td><td>${inp('ferries.'+i+'.hours',f.hours,'num',66)}</td><td>${inp('ferries.'+i+'.cost',f.cost,'num',76)}</td><td>${qChip(f.q)}</td><td style="font-size:12px;color:var(--muted)">${esc(f.note||'')}</td></tr>`).join('')}</tbody></table></div>
+    <div style="margin-top:8px"><button class="btn" onclick="settings.ferries.push({id:'f'+Date.now(),name:'Nouvelle traversée',a:'',b:'',hours:2,cost:200,q:'est',note:''});render()">＋ Ajouter une traversée</button></div>
+    <p style="font-size:12px;color:var(--muted)">Les tarifs des compagnies sont négociés et non publics : les montants ci-dessus sont des <b>estimations</b> à remplacer par tes contrats. Scandlines publie ses suppléments carburant / ETS (août 2026 : 2,21 €/m linéaire Puttgarden–Rødby, 5,48 €/m Rostock–Gedser).</p>${saveBar('ferries')}</div>`;
+  }
+  if(rulesTab==='bans'){
+    const days=Array.from({length:14},(_,i)=>addDays(todayIso(),i));
+    const ccs=Object.keys(settings.bans).filter(cc=>settings.bans[cc].w);
+    const cell=(cc,d)=>{const h=banHours(cc,d);return `<td style="text-align:center;font-size:10.5px;background:${h>=12?'#f4c7c3':(h>0?'#fde9b8':'#e7f4e7')};color:#333" title="${h?h+' h d\'interdiction':'libre'}">${h>=12?'⛔':(h>0?Math.round(h)+'h':'·')}</td>`;};
+    return head+`<div class="panel"><div class="panel-title"><h2>Interdictions de rouler — 14 prochains jours</h2><small>⛔ jour (presque) entièrement interdit · nombre d'heures si partiel · · libre</small></div>
+    <div class="table-wrap"><table><thead><tr><th>Pays</th>${days.map(d=>`<th style="font-size:10px;text-align:center">${new Date(d+'T12:00:00Z').toLocaleDateString('fr-BE',{weekday:'short',day:'numeric',timeZone:'UTC'})}</th>`).join('')}</tr></thead><tbody>
+    ${ccs.map(cc=>`<tr><td>${esc(cc)} · ${esc(ccName(cc))}</td>${days.map(d=>cell(cc,d)).join('')}</tr>`).join('')}</tbody></table></div>
+    <p style="font-size:12px;color:var(--muted)">Les jours fériés viennent de l'onglet « Jours fériés » : pense à y précharger les pays.</p></div>
+    <div class="panel"><div class="panel-title"><h2>Règles par pays</h2><small>Fenêtres : « sam 15:00-24:00, dim 00:00-22:00, fer 00:00-22:00, veille 22:00-24:00 » (fer = jour férié, veille = veille de jour férié)</small></div>
+    <div class="table-wrap"><table><thead><tr><th>Pays</th><th>Seuil de poids</th><th>Fenêtres d'interdiction</th><th>Fiabilité</th><th>Note</th></tr></thead><tbody>
+    ${Object.keys(settings.bans).map(cc=>{const b=settings.bans[cc];return `<tr><td>${esc(cc)} · ${esc(ccName(cc))}</td><td>${inp('bans.'+cc+'.th',b.th,'text',130)}</td><td>${inp('bans.'+cc+'.w',b.w,'text',330)}</td><td>${qChip(b.q)}</td><td style="font-size:12px;color:var(--muted)">${esc(b.note||'')}</td></tr>`;}).join('')}</tbody></table></div>
+    <p style="font-size:12px;color:var(--muted)">Sources : <a href="https://www.timocom.co.uk/blog/truck-driving-bans-overview-584634" target="_blank">TIMOCOM</a> et <a href="https://nakordoni.eu/en/news/2026-09-21/traffic-bans-week-2026-39" target="_blank">NaKordoni</a> (2026). Les pays absents de la liste (Portugal, Grèce, pays baltes, Nordiques…) n'ont pas de règle enregistrée : à renseigner. Les restrictions d'été et régionales changent chaque année : vérifie avant le départ.</p>${saveBar('bans')}</div>`;
+  }
+  // jours fériés
+  const hol=holGet(holCC,holYear);
+  return head+`<div class="panel"><div class="panel-title"><h2>Jours fériés par pays</h2><small>Source : API Nager.Date (jours fériés nationaux, conservés dans ce navigateur)</small></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <select onchange="holCC=this.value;holShow()">${EUROPE_CC.map(c=>`<option value="${c}" ${holCC===c?'selected':''}>${c} · ${esc(ccName(c))}</option>`).join('')}</select>
+      <select onchange="holYear=Number(this.value);holShow()">${[holYear-1,new Date().getFullYear(),new Date().getFullYear()+1,new Date().getFullYear()+2].filter((v,i,a)=>a.indexOf(v)===i).sort().map(y=>`<option ${holYear===y?'selected':''}>${y}</option>`).join('')}</select>
+      <button class="btn" onclick="holPreloadAll()">⬇ Précharger toute l'Europe (cette année et la suivante)</button><span id="hol-prog" style="font-size:12px;color:var(--muted)"></span></div>
+    <div id="hol-list">${hol?holTableHtml(hol):'<div style="color:var(--muted);font-size:13px">Chargement…</div>'}</div></div>`;
+}
+function holTableHtml(h){
+  return h.length?`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Jour</th><th>Nom local</th><th>Nom</th></tr></thead><tbody>${h.map(x=>`<tr><td>${pretty(x.d)}</td><td>${new Date(x.d+'T12:00:00Z').toLocaleDateString('fr-BE',{weekday:'long',timeZone:'UTC'})}</td><td>${esc(x.l)}</td><td style="color:var(--muted)">${esc(x.n)}</td></tr>`).join('')}</tbody></table></div>`:'<div style="color:var(--muted);font-size:13px">Aucun jour férié national trouvé (pays non couvert).</div>';
+}
+async function holShow(){
+  const box=document.getElementById('hol-list');if(box)box.innerHTML='<div style="color:var(--muted);font-size:13px">Chargement…</div>';
+  const h=await holLoad(holCC,holYear);
+  if(box)box.innerHTML=h?holTableHtml(h):'<div style="color:var(--red);font-size:13px">Service des jours fériés indisponible.</div>';
+}
+async function holPreloadAll(){
+  const prog=document.getElementById('hol-prog');const y=new Date().getFullYear();let n=0;const tot=EUROPE_CC.length*2;
+  for(const cc of EUROPE_CC)for(const yy of [y,y+1]){await holLoad(cc,yy);n++;if(prog)prog.textContent=`${n} / ${tot}`;}
+  if(prog)prog.textContent='✓ '+tot+' listes chargées';
+  render();
 }
 
 // ─── DOCUMENTS DE TRANSPORT : CMR toujours, documents douaniers hors UE ───
