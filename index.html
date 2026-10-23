@@ -217,6 +217,16 @@ tbody tr:hover{background:#f7fbff}
 .ctl .recent-row>strong small{display:block;margin-top:3px;overflow-wrap:anywhere}
 .ctl .recent-row>span{flex:2 1 280px;min-width:0;line-height:1.9}
 .ctl .recent-row>div{flex:0 1 auto;display:flex;gap:6px;flex-wrap:wrap}
+
+/* Contrôle : documents des transporteurs, une colonne par document */
+.dc{display:grid;grid-template-columns:minmax(190px,1.1fr) minmax(220px,1fr) minmax(220px,1fr);gap:12px 28px;padding:16px 4px;border-top:1px solid var(--line);align-items:start}
+.ctl>.dc:first-child{border-top:0;padding-top:6px}
+.dc-who b{display:block;font-size:14px;font-weight:700}
+.dc-who small{display:block;margin-top:3px;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.dc-cell{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.dc-l{font-size:10.5px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--muted)}
+.dc-b{padding:6px 12px;font-size:11.5px}
+@media(max-width:900px){.dc{grid-template-columns:1fr 1fr}.dc-who{grid-column:1/-1}}
 /* ═════════ MODE SOMBRE (généré à partir des styles clairs) ═════════ */
 
 html[data-theme="dark"]{color-scheme:dark;--bg:#0b1520;--card:#142130;--ink:#e3ecf4;--muted:#93a7ba;--line:#26394c;--pale:#1b2f45;--blue:#4a9de0;--brand:#4a9de0;--green:#3fbf86;--amber:#e3a63f;--red:#ef7069;--sh1:0 1px 2px rgba(0,0,0,.35);--sh2:0 2px 6px rgba(0,0,0,.35),0 14px 34px rgba(0,0,0,.4)}
@@ -4158,7 +4168,7 @@ function controlPage(){
     ${tile('Documents manquants',docs.length,'#9a6b18')}${tile('Non géolocalisées',nogeo.length,'#8094a6')}${tile('Prix manquants',noprice.length,'#8094a6')}</div>
   ${panel('📣 Bourse de fret : invendus depuis 3 jours ouvrables','#d2308f',bourseAl,m=>`<div class="recent-row"><strong>${esc(m.ref)}<small>${esc(getClient(m).name||'—')}</small></strong><span>${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}</span><span>${bdSince(m.exchangePublishedAt)} j ouvrables · ${offersOf(m.id).filter(o=>o.status==='pending').length} offre(s)</span><span><button class="btn primary" onclick="planLot('${esc(m.id)}')">🚛 Planifier sur un camion</button> <button class="btn" onclick="snoozeLot('${esc(m.id)}')">Laisser en bourse (3 j)</button></span></div>`,'Décide : planifier sur un camion ou laisser en bourse')}
   ${panel('💶 Offres de transporteurs à traiter','#2675a9',offersWaiting,m=>{const best=offersOf(m.id).filter(o=>o.status==='pending').sort((a,b)=>a.price-b.price)[0];return `<div class="recent-row" style="cursor:pointer" onclick="bourseTab='open';setView('Bourse de fret')"><strong>${esc(m.ref)}<small>${esc(getClient(m).name||'—')}</small></strong><span>${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}</span><span>${offersOf(m.id).filter(o=>o.status==='pending').length} offre(s) · meilleure : <b>${eur(best.price)}</b> (${esc((db.carriers.find(c=>c.id===best.carrierId)||{}).name||'—')})</span><span></span></div>`;},'Ouvre la bourse pour accepter ou refuser')}
-  ${panel('📑 Licences et assurances des transporteurs','#7a3b8f',docAl,o=>`<div class="recent-row"><strong>${esc(o.c.name)}<small>${esc(o.c.email||'sans e-mail')}</small></strong><span>${o.comp.sts.map(st=>DOC_KINDS.find(k=>k[0]===st.k)[1]+' : '+docChip(st)).join(' &nbsp; ')}</span><span></span><span>${o.comp.sts.filter(st=>st.level!=='ok').map(st=>`<button class="btn" onclick="sendDocReminder('${esc(o.c.id)}','${st.k}')">✉ Rappel ${st.k==='license'?'licence':'assurance'}</button>`).join(' ')}</span></div>`,'Échéance à 2 mois (jaune), 1 mois (orange), 15 jours (rouge), expiré ou manquant (bloqué)')}
+  ${panel('📑 Licences et assurances des transporteurs','#7a3b8f',docAl,o=>`<div class="dc"><div class="dc-who"><b>${esc(o.c.name)}</b><small>${esc(o.c.email||'sans e-mail')}</small></div>${o.comp.sts.map(st=>`<div class="dc-cell"><span class="dc-l">${esc(DOC_KINDS.find(k=>k[0]===st.k)[1])}</span>${docChip(st)}${st.level!=='ok'?`<button class="btn dc-b" onclick="sendDocReminder('${esc(o.c.id)}','${st.k}')">✉ Envoyer un rappel</button>`:''}</div>`).join('')}</div>`,'Échéance à 2 mois (jaune), 1 mois (orange), 15 jours (rouge), expiré ou manquant (bloqué)')}
   ${panel('⚠ En retard','#c0392b',late,m=>row(m,`<b style="color:#c0392b">${-left(m)} j de retard</b>`),'Date limite de livraison dépassée')}
   ${panel('⏱ À risque','#e0850c',risk,m=>row(m,`<b style="color:#e0850c">${left(m)} j restant${left(m)>1?'s':''}</b>`),'Date limite dans 2 jours ou moins')}
   ${panel('🚛 À planifier (sans camion ni transporteur)','#2675a9',unplanned,m=>row(m,(left(m)==null?'':(left(m)<0?'<b style="color:#c0392b">en retard</b>':left(m)+' j restants'))+` <button class="btn" onclick="event.stopPropagation();publishToExchange(['${esc(m.id)}'])">📣 En bourse</button>`),'À placer sur un camion, à affréter, ou à mettre en bourse de fret')}
