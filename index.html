@@ -227,6 +227,88 @@ tbody tr:hover{background:#f7fbff}
 .dc-l{font-size:10.5px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--muted)}
 .dc-b{padding:6px 12px;font-size:11.5px}
 @media(max-width:900px){.dc{grid-template-columns:1fr 1fr}.dc-who{grid-column:1/-1}}
+
+/* ═════════ PORTAIL CHAUFFEUR : design mobile (clair / sombre selon le téléphone) ═════════ */
+.portal-wrap{--pt-bg:#eef2f7;--pt-card:#fff;--pt-ink:#1c3349;--pt-mut:#6f8396;--pt-line:#e1e8ef;--pt-soft:#f4f7fb;--pt-ok:#1f8a5b;--pt-brand:#2677b4;--pt-warn:#c0443f;background:var(--pt-bg);color:var(--pt-ink);font-family:'Inter',-apple-system,'Segoe UI',Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+@media(prefers-color-scheme:dark){.portal-wrap{--pt-bg:#0b1520;--pt-card:#142130;--pt-ink:#e3ecf4;--pt-mut:#93a7ba;--pt-line:#26394c;--pt-soft:#1a2c3e;--pt-ok:#3fbf86;--pt-brand:#4a9de0;--pt-warn:#ef7069}}
+.pt-head{background:linear-gradient(180deg,#12315a,#0e2a47);color:#fff;padding:18px 16px 22px;border-radius:0 0 22px 22px}
+.pt-brand{display:flex;align-items:center;gap:9px;margin-bottom:14px}
+.pt-logo{width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center}
+.pt-logo svg{width:17px;height:17px}
+.pt-brand b{font-size:16px;font-weight:800;letter-spacing:-.4px}.pt-brand b i{font-style:normal;font-weight:400;color:#98c9e9}
+.pt-brand small{margin-left:auto;font-size:9.5px;letter-spacing:1.1px;opacity:.65;text-align:right;max-width:150px;line-height:1.3}
+.pt-ref{font-size:25px;font-weight:800;letter-spacing:-.8px}
+.pt-client{font-size:12.5px;opacity:.75;margin:2px 0 14px}
+.pt-route{background:rgba(255,255,255,.1);border-radius:16px;padding:6px 14px}
+.pt-stop{display:flex;gap:12px;align-items:flex-start;padding:10px 0;position:relative}
+.pt-stop+.pt-stop{border-top:1px dashed rgba(255,255,255,.2)}
+.pt-dot{width:12px;height:12px;border-radius:50%;margin-top:4px;flex-shrink:0;background:#5ab0e8;box-shadow:0 0 0 4px rgba(90,176,232,.25)}
+.pt-dot.b{background:#58d39b;box-shadow:0 0 0 4px rgba(88,211,155,.25)}
+.pt-sb{flex:1;min-width:0}
+.pt-lab{display:block;font-size:9.5px;font-weight:800;letter-spacing:1.2px;opacity:.65}
+.pt-city{display:block;font-size:17px;font-weight:700;margin-top:1px}
+.pt-addr{display:block;font-size:12px;opacity:.75;margin-top:1px;overflow-wrap:anywhere}
+.pt-date{display:inline-block;margin-top:5px;font-size:11px;font-weight:700;background:rgba(255,255,255,.14);padding:2px 9px;border-radius:20px}
+.pt-acts{display:flex;gap:8px;flex-shrink:0}
+.pt-act{width:42px;height:42px;border-radius:13px;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;color:#fff;text-decoration:none}
+.pt-act svg{width:20px;height:20px}
+.pt-act:active{transform:scale(.94)}
+.pt-main{max-width:640px;margin:0 auto;padding:14px 14px 90px}
+.pt-tip{display:flex;gap:10px;align-items:flex-start;font-size:12.5px;color:var(--pt-mut);background:var(--pt-card);border:1px solid var(--pt-line);border-radius:14px;padding:12px 14px;margin-bottom:14px;line-height:1.45}
+.pt-car{background:var(--pt-card);border:1px solid var(--pt-line);border-radius:18px;padding:16px;margin-bottom:16px;box-shadow:0 1px 2px rgba(15,42,71,.05)}
+.pt-ch{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.pt-cn{font-size:18px;font-weight:800;letter-spacing:-.4px}
+.pt-plate{display:inline-block;margin-top:6px;font-weight:800;font-size:13px;letter-spacing:1px;padding:3px 10px;border-radius:7px;border:2px solid var(--pt-ink);background:var(--pt-soft)}
+.pt-vin{display:block;margin-top:5px;font-size:11px;color:var(--pt-mut);font-family:ui-monospace,Menlo,monospace}
+.pt-chip{font-size:11.5px;font-weight:800;padding:4px 11px;border-radius:20px;white-space:nowrap;background:color-mix(in srgb,var(--pt-mut) 18%,transparent);color:var(--pt-mut)}
+.pt-chip.b{background:color-mix(in srgb,var(--pt-brand) 16%,transparent);color:var(--pt-brand)}
+.pt-chip.g{background:color-mix(in srgb,var(--pt-ok) 18%,transparent);color:var(--pt-ok)}
+.pt-steps{display:flex;align-items:center;gap:8px;margin:16px 0 4px}
+.pt-step{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;letter-spacing:.6px;color:var(--pt-mut)}
+.pt-step i{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:12px;background:var(--pt-soft);border:2px solid var(--pt-line);color:var(--pt-mut)}
+.pt-step.on{color:var(--pt-brand)}.pt-step.on i{background:var(--pt-brand);border-color:var(--pt-brand);color:#fff}
+.pt-step.ok{color:var(--pt-ok)}.pt-step.ok i{background:var(--pt-ok);border-color:var(--pt-ok);color:#fff}
+.pt-bar{flex:1;height:3px;background:var(--pt-line);border-radius:3px;min-width:16px}
+.pt-bar.ok{background:var(--pt-ok)}
+.pt-sec{margin-top:16px;border:1.5px solid var(--pt-line);border-radius:16px;padding:14px}
+.pt-sec.done{border-color:color-mix(in srgb,var(--pt-ok) 45%,var(--pt-line));background:color-mix(in srgb,var(--pt-ok) 6%,transparent)}
+.pt-sec.lock{opacity:.55}
+.pt-sh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}
+.pt-st{font-size:11px;font-weight:800;letter-spacing:.9px;color:var(--pt-mut);line-height:1.35}
+.pt-sec.done .pt-st{color:var(--pt-ok)}
+.pt-cnt{font-size:11px;font-weight:800;color:var(--pt-mut);background:var(--pt-soft);padding:2px 9px;border-radius:20px;white-space:nowrap}
+.pt-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pt-tile{background:var(--pt-card);border:1.5px solid var(--pt-line);border-radius:14px;padding:8px;display:flex;flex-direction:column;gap:6px}
+.pt-tile.ok{border-color:color-mix(in srgb,var(--pt-ok) 50%,var(--pt-line))}
+.pt-tile.wide{grid-column:1/-1}
+.pt-cam{position:relative;height:86px;border-radius:10px;background:var(--pt-soft);display:flex;align-items:center;justify-content:center;color:var(--pt-brand);border:1.5px dashed color-mix(in srgb,var(--pt-brand) 45%,transparent);cursor:pointer;overflow:hidden;padding:0;width:100%}
+.pt-cam svg{width:30px;height:30px}
+.pt-cam img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border:0}
+.pt-cam.has{border-style:solid;border-color:transparent}
+.pt-cam .k{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:var(--pt-ok);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;z-index:1}
+.pt-cam .n{position:absolute;bottom:6px;left:6px;font-size:11px;font-weight:800;color:#fff;background:rgba(0,0,0,.55);padding:1px 8px;border-radius:20px;z-index:1}
+.pt-cam.skip{color:var(--pt-mut);border-color:var(--pt-line)}
+.pt-tl{font-size:12.5px;font-weight:700;display:flex;gap:5px;align-items:center;line-height:1.25}
+.pt-tl em{color:var(--pt-warn);font-style:normal}
+.pt-tb{display:flex;gap:6px;flex-wrap:wrap}
+.pt-tb button{flex:1;min-height:36px;border-radius:9px;border:1px solid var(--pt-line);background:var(--pt-soft);color:var(--pt-mut);font-size:11px;font-weight:700;padding:0 6px;line-height:1.15}
+.pt-tb button.p{background:color-mix(in srgb,var(--pt-brand) 14%,transparent);color:var(--pt-brand);border-color:color-mix(in srgb,var(--pt-brand) 30%,transparent)}
+.pt-cta{margin-top:16px}
+.pt-cta button{width:100%;min-height:54px;border:0;border-radius:16px;background:linear-gradient(180deg,#27a46f,#1f8a5b);color:#fff;font-size:15.5px;font-weight:800;box-shadow:0 8px 22px rgba(31,138,91,.38)}
+.pt-cta button:disabled{background:var(--pt-line);color:var(--pt-mut);box-shadow:none}
+.pt-hint{text-align:center;font-size:11.5px;color:var(--pt-warn);margin-top:8px;font-weight:600}
+.pt-okmsg{text-align:center;padding:10px;font-size:13px;color:var(--pt-ok);font-weight:800}
+.pt-docs{margin-top:14px;border:1.5px solid color-mix(in srgb,var(--pt-brand) 30%,var(--pt-line));border-radius:14px;padding:12px;background:color-mix(in srgb,var(--pt-brand) 6%,transparent)}
+.pt-docs h4{margin:0 0 6px;font-size:10px;letter-spacing:1px;color:var(--pt-brand);font-weight:800}
+.pt-doc{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-top:1px solid var(--pt-line);font-size:12.5px;font-weight:600}
+.pt-doc:first-of-type{border-top:0}
+.pt-doc a{background:var(--pt-brand);color:#fff;padding:8px 14px;border-radius:10px;font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap}
+.pt-video{margin-top:10px;border:1.5px dashed var(--pt-line);border-radius:14px;padding:10px 12px}
+.pt-video.ok{border-style:solid;border-color:color-mix(in srgb,var(--pt-ok) 45%,var(--pt-line))}
+.pt-vh{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12.5px;font-weight:700}
+.pt-vh small{color:var(--pt-mut);font-weight:500}
+.pt-vl{cursor:pointer;display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 12px;border-radius:10px;font-size:12px;font-weight:700;background:color-mix(in srgb,var(--pt-brand) 14%,transparent);color:var(--pt-brand)}
+.pt-vl svg{width:16px;height:16px}
 /* ═════════ MODE SOMBRE (généré à partir des styles clairs) ═════════ */
 
 html[data-theme="dark"]{color-scheme:dark;--bg:#0b1520;--card:#142130;--ink:#e3ecf4;--muted:#93a7ba;--line:#26394c;--pale:#1b2f45;--blue:#4a9de0;--brand:#4a9de0;--green:#3fbf86;--amber:#e3a63f;--red:#ef7069;--sh1:0 1px 2px rgba(0,0,0,.35);--sh2:0 2px 6px rgba(0,0,0,.35),0 14px 34px rgba(0,0,0,.4)}
@@ -300,8 +382,7 @@ html[data-theme="dark"] .notification{background:#182831;border:1px solid #2c3e4
 html[data-theme="dark"] .notification p{color:#94a6b5}
 html[data-theme="dark"] .summary{color:#9bafbe}
 html[data-theme="dark"] .toast{background:#212121}
-html[data-theme="dark"] /* ── PORTAIL INSPECTION ── */
-#inspection-portal{background:#1c2731}
+html[data-theme="dark"] #inspection-portal{background:#1c2731}
 html[data-theme="dark"] .insp-card{background:#212121}
 html[data-theme="dark"] .insp-zone-btn{background:#1b2530}
 html[data-theme="dark"] .insp-zone-btn:hover,html[data-theme="dark"] .insp-zone-btn:active{background:#1c2c39}
@@ -309,8 +390,7 @@ html[data-theme="dark"] .insp-zone-btn.has-damage{background:#372d1b}
 html[data-theme="dark"] .damage-thumb-placeholder{background:#1b2530}
 html[data-theme="dark"] .insp-sig-canvas{border:2px dashed #2c3c49;background:#17232e}
 html[data-theme="dark"] .insp-submit-bar{background:#212121}
-html[data-theme="dark"] /* ── PORTAIL TRANSPORTEUR ── */
-.portal-wrap{background:#1c2731}
+html[data-theme="dark"] .portal-wrap{background:#1c2731}
 html[data-theme="dark"] .portal-mission-bar{background:#212121}
 html[data-theme="dark"] .portal-car{background:#212121}
 html[data-theme="dark"] .portal-section.done{border-color:#2c4933;background:#193322}
@@ -399,9 +479,6 @@ html[data-theme="dark"] [style*="background:#f4f9fc "]{background:#182831!import
 html[data-theme="dark"] [style*="background:#f5f7fa;"]{background:#1c232e!important}
 html[data-theme="dark"] [style$="background:#f5f7fa"]{background:#1c232e!important}
 html[data-theme="dark"] [style*="background:#f5f7fa "]{background:#1c232e!important}
-html[data-theme="dark"] [style*="background:#f5fafd;"]{background:#182730!important}
-html[data-theme="dark"] [style$="background:#f5fafd"]{background:#182730!important}
-html[data-theme="dark"] [style*="background:#f5fafd "]{background:#182730!important}
 html[data-theme="dark"] [style*="background:#f6f9fc;"]{background:#182430!important}
 html[data-theme="dark"] [style$="background:#f6f9fc"]{background:#182430!important}
 html[data-theme="dark"] [style*="background:#f6f9fc "]{background:#182430!important}
@@ -574,7 +651,6 @@ html[data-theme="dark"] [style*="border"][style*="#dbe4eb"]{border-color:#2c3c49
 html[data-theme="dark"] [style*="border"][style*="#dde"]{border-color:#2c2c49!important}
 html[data-theme="dark"] [style*="border"][style*="#dfeaf1"]{border-color:#2c3e49!important}
 html[data-theme="dark"] [style*="border"][style*="#e0e6f0"]{border-color:#2c3749!important}
-html[data-theme="dark"] [style*="border"][style*="#e0eef7"]{border-color:#2c3e49!important}
 html[data-theme="dark"] [style*="border"][style*="#edf1f4"]{border-color:#2c3d49!important}
 html[data-theme="dark"] [style*="border"][style*="#eee"]{border-color:#3b3b3b!important}
 html[data-theme="dark"] [style*="border"][style*="#eef1f4"]{border-color:#2e3b47!important}
@@ -6611,25 +6687,27 @@ function renderCarrierPortal(){
   const L=tr(lang);
   const portal=document.getElementById('carrier-portal');
   portal.className='portal-wrap';
-  // Date locale selon la langue du portail
   const localeMap={fr:'fr-BE',en:'en-GB',ro:'ro-RO',pl:'pl-PL',lt:'lt-LT',de:'de-DE',lv:'lv-LV',et:'et-EE',cs:'cs-CZ',sk:'sk-SK',hu:'hu-HU',bg:'bg-BG',sl:'sl-SI',hr:'hr-HR',sr:'sr-RS',es:'es-ES',it:'it-IT',nl:'nl-NL'};
   const loc=localeMap[lang]||'en-GB';
-  const fmtDate=d=>d?new Date(d+'T12:00:00').toLocaleDateString(loc,{day:'numeric',month:'short'}):'—';
+  const fmtDate=d=>d?new Date(d+'T12:00:00').toLocaleDateString(loc,{weekday:'short',day:'numeric',month:'short'}):'—';
+  const addr=(st,pc,ci,co)=>[[st].filter(Boolean).join(''),[pc,ci].filter(Boolean).join(' '),co].filter(Boolean).join(', ');
+  const phoneOf=t=>{const x=String(t||'').match(/\+?\d[\d\s().\/-]{6,}\d/);return x?x[0].replace(/[^\d+]/g,''):'';};
+  const stop=(cls,label,site,city,street,postal,country,date,contact)=>{
+    const full=addr(street,postal,city,country),ph=phoneOf(contact);
+    return `<div class="pt-stop"><i class="pt-dot ${cls}"></i><div class="pt-sb"><span class="pt-lab">${label}</span><span class="pt-city">${esc(city||'—')}</span>${site?`<span class="pt-addr"><b>${esc(site)}</b></span>`:''}<span class="pt-addr">${esc([street,[postal,city].filter(Boolean).join(' ')].filter(Boolean).join(', '))}</span><span class="pt-date">${fmtDate(date)}</span></div>
+      <div class="pt-acts">${full?`<a class="pt-act" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(full)}" target="_blank" rel="noopener" aria-label="GPS"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-8z"/></svg></a>`:''}${ph?`<a class="pt-act" href="tel:${ph}" aria-label="Tel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg></a>`:''}</div></div>`;};
   portal.innerHTML=`
-    <div class="portal-header">
-      <div class="brand">auto<span>dispatch</span></div>
-      <div style="font-size:11px;opacity:.7;margin-bottom:10px">${L.portal_subtitle}</div>
-      <div class="portal-mission-bar" style="background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2);margin-bottom:0">
-        <div style="font-size:19px;font-weight:800">${esc(m.ref)}</div>
-        <div style="font-size:12px;opacity:.8;margin-top:4px">${esc(m.clients?.name||'—')}</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;font-size:12px">
-          <div><div style="font-size:9px;letter-spacing:1px;opacity:.6">${L.pickup}</div><strong>${esc(m.pickup_city||'—')}</strong><br><span style="opacity:.7">${fmtDate(m.pickup_date)}</span></div>
-          <div><div style="font-size:9px;letter-spacing:1px;opacity:.6">${L.delivery}</div><strong>${esc(m.delivery_city||'—')}</strong><br><span style="opacity:.7">${fmtDate(m.delivery_date)}</span></div>
-        </div>
+    <div class="pt-head">
+      <div class="pt-brand"><span class="pt-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5"/></svg></span><b>auto<i>dispatch</i></b><small>${L.portal_subtitle}</small></div>
+      <div class="pt-ref">${esc(m.ref)}</div>
+      <div class="pt-client">${esc(m.clients?.name||'—')}</div>
+      <div class="pt-route">
+        ${stop('',L.pickup,m.pickup_site,m.pickup_city,m.pickup_street,m.pickup_postal,m.pickup_country,m.pickup_date,m.pickup_contact)}
+        ${stop('b',L.delivery,m.delivery_site,m.delivery_city,m.delivery_street,m.delivery_postal,m.delivery_country,m.delivery_date,m.delivery_contact)}
       </div>
     </div>
-    <div class="portal-body">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:14px;padding:10px;background:white;border-radius:8px;border:1px solid var(--line)">${L.tip}</div>
+    <div class="pt-main">
+      <div class="pt-tip"><span>📋</span><span>${L.tip.replace(/^📋\s*/,'')}</span></div>
       ${portalCars.map(car=>renderCarPortalCard(car,lang,L)).join('')}
     </div>
   `;
@@ -6647,26 +6725,27 @@ function phaseComplete(carId,type){
 function renderPhotoRow(cat,carId,eventType,locked,L){
   const evts=getEventsByKey(carId,eventType,cat.key);
   const photos=evts.filter(e=>e.photo_url);
-  const confirmed=evts.length>0;
-  const isRequired=cat.required;
-  return `
-    <div style="border:1px solid ${confirmed?'#c3e6cb':'var(--line)'};border-radius:8px;padding:11px;margin-bottom:8px;background:${confirmed?'#f6fcf8':'white'}">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${photos.length?'8px':'0'}">
-        <span style="font-size:12px;font-weight:700">${cat.icon} ${cat.label}${isRequired?' <span style="color:#e05c5c;font-size:10px">*</span>':''}</span>
-        <span style="display:flex;gap:6px;align-items:center">
-          ${confirmed?`<span style="color:var(--green);font-size:11px;font-weight:700">✓</span>`:''}
-          ${!locked?`<button type="button" style="cursor:pointer;background:${confirmed?'#e8f5ec':'var(--pale)'};border:1px solid ${confirmed?'#b8dfc4':'#d0e8f5'};color:${confirmed?'var(--green)':'var(--blue)'};padding:5px 9px;border-radius:6px;font-size:11px;font-weight:700" onclick="document.getElementById('ph_${carId}_${eventType}_${cat.key}').click()">
-            ${confirmed&&!cat.multi?L.retake:L.photo}
-          </button>
-          <input id="ph_${carId}_${eventType}_${cat.key}" type="file" accept="image/*" capture="environment" style="display:none" onchange="portalUploadPhoto('${esc(carId)}','${esc(eventType)}',this,'${esc(cat.key)}')">
-          ${!confirmed?`<button style="background:white;border:1px solid #d9e2e9;color:var(--muted);padding:5px 9px;border-radius:6px;font-size:11px;cursor:pointer" onclick="portalSkipPhoto('${esc(carId)}','${esc(eventType)}','${esc(cat.key)}')">${L.no_photo}</button>`:''}
-          `:''}
-        </span>
-      </div>
-      ${photos.length?`<div class="portal-photos" style="margin:0">${photos.map(e=>`<img src="${esc(e.photo_url)}" onclick="portalOpenPhoto('${esc(e.photo_url)}')">`).join('')}</div>`:''}
-    </div>`;
+  const done=evts.length>0,skipped=done&&!photos.length;
+  const inId=`ph_${carId}_${eventType}_${cat.key}`;
+  const last=photos[photos.length-1];
+  const pick=`document.getElementById('${inId}').click()`;
+  const cam=last
+    ?`<button type="button" class="pt-cam has" onclick="portalOpenPhoto('${esc(last.photo_url)}')"><img src="${esc(last.photo_url)}" alt=""><span class="k">✓</span>${photos.length>1?`<span class="n">${photos.length}</span>`:''}</button>`
+    :(locked?`<div class="pt-cam ${skipped?'skip':''}" style="cursor:default">${skipped?'<span style="font-size:20px">—</span>':''}</div>`
+      :`<button type="button" class="pt-cam ${skipped?'skip':''}" onclick="${pick}">${skipped?'<span style="font-size:20px">—</span>':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.6"/></svg>'}</button>`);
+  return `<div class="pt-tile ${done?'ok':''} ${cat.wide?'wide':''}">
+    ${cam}
+    <div class="pt-tl"><span>${cat.icon}</span><span>${cat.label}</span>${cat.required?'<em>*</em>':''}</div>
+    ${!locked?`<div class="pt-tb">
+      <button type="button" class="p" onclick="${pick}">${done&&!cat.multi?L.retake:L.photo}</button>
+      ${!done?`<button type="button" onclick="portalSkipPhoto('${esc(carId)}','${esc(eventType)}','${esc(cat.key)}')">${L.no_photo}</button>`:''}
+      <input id="${inId}" type="file" accept="image/*" capture="environment" style="display:none" onchange="portalUploadPhoto('${esc(carId)}','${esc(eventType)}',this,'${esc(cat.key)}')">
+    </div>`:''}
+  </div>`;
 }
 
+// Grille de photos : le CMR (obligatoire) occupe toute la largeur ; si le nombre de cases qui le précèdent est impair, la dernière s'étend aussi
+function wideLast(cats){const n=cats.length;return cats.map((c,i)=>({...c,wide:c.required||(i===n-2&&(n-1)%2===1)}));}
 function renderCarPortalCard(car,lang,L){
   const isLoaded=phaseComplete(car.id,'loading');
   const isDelivered=phaseComplete(car.id,'delivery');
@@ -6675,55 +6754,41 @@ function renderCarPortalCard(car,lang,L){
   const carDocs=portalDocs.filter(d=>d.car_id===car.id);
   const catsLoad=getPhotoCatsLoading(lang);
   const catsDel=getPhotoCatsDelivery(lang);
-
+  const prog=(cats,type)=>cats.filter(c=>getEventsByKey(car.id,type,c.key).length>0).length+' / '+cats.length;
+  const s1=isLoaded?'ok':'on',s2=isDelivered?'ok':(isLoaded?'on':'');
+  const stepTxt=(cls,n)=>cls==='ok'?'✓':n;
+  const cta=(type,enabled,label)=>`<div class="pt-cta"><button ${enabled?'':'disabled'} onclick="portalConfirmPhase('${esc(car.id)}','${type}')">${label}</button>${enabled?'':`<div class="pt-hint">${L.cmr_required}</div>`}</div>`;
   return `
-    <div class="portal-car">
-      <div class="portal-car-head">
+    <div class="pt-car">
+      <div class="pt-ch">
         <div>
-          <div style="font-weight:800;font-size:16px">${esc(car.make)} ${esc(car.model)}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:3px">${L.vin} : ${esc(car.vin||'—')}　·　${L.plate} : ${esc(car.plate||'—')}</div>
+          <div class="pt-cn">${esc(car.make)} ${esc(car.model)}</div>
+          ${car.plate?`<span class="pt-plate">${esc(car.plate)}</span>`:''}
+          <span class="pt-vin">${L.vin} ${esc(car.vin||'—')}</span>
         </div>
-        <span class="badge ${isDelivered?'green':isLoaded?'blue':''}">${isDelivered?L.badge_delivered:isLoaded?L.badge_loaded:L.badge_pending}</span>
+        <span class="pt-chip ${isDelivered?'g':isLoaded?'b':''}">${isDelivered?L.badge_delivered:isLoaded?L.badge_loaded:L.badge_pending}</span>
+      </div>
+      <div class="pt-steps">
+        <div class="pt-step ${s1}"><i>${stepTxt(s1,1)}</i>${L.pickup}</div><div class="pt-bar ${isLoaded?'ok':''}"></div>
+        <div class="pt-step ${s2}"><i>${stepTxt(s2,2)}</i>${L.delivery}</div>
       </div>
 
-      <!-- DOCUMENTS REÇUS -->
-      ${carDocs.length?`
-      <div style="border:1px solid #d0e8f5;border-radius:8px;padding:11px;margin-bottom:10px;background:#f5fafd">
-        <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:#2675a9;margin-bottom:8px">${L.docs_received} (${carDocs.length})</div>
-        ${carDocs.map(d=>`
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-top:1px solid #e0eef7">
-            <span style="font-size:12px;font-weight:600">📄 ${esc(d.name||'Document')}</span>
-            ${d.url?`<a href="${esc(d.url)}" target="_blank" style="font-size:11px;background:var(--blue);color:white;padding:5px 10px;border-radius:6px;font-weight:700;text-decoration:none">${L.doc_open}</a>`:`<span style="font-size:11px;color:var(--muted)">${L.doc_none}</span>`}
-          </div>`).join('')}
+      ${carDocs.length?`<div class="pt-docs"><h4>${L.docs_received} (${carDocs.length})</h4>
+        ${carDocs.map(d=>`<div class="pt-doc"><span>📄 ${esc(d.name||'Document')}</span>${d.url?`<a href="${esc(d.url)}" target="_blank">${L.doc_open}</a>`:`<span style="color:var(--pt-mut);font-size:11px">${L.doc_none}</span>`}</div>`).join('')}
       </div>`:''}
 
-      <!-- CHARGEMENT -->
-      <div class="portal-section ${isLoaded?'done':''}">
-        <div class="portal-section-label" style="margin-bottom:12px">${isLoaded?'✓ ':''}${L.loading_title}${isLoaded?L.confirmed_suffix:''}</div>
-        ${catsLoad.map(cat=>renderPhotoRow(cat,car.id,'loading',isLoaded,L)).join('')}
-        <!-- VIDÉO OPTIONNELLE -->
+      <div class="pt-sec ${isLoaded?'done':''}">
+        <div class="pt-sh"><div class="pt-st">${isLoaded?'✓ ':''}${L.loading_title}${isLoaded?L.confirmed_suffix:''}</div><span class="pt-cnt">${prog(catsLoad,'loading')}</span></div>
+        <div class="pt-grid">${wideLast(catsLoad).map(cat=>renderPhotoRow(cat,car.id,'loading',isLoaded,L)).join('')}</div>
         ${renderVideoRow(car.id,'loading',isLoaded,L)}
-        ${!isLoaded?`
-          <button class="portal-confirm-btn" ${!loadCmrDone?'disabled style="opacity:.45;cursor:not-allowed"':''} onclick="portalConfirmPhase('${esc(car.id)}','loading')">
-            ${L.btn_confirm_loading}
-          </button>
-          ${!loadCmrDone?`<div style="text-align:center;font-size:11px;color:var(--muted);margin-top:6px">${L.cmr_required}</div>`:''}
-        `:`
-          <div style="text-align:center;padding:8px;font-size:12px;color:var(--green);font-weight:700">${L.loading_done}</div>
-        `}
+        ${!isLoaded?cta('loading',loadCmrDone,L.btn_confirm_loading):`<div class="pt-okmsg">${L.loading_done}</div>`}
       </div>
 
-      <!-- LIVRAISON -->
-      <div class="portal-section ${isDelivered?'done':''} ${!isLoaded&&!isDelivered?'locked':''}">
-        <div class="portal-section-label" style="margin-bottom:${isLoaded?'12px':'0'}">${isDelivered?'✓ ':''}${L.delivery_title}${isDelivered?L.confirmed_suffix:!isLoaded?' ('+L.delivery_locked+')':''}</div>
-        ${isLoaded?catsDel.map(cat=>renderPhotoRow(cat,car.id,'delivery',isDelivered,L)).join(''):''}
-        ${isLoaded&&!isDelivered?`
-          <button class="portal-confirm-btn" ${!delivCmrDone?'disabled style="opacity:.45;cursor:not-allowed"':''} onclick="portalConfirmPhase('${esc(car.id)}','delivery')">
-            ${L.btn_confirm_delivery}
-          </button>
-          ${!delivCmrDone?`<div style="text-align:center;font-size:11px;color:var(--muted);margin-top:6px">${L.cmr_required}</div>`:''}
-        `:''}
-        ${isDelivered?`<div style="text-align:center;padding:8px;font-size:12px;color:var(--green);font-weight:700">${L.delivery_done}</div>`:''}
+      <div class="pt-sec ${isDelivered?'done':''} ${!isLoaded&&!isDelivered?'lock':''}">
+        <div class="pt-sh"><div class="pt-st">${isDelivered?'✓ ':''}${L.delivery_title}${isDelivered?L.confirmed_suffix:!isLoaded?' '+L.delivery_locked:''}</div>${isLoaded?`<span class="pt-cnt">${prog(catsDel,'delivery')}</span>`:''}</div>
+        ${isLoaded?`<div class="pt-grid">${wideLast(catsDel).map(cat=>renderPhotoRow(cat,car.id,'delivery',isDelivered,L)).join('')}</div>`:''}
+        ${isLoaded&&!isDelivered?cta('delivery',delivCmrDone,L.btn_confirm_delivery):''}
+        ${isDelivered?`<div class="pt-okmsg">${L.delivery_done}</div>`:''}
       </div>
     </div>
   `;
@@ -6736,23 +6801,19 @@ function inspOpenPhoto(url){window.open(url,'_blank');}
 function renderVideoRow(carId,eventType,locked,L){
   const vidEvts=portalEvents.filter(e=>e.car_id===carId&&e.event_type===eventType&&e.video_url);
   const hasVideo=vidEvts.length>0;
-  if(locked&&!hasVideo)return ''; // si phase terminée et pas de vidéo → on n'affiche rien
+  if(locked&&!hasVideo)return '';
+  const vic='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/></svg>';
   return `
-    <div style="border:1px solid ${hasVideo?'#c3e6cb':'#dce8f2'};border-radius:8px;padding:11px;margin-bottom:8px;background:${hasVideo?'#f6fcf8':'#f8fbfd'}">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:12px;font-weight:700">🎬 Vidéo <span style="font-size:10px;color:var(--muted);font-weight:400">(optionnelle)</span></span>
-        ${!locked?`<div style="display:flex;gap:6px;align-items:center">
-          ${!hasVideo?`<label style="cursor:pointer;background:var(--pale);border:1px solid #d0e8f5;color:var(--blue);padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700">
-            📹 Ajouter une vidéo
-            <input type="file" accept="video/*" capture="environment" style="display:none" onchange="portalUploadVideo('${esc(carId)}','${esc(eventType)}',this)">
-          </label>`:'<span style="color:var(--green);font-size:11px;font-weight:700">✓ Vidéo ajoutée</span>'}
-        </div>`:''}
+    <div class="pt-video ${hasVideo?'ok':''}">
+      <div class="pt-vh">
+        <span>🎬 Video <small>(opt.)</small></span>
+        ${!locked?(!hasVideo?`<label class="pt-vl">${vic}＋<input type="file" accept="video/*" capture="environment" style="display:none" onchange="portalUploadVideo('${esc(carId)}','${esc(eventType)}',this)"></label>`:'<span style="color:var(--pt-ok);font-size:12px;font-weight:800">✓</span>'):''}
       </div>
       <div id="vid-progress-${esc(carId)}-${esc(eventType)}" style="display:none;margin-top:8px">
-        <div style="font-size:11px;color:var(--muted);margin-bottom:4px" id="vid-progress-label-${esc(carId)}-${esc(eventType)}">Envoi en cours…</div>
-        <div style="background:#e0ecf7;border-radius:4px;height:6px"><div id="vid-progress-bar-${esc(carId)}-${esc(eventType)}" style="background:var(--blue);height:6px;border-radius:4px;width:0%;transition:width .3s"></div></div>
+        <div style="font-size:11px;color:var(--pt-mut);margin-bottom:4px" id="vid-progress-label-${esc(carId)}-${esc(eventType)}">…</div>
+        <div style="background:var(--pt-line);border-radius:4px;height:6px"><div id="vid-progress-bar-${esc(carId)}-${esc(eventType)}" style="background:var(--pt-brand);height:6px;border-radius:4px;width:0%;transition:width .3s"></div></div>
       </div>
-      ${hasVideo?`<div style="margin-top:8px">${vidEvts.map(e=>`<video src="${esc(e.video_url)}" controls playsinline style="width:100%;border-radius:6px;max-height:200px;background:#000"></video>`).join('')}</div>`:''}
+      ${hasVideo?`<div style="margin-top:8px">${vidEvts.map(e=>`<video src="${esc(e.video_url)}" controls playsinline style="width:100%;border-radius:10px;max-height:220px;background:#000"></video>`).join('')}</div>`:''}
     </div>`;
 }
 
