@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="fr">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#102d4c">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0e2a47"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 <title>AutoDispatch</title>
 <style>
 :root{--navy:#102d4c;--blue:#2675a9;--pale:#edf5fb;--ink:#20384e;--muted:#74879a;--line:#e2e9ef;--bg:#f4f7fa;--green:#24784d;--amber:#9a6b18;--red:#a54b48}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px Arial,Helvetica,sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid #4a9cdc;outline-offset:2px}
@@ -73,6 +73,93 @@
 @media(max-width:950px){.sidebar{width:190px}.main{margin-left:190px;width:calc(100% - 190px)}.stats{grid-template-columns:repeat(2,1fr)}.recent-row{grid-template-columns:100px 1fr 1fr 100px}.recent-row>*:nth-child(3){display:none}.cards{grid-template-columns:repeat(2,1fr)}}@media(max-width:680px){.sidebar{width:62px;padding:14px 6px}.brand{padding:5px 9px 20px;font-size:0}.brand:before{content:'AD';font-size:16px;color:white}.brand span,.brand small,.nav-label,.nav button:not(.active) .label,.nav .label,.sidebar-foot{display:none}.nav button{justify-content:center;padding:12px 4px}.nav .icon{font-size:17px}.main{margin-left:62px;width:calc(100% - 62px)}.topbar{padding:0 13px;height:60px}.content{padding:17px 12px}.heading{align-items:flex-start;flex-direction:column}.heading h1{font-size:22px}.stats{gap:8px}.stat{padding:12px}.stat strong{font-size:19px}.cards{grid-template-columns:1fr}.route{grid-template-columns:1fr}.recent-row{grid-template-columns:88px 1fr 90px}.recent-row>*:nth-child(4){display:none}.form-grid{grid-template-columns:1fr}.field.wide,.form-section{grid-column:1}.car-form{grid-template-columns:1fr 1fr}.mission-mini{grid-template-columns:24px 1fr 95px}.heading>.btn{align-self:flex-start}.toolbar input[type=search]{min-width:100%}}
 @media(max-height:900px){.sidebar{padding:14px 11px}.brand{padding-bottom:14px}.nav{gap:2px}.nav button{padding:8px 12px}.nav-label{padding:6px 12px}.sidebar-foot{padding:10px}}
 @media(max-height:700px){.nav button{padding:6px 12px}}
+
+/* ═════════ DESIGN V2 : couleurs, typographie, cartes, navigation ═════════ */
+:root{--navy:#0e2a47;--blue:#2677b4;--brand:#2f8ad0;--pale:#eef5fb;--ink:#1c3349;--muted:#6f8396;--line:#e3eaf1;--bg:#f3f6fa;--green:#1f8a5b;--amber:#b0741a;--red:#c0443f;--r:14px;--sh1:0 1px 2px rgba(15,42,71,.05);--sh2:0 2px 6px rgba(15,42,71,.05),0 12px 30px rgba(15,42,71,.07)}
+body{font:14px/1.5 'Inter',-apple-system,'Segoe UI',Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.heading h1{font-size:27px;font-weight:800;letter-spacing:-.7px}
+.heading p{font-size:13px}
+.stat,.panel,.card{border-radius:var(--r);box-shadow:var(--sh1);border-color:var(--line)}
+.panel{padding:20px}
+.panel-title h2{font-size:15px;font-weight:700;letter-spacing:-.2px}
+.btn{border-radius:9px;font-weight:600;padding:9px 14px;transition:transform .12s,box-shadow .12s,background .12s,border-color .12s}
+.btn:hover{transform:translateY(-1px);box-shadow:0 3px 10px rgba(15,42,71,.10)}
+.btn:active{transform:none;box-shadow:none}
+.btn.primary{background:linear-gradient(180deg,#3490d6,#2677b4);border-color:#2271ab;box-shadow:0 1px 2px rgba(38,119,180,.35)}
+.btn.primary:hover{background:linear-gradient(180deg,#3a98de,#2a7fbd)}
+input,select,textarea{border-radius:8px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand)!important;box-shadow:0 0 0 3px rgba(47,138,208,.18)}
+.table-wrap{border-radius:12px;box-shadow:var(--sh1)}
+th{background:#f6f9fc;padding:12px}
+tbody tr{transition:background .1s}
+tbody tr:hover{background:#f7fbff}
+.badge{font-weight:700;letter-spacing:.1px}
+.modal{border-radius:16px;box-shadow:0 24px 70px rgba(10,30,50,.28)}
+.topbar{background:rgba(255,255,255,.9);-webkit-backdrop-filter:saturate(1.5) blur(10px);backdrop-filter:saturate(1.5) blur(10px)}
+.crumb strong{font-weight:700}
+/* — Menu latéral — */
+.sidebar{background:linear-gradient(185deg,#12315a 0%,#0e2a47 45%,#0a2038 100%)}
+.brand{font-weight:800;letter-spacing:-.6px}
+.brand small{letter-spacing:2.4px;opacity:.75}
+.nav-label{display:none}
+.nav{gap:0}
+.nav-group{margin-top:10px}
+.nav-group:first-child{margin-top:2px}
+.nav-group-h{display:flex;align-items:center;justify-content:space-between;width:100%;background:none;border:0;color:#7f9cb6;font-size:10.5px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;padding:7px 12px;border-radius:7px}
+.nav-group-h:hover{color:#cfe0ee;background:rgba(255,255,255,.04)}
+.nav-group-h svg{width:12px;height:12px;transition:transform .15s;flex-shrink:0}
+.nav-group.closed .nav-group-h svg{transform:rotate(-90deg)}
+.nav-group.closed .nav-items{display:none}
+.nav-items{display:grid;gap:2px;margin-top:2px}
+.nav button.nav-item{position:relative;padding:9px 12px;gap:11px;font-size:13.5px;font-weight:600;border-radius:9px;color:#bcd0e0;transition:background .12s,color .12s}
+.nav button.nav-item .icon{width:20px;display:flex;align-items:center;justify-content:center}
+.nav button.nav-item svg{width:18px;height:18px;opacity:.82}
+.nav button.nav-item:hover{background:rgba(255,255,255,.07);color:#fff}
+.nav button.nav-item.active{background:rgba(255,255,255,.12);color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.04)}
+.nav button.nav-item.active::before{content:'';position:absolute;left:-13px;top:9px;bottom:9px;width:4px;border-radius:0 4px 4px 0;background:#5ab0e8}
+.nav button.nav-item.active svg{opacity:1;color:#8fd0ff}
+.nbadge{margin-left:auto;min-width:21px;text-align:center;padding:1px 7px;border-radius:20px;font-size:10.5px;font-weight:800;line-height:1.5;background:rgba(255,255,255,.14);color:#dbe8f3}
+.nbadge.red{background:#e5534b;color:#fff}
+.nbadge.amber{background:#f0b240;color:#3a2a05}
+.sidebar-foot{border-top-color:rgba(255,255,255,.1)}
+#user-info{font-size:11.5px;color:#c7d8e7;font-weight:600}
+@media(min-width:951px){.sidebar{width:248px}.main{margin-left:248px;width:calc(100% - 248px)}}
+@media(max-width:680px){.top-actions>.btn:not(.primary):not(.notif-bell){display:none}.top-actions .btn.primary{padding:8px 10px;font-size:11.5px}.nav .nav-group-h{display:none}.nav-group{margin-top:4px}.nav-group.closed .nav-items{display:grid}.nav .nbadge{display:none!important}.nav button.nav-item{padding:11px 4px;justify-content:center}.nav button.nav-item.active::before{left:-6px}}
+/* — Tableau de bord — */
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:14px}
+.kpi{position:relative;display:flex;gap:14px;align-items:center;padding:18px;background:#fff;border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh1);cursor:pointer;transition:transform .15s,box-shadow .15s}
+.kpi:hover{transform:translateY(-2px);box-shadow:var(--sh2)}
+.kpi-ic{width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--tint,#eef5fb);color:var(--tone,#2677b4)}
+.kpi-ic svg{width:22px;height:22px}
+.kpi small{display:block;font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.2px}
+.kpi strong{display:block;font-size:28px;line-height:1.1;font-weight:800;letter-spacing:-1px;color:var(--ink);margin-top:3px}
+.kpi em{display:block;font-style:normal;font-size:11px;color:#8094a6;margin-top:3px}
+.kpi.alert{border-color:#f3c9c6;background:linear-gradient(180deg,#fff,#fff6f5)}
+.kpi.alert strong{color:var(--red)}
+.kpi.warn{border-color:#f1dba8;background:linear-gradient(180deg,#fff,#fffaf0)}
+.kpis.mini{grid-template-columns:repeat(3,minmax(0,1fr))}
+.kpis.mini .kpi{padding:14px 16px}.kpis.mini .kpi strong{font-size:22px}.kpis.mini .kpi-ic{width:38px;height:38px}
+.dash-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:14px;margin-bottom:16px}
+.todo-row{display:flex;gap:12px;align-items:center;padding:11px 0;border-top:1px solid #eef2f6}
+.todo-row:first-of-type{border-top:0}
+.todo-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.todo-row span.t{flex:1;font-size:12.5px;line-height:1.4;color:#34495e}
+.todo-row b.c{display:block;font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:#8094a6;margin-bottom:1px}
+.statusbar{display:flex;height:12px;border-radius:8px;overflow:hidden;background:#eef2f6;margin:6px 0 12px}
+.statusbar i{display:block;height:100%}
+.legend{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:12px;color:#4b6075}
+.legend span{display:flex;align-items:center;gap:7px}
+.legend u{width:9px;height:9px;border-radius:3px;display:inline-block;text-decoration:none}
+.legend b{margin-left:auto;color:var(--ink)}
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;align-items:end;height:120px;margin-top:6px}
+.week .d{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px;height:100%}
+.week .bars{display:flex;align-items:flex-end;gap:3px;height:84px}
+.week .bars i{display:block;width:13px;border-radius:5px 5px 2px 2px;min-height:3px}
+.week .lab{font-size:10.5px;color:#7a8ea1;font-weight:600}
+.week .d.today .lab{color:var(--blue);font-weight:800}
+.empty-ok{display:flex;flex-direction:column;align-items:center;gap:6px;padding:26px 10px;color:var(--green);font-weight:600;font-size:13px}
+@media(max-width:1100px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.dash-grid{grid-template-columns:1fr}}
+@media(max-width:600px){.kpis,.kpis.mini{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -1132,21 +1219,80 @@ async function dbDelete(table,id){
 }
 
 // ─── NAV & RENDER ────────────────────────────────────────────────
+const NAV_ICONS={
+"Vue d'ensemble":'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+'Contrôle':'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+'Exceptions et journal':'<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17.3v.4"/>',
+'Planning général':'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>',
+'Missions':'<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4h6v3H9zM9 12h6M9 16h4"/>',
+'Carte':'<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',
+'Planning camions':'<circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5"/>',
+'Affrètement':'<path d="M4 8h14l-3-3M20 16H6l3 3"/>',
+'Bourse de fret':'<path d="M3 9l1.5-5h15L21 9v1a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0zM5 13v7h14v-7"/>',
+'Clients':'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.2a6 6 0 0 1 3.5 5.8"/>',
+'Sites':'<path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+'Véhicules':'<path d="M5 17H3v-4l2-6a2 2 0 0 1 2-1h10a2 2 0 0 1 2 1l2 6v4h-2"/><path d="M3 13h18M8 17h8"/><circle cx="7.5" cy="17" r="1.6"/><circle cx="16.5" cy="17" r="1.6"/>',
+'Transporteurs':'<path d="M2 6h11v10H2zM13 9h4l4 4v3h-8z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+'Documents':'<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+'Finance':'<path d="M18 6.5A7 7 0 1 0 18 17.5M4 10h9M4 14h9"/>',
+'Facturation':'<path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6"/>',
+'Rapports':'<path d="M4 21V10M10 21V4M16 21v-8M2 21h20"/>',
+'Règles et coûts':'<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
+'Résumé':'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.4"/>'};
+const NAV_GROUPS=[['pilotage','Pilotage',["Vue d'ensemble",'Contrôle','Exceptions et journal']],
+ ['operations','Opérations',['Planning général','Missions','Carte','Planning camions','Affrètement','Bourse de fret']],
+ ['donnees','Données',['Clients','Sites','Véhicules','Transporteurs','Documents']],
+ ['finance','Finance',['Finance','Facturation','Rapports']],
+ ['reglages','Réglages',['Règles et coûts','Résumé']]];
+const navIcon=n=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${NAV_ICONS[n]||'<circle cx="12" cy="12" r="4"/>'}</svg>`;
+let _navClosed=(()=>{try{return JSON.parse(localStorage.getItem('adNavClosed')||'[]');}catch(_){return[];}})();
+function toggleNavGroup(id){
+  _navClosed=_navClosed.includes(id)?_navClosed.filter(x=>x!==id):[..._navClosed,id];
+  try{localStorage.setItem('adNavClosed',JSON.stringify(_navClosed));}catch(_){}
+  const g=document.querySelector(`.nav-group[data-g="${id}"]`);if(g)g.classList.toggle('closed',_navClosed.includes(id));
+}
+function renderNav(){
+  const known=new Set(NAV.map(x=>x[0]));
+  const used=new Set();
+  const grp=NAV_GROUPS.map(([id,label,items])=>{
+    const its=items.filter(n=>known.has(n));its.forEach(n=>used.add(n));
+    return `<div class="nav-group ${_navClosed.includes(id)?'closed':''}" data-g="${id}"><button class="nav-group-h" onclick="toggleNavGroup('${id}')"><span>${label}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-items">${its.map(n=>`<button class="nav-item" data-name="${esc(n)}" onclick="setView(this.dataset.name)"><span class="icon">${navIcon(n)}</span><span class="label">${esc(n)}</span><span class="nbadge" data-b="${esc(n)}" style="display:none"></span></button>`).join('')}</div></div>`;
+  });
+  const rest=NAV.map(x=>x[0]).filter(n=>!used.has(n));   // toute nouvelle page non classée reste visible
+  if(rest.length)grp.push(`<div class="nav-group" data-g="autres"><div class="nav-items">${rest.map(n=>`<button class="nav-item" data-name="${esc(n)}" onclick="setView(this.dataset.name)"><span class="icon">${navIcon(n)}</span><span class="label">${esc(n)}</span></button>`).join('')}</div></div>`);
+  document.getElementById('nav').innerHTML=grp.join('');
+}
+// Pastilles : ce qui demande une action
+function updateNavBadges(){
+  try{
+    const b={};
+    const ex=computeExceptions(),red=ex.filter(x=>x.sev==='red').length,amb=ex.filter(x=>x.sev==='amb').length;
+    if(red)b['Exceptions et journal']=[red,'red'];else if(amb)b['Exceptions et journal']=[amb,'amber'];
+    const topl=db.missions.filter(m=>m.status==='à planifier').length;if(topl)b['Missions']=[topl,''];
+    const pend=db.offers.filter(o=>o.status==='pending').length;if(pend)b['Bourse de fret']=[pend,'amber'];
+    const od=db.invoices.filter(i=>invOverdueDays(i)>0).length;if(od)b['Facturation']=[od,'red'];
+    const bl=db.carriers.filter(c=>carrierCompliance(c.id).blocked).length;if(bl)b['Transporteurs']=[bl,'amber'];
+    document.querySelectorAll('.nbadge[data-b]').forEach(el=>{
+      const v=b[el.dataset.b];
+      if(v){el.textContent=v[0];el.className='nbadge '+v[1];el.style.display='';}else el.style.display='none';
+    });
+  }catch(e){}
+}
 function setView(v){
   current=v;
   document.getElementById('crumb').textContent=v;
   render();
-  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.name===v));
+  document.querySelectorAll('.nav button[data-name]').forEach(b=>b.classList.toggle('active',b.dataset.name===v));
+  const act=document.querySelector('.nav-item.active');if(act){const g=act.closest('.nav-group');if(g)g.classList.remove('closed');}
 }
 
 function boot(){
-  document.getElementById('nav').innerHTML=NAV.map(([n,i])=>
-    `<button data-name="${esc(n)}" onclick="setView(this.dataset.name)"><span class="icon">${i}</span><span class="label">${esc(n)}</span></button>`
-  ).join('');
+  renderNav();
   setView(current);
 }
 
-function render(){
+function render(){_renderCore();updateNavBadges();}
+function _renderCore(){
   const view=document.getElementById('view');if(!view)return;
   if(current==="Vue d'ensemble")view.innerHTML=dashboard();
   else if(current==='Résumé')view.innerHTML=summary();
@@ -1196,12 +1342,44 @@ function dashboard(){
   const inTransit=db.missions.reduce((n,m)=>n+m.cars.filter(c=>c.status==='en transport'||c.status==='chargé').length,0);
 
   const kpiStyle=(color)=>`color:${color};font-size:26px;margin-top:9px;display:block`;
-  return heading("Vue d'ensemble","Tableau de bord opérationnel · "+new Date().toLocaleDateString('fr-BE',{weekday:'long',day:'numeric',month:'long'}))+
-  `<div class="grid stats" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:8px">
-    <div class="stat"><small>Missions actives</small><strong style="${kpiStyle('var(--blue)')}">${activeMissions.length}</strong><em>${db.missions.length} total · ${inTransit} en transit</em></div>
-    <div class="stat" style="${lateMissions.length?'background:#fff5f5;border-color:#fcd4d4':''}"><small style="${lateMissions.length?'color:var(--red);font-weight:800':''}">⚠ En retard</small><strong style="${kpiStyle(lateMissions.length?'var(--red)':'var(--green)')}">${lateMissions.length}</strong><em>${lateMissions.length?lateMissions.slice(0,2).map(m=>m.ref).join(', ')+(lateMissions.length>2?' +'+( lateMissions.length-2):''):'Tout est à jour ✓'}</em></div>
-    <div class="stat" style="${toLoadToday.length?'background:#fffbf0;border-color:#f5dfa0':''}"><small style="${toLoadToday.length?'color:var(--amber);font-weight:800':''}">📦 À charger aujourd'hui</small><strong style="${kpiStyle(toLoadToday.length?'var(--amber)':'#8094a6')}">${toLoadToday.length}</strong><em>${toLoadToday.length?toLoadToday.map(m=>m.ref).join(', '):'Rien de prévu'}</em></div>
-    <div class="stat"><small>Livrées aujourd'hui</small><strong style="${kpiStyle('var(--green)')}">${deliveredToday.length}</strong><em>${totalVehicles} véhicules · ${db.clients.length} clients</em></div>
+  const ic=n=>navIcon(n);
+  const toPlan=db.missions.filter(m=>m.status==='à planifier').length;
+  const invDone=(typeof invoicedMids==='function')?invoicedMids():new Set();
+  const toInvoice=db.missions.filter(m=>['livré','à facturer'].includes(m.status)&&!invDone.has(m.id)).reduce((q,m)=>q+(m.priceSell||0),0);
+  const unpaid=(db.invoices||[]).filter(i=>i.status==='issued').reduce((q,i)=>q+i.total,0);
+  const ex=(typeof computeExceptions==='function')?computeExceptions():[];
+  const sevCol={red:'#e5534b',amb:'#f0a93a',info:'#4a97d4'};
+  const byStatus={};db.missions.forEach(m=>{byStatus[m.status]=(byStatus[m.status]||0)+1;});
+  const ST=[['à planifier','#f0b240'],['attribué','#8f9db0'],['à charger','#6aa6d8'],['en transport','#2f8ad0'],['livré','#38b07a'],['à facturer','#a77bd8'],['facturé','#7d6ad8'],['payé','#1f8a5b'],['annulé','#c4cbd3']];
+  const totalM=db.missions.length||1;
+  const days=Array.from({length:7},(_,i)=>{const d=new Date(todayD);d.setDate(d.getDate()+i);return d;});
+  const iso=d=>d.toLocaleDateString('sv-SE');
+  const wk=days.map(d=>({d,p:db.missions.filter(m=>m.pickupDate===iso(d)).length,l:db.missions.filter(m=>m.deliveryDate===iso(d)).length}));
+  const wmax=Math.max(1,...wk.map(x=>Math.max(x.p,x.l)));
+  const kpi=(cls,icon,tone,tint,label,val,sub,go)=>`<div class="kpi ${cls}" style="--tone:${tone};--tint:${tint}" onclick="${go}"><div class="kpi-ic">${ic(icon)}</div><div><small>${label}</small><strong>${val}</strong><em>${sub}</em></div></div>`;
+  return heading("Vue d'ensemble",new Date().toLocaleDateString('fr-BE',{weekday:'long',day:'numeric',month:'long'})+" · tout ce qui demande ton attention")+
+  `<div class="kpis">
+    ${kpi('', 'Missions','#2677b4','#e8f2fb','Missions actives',activeMissions.length,`${db.missions.length} au total · ${inTransit} véhicule(s) en route`,"setView('Missions')")}
+    ${kpi(lateMissions.length?'alert':'','Exceptions et journal',lateMissions.length?'#c0443f':'#1f8a5b',lateMissions.length?'#fdeceb':'#e6f5ee','En retard',lateMissions.length,lateMissions.length?'à traiter en priorité':'tout est dans les temps',"setView('Exceptions et journal')")}
+    ${kpi(toPlan?'warn':'','Planning camions','#b0741a','#fdf3e1','À planifier',toPlan,toPlan?'missions sans affectation':'rien en attente',"setView('Carte')")}
+    ${kpi(toLoadToday.length?'warn':'','Transporteurs','#6b5bd2','#efecfb',"À charger aujourd'hui",toLoadToday.length,`${deliveredToday.length} livrée(s) aujourd'hui`,"setView('Planning général')")}
+  </div>
+  <div class="kpis mini">
+    ${kpi('','Facturation','#a77bd8','#f3ecfb','À facturer',eur(toInvoice),'missions livrées',"invTab='todo';setView('Facturation')")}
+    ${kpi('','Finance','#2677b4','#e8f2fb','Facturé, non payé',eur(unpaid),'encours clients',"invTab='list';setView('Facturation')")}
+    ${kpi('','Véhicules','#1f8a5b','#e6f5ee','Véhicules suivis',totalVehicles,`${db.clients.length} client(s) · ${db.carriers.length} transporteur(s)`,"setView('Véhicules')")}
+  </div>
+  <div class="dash-grid">
+    <div class="panel"><div class="panel-title"><h2>À traiter</h2><button class="btn" onclick="setView('Exceptions et journal')">Tout voir${ex.length>6?' ('+ex.length+')':''}</button></div>
+      ${ex.length?ex.slice(0,6).map(x=>`<div class="todo-row"><span class="todo-dot" style="background:${sevCol[x.sev]}"></span><span class="t"><b class="c">${esc(x.cat)}</b>${esc(x.text)}</span><button class="btn" onclick="${x.act}">Ouvrir</button></div>`).join(''):`<div class="empty-ok"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.5"/></svg>Rien d'urgent : tout est en ordre.</div>`}
+    </div>
+    <div style="display:grid;gap:14px;align-content:start">
+      <div class="panel"><div class="panel-title"><h2>Répartition des missions</h2></div>
+        <div class="statusbar">${ST.filter(([k])=>byStatus[k]).map(([k,c])=>`<i style="width:${byStatus[k]/totalM*100}%;background:${c}" title="${esc(k)} : ${byStatus[k]}"></i>`).join('')}</div>
+        <div class="legend">${ST.filter(([k])=>byStatus[k]).map(([k,c])=>`<span><u style="background:${c}"></u>${esc(k)}<b>${byStatus[k]}</b></span>`).join('')||'<span>Aucune mission</span>'}</div></div>
+      <div class="panel"><div class="panel-title"><h2>7 prochains jours</h2><small style="color:var(--muted);font-size:11px"><u style="background:#2f8ad0;display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px"></u>chargements <u style="background:#38b07a;display:inline-block;width:8px;height:8px;border-radius:2px;margin:0 4px 0 8px"></u>livraisons</small></div>
+        <div class="week">${wk.map((x,i)=>`<div class="d ${i===0?'today':''}"><div class="bars"><i style="height:${Math.max(3,x.p/wmax*80)}px;background:#2f8ad0" title="${x.p} chargement(s)"></i><i style="height:${Math.max(3,x.l/wmax*80)}px;background:#38b07a" title="${x.l} livraison(s)"></i></div><span class="lab">${i===0?"Auj.":x.d.toLocaleDateString('fr-BE',{weekday:'short'})}</span></div>`).join('')}</div></div>
+    </div>
   </div>
   ${lateMissions.length?`<div class="panel" style="border-color:#fcd4d4;background:#fff8f8;margin-bottom:16px">
     <div class="panel-title" style="margin-bottom:10px"><h2 style="color:var(--red)">⚠ Missions en retard (${lateMissions.length})</h2><button class="btn" onclick="filterStatus='à charger';setView('Missions')">Voir toutes</button></div>
