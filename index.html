@@ -210,6 +210,13 @@ tbody tr:hover{background:#f7fbff}
 .seg button.on b{background:rgba(255,255,255,.25);color:#fff}
 /* planning camions */
 .tr-day{border-radius:6px}
+
+/* Contrôle : lignes qui s'adaptent à la largeur (plus de texte qui déborde) */
+.ctl .recent-row{display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px 20px;padding:14px 4px}
+.ctl .recent-row>strong{flex:1 1 210px;min-width:0;overflow-wrap:anywhere}
+.ctl .recent-row>strong small{display:block;margin-top:3px;overflow-wrap:anywhere}
+.ctl .recent-row>span{flex:2 1 280px;min-width:0;line-height:1.9}
+.ctl .recent-row>div{flex:0 1 auto;display:flex;gap:6px;flex-wrap:wrap}
 /* ═════════ MODE SOMBRE (généré à partir des styles clairs) ═════════ */
 
 html[data-theme="dark"]{color-scheme:dark;--bg:#0b1520;--card:#142130;--ink:#e3ecf4;--muted:#93a7ba;--line:#26394c;--pale:#1b2f45;--blue:#4a9de0;--brand:#4a9de0;--green:#3fbf86;--amber:#e3a63f;--red:#ef7069;--sh1:0 1px 2px rgba(0,0,0,.35);--sh2:0 2px 6px rgba(0,0,0,.35),0 14px 34px rgba(0,0,0,.4)}
@@ -1325,9 +1332,10 @@ async function initApp(){
 }
 
 // ─── DATA LOAD ───────────────────────────────────────────────────
+const cleanMail=v=>String(v||'').replace(/^\s*mailto:/i,'').trim();   // une adresse collée avec « mailto: » devant reste utilisable
 function mapPartner(x){
-  return{id:x.id,name:x.name||'',contact:x.contact||'',email:x.email||'',
-    billingEmail:x.billing_email||'',vat:x.vat||'',phone:x.phone||'',
+  return{id:x.id,name:x.name||'',contact:x.contact||'',email:cleanMail(x.email),
+    billingEmail:cleanMail(x.billing_email),vat:x.vat||'',phone:x.phone||'',
     street:x.street||'',postal:x.postal||'',city:x.city||'',country:x.country||''};
 }
 
@@ -4142,7 +4150,7 @@ function controlPage(){
   const offersWaiting=db.missions.filter(m=>m.exchangeStatus==='open'&&offersOf(m.id).some(o=>o.status==='pending'));
   const row=(m,extra)=>`<div class="recent-row" style="cursor:pointer" onclick="openDetail('${esc(m.id)}')"><strong>${esc(m.ref)}<small>${esc(getClient(m).name||'—')}</small></strong><span>${esc(place(m.pickupCountry,m.pickupCity))} → ${esc(place(m.deliveryCountry,m.deliveryCity))}</span><span>${extra||''}</span><span style="font-size:12px">${esc(execInfo(m).label)}</span></div>`;
   const panel=(title,color,list,fmt,hint)=>`<div class="panel"><div class="panel-title"><h2 style="color:${color}">${title} <span style="font-size:13px">(${list.length})</span></h2>${hint?`<small>${hint}</small>`:''}</div>
-    ${list.slice(0,8).map(fmt).join('')||'<div style="color:var(--green);font-size:13px;padding:6px 0">✓ Rien à signaler</div>'}${list.length>8?`<div style="font-size:12px;color:var(--muted);padding:6px 0">… et ${list.length-8} autre(s)</div>`:''}</div>`;
+    <div class="ctl">${list.slice(0,8).map(fmt).join('')||'<div style="color:var(--green);font-size:13px;padding:6px 0">✓ Rien à signaler</div>'}</div>${list.length>8?`<div style="font-size:12px;color:var(--muted);padding:6px 0">… et ${list.length-8} autre(s)</div>`:''}</div>`;
   const tile=(label,n,col)=>`<div class="stat" style="${n?'border-color:'+col+';background:'+col+'12':''}"><small style="${n?'color:'+col+';font-weight:800':''}">${label}</small><strong style="color:${n?col:'var(--green)'};font-size:30px;margin-top:8px;display:block">${n}</strong></div>`;
   return heading('Contrôle','Tableau de bord du dispatcher : ce qui demande une action aujourd\'hui.')+
   `<div class="grid stats" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:12px">
@@ -6018,7 +6026,7 @@ function partnerForm(kind,id){
 
 async function savePartner(kind,id){
   if(!val('p-name')){document.getElementById('form-error').innerHTML='<div class="notice error">Indique le nom de la société.</div>';return;}
-  const p={id:id||crypto.randomUUID(),name:val('p-name'),vat:val('p-vat'),contact:val('p-contact'),phone:val('p-phone'),email:val('p-email'),billingEmail:val('p-billing'),street:val('p-street'),postal:val('p-postal'),city:val('p-city'),country:val('p-country')};
+  const p={id:id||crypto.randomUUID(),name:val('p-name'),vat:val('p-vat'),contact:val('p-contact'),phone:val('p-phone'),email:cleanMail(val('p-email')),billingEmail:cleanMail(val('p-billing')),street:val('p-street'),postal:val('p-postal'),city:val('p-city'),country:val('p-country')};
   const table=kind==='clients'?'clients':'carriers';
   setLoading(true);
   await dbUpsertPartner(table,p);
