@@ -160,6 +160,56 @@ tbody tr:hover{background:#f7fbff}
 .empty-ok{display:flex;flex-direction:column;align-items:center;gap:6px;padding:26px 10px;color:var(--green);font-weight:600;font-size:13px}
 @media(max-width:1100px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.dash-grid{grid-template-columns:1fr}}
 @media(max-width:600px){.kpis,.kpis.mini{grid-template-columns:1fr}}
+
+/* ═════════ DESIGN V2 : calendrier, statuts, planning camions ═════════ */
+.wk{background:var(--card,#fff);border:1px solid var(--line);border-radius:var(--r);padding:20px;margin-bottom:18px;box-shadow:var(--sh1)}
+.wk-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.wk-title{font-size:16px;font-weight:700;letter-spacing:-.2px}
+.wk-sub{font-size:12px;color:var(--muted);margin-top:3px}
+.wk-nav{display:flex;gap:6px;flex-shrink:0}
+.wk-legend{display:flex;gap:18px;font-size:11.5px;color:var(--muted);margin-bottom:14px;align-items:center;flex-wrap:wrap}
+.wk-legend i{width:10px;height:10px;border-radius:3px;display:inline-block;margin-right:6px;vertical-align:-1px}
+.wk-grid{display:grid;grid-template-columns:repeat(7,minmax(158px,1fr));gap:10px;overflow-x:auto;padding-bottom:6px}
+.wk-col{background:color-mix(in srgb,var(--line) 24%,transparent);border-radius:12px;padding:10px;min-height:160px}
+.wk-col.we{background:color-mix(in srgb,var(--line) 46%,transparent)}
+.wk-col.today{background:color-mix(in srgb,var(--brand) 9%,var(--card,#fff));box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--brand) 55%,transparent)}
+.wk-dayh{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.wk-dayn{display:flex;align-items:baseline;gap:6px}
+.wk-dayn b{font-size:22px;font-weight:800;letter-spacing:-1px;line-height:1}
+.wk-dayn span{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.9px;color:var(--muted)}
+.wk-col.today .wk-dayn b{color:var(--brand)}
+.wk-counts{display:flex;gap:4px}
+.wk-count{font-size:10.5px;font-weight:800;padding:1px 7px;border-radius:20px}
+.wk-count.l{background:color-mix(in srgb,var(--brand) 16%,transparent);color:var(--brand)}
+.wk-count.d{background:color-mix(in srgb,var(--green) 18%,transparent);color:var(--green)}
+.wk-card{background:var(--card,#fff);border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;padding:10px 11px;margin-bottom:8px;cursor:pointer;transition:transform .12s,box-shadow .12s}
+.wk-card:hover{transform:translateY(-1px);box-shadow:var(--sh2)}
+.wk-card.late{border-color:var(--red);box-shadow:0 0 0 1px color-mix(in srgb,var(--red) 35%,transparent)}
+.wk-t{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px}
+.wk-type{font-size:9.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--c);white-space:nowrap}
+.wk-veh{white-space:nowrap;font-size:10.5px;font-weight:700;color:var(--muted);background:color-mix(in srgb,var(--line) 70%,transparent);padding:1px 7px;border-radius:20px}
+.wk-ref{font-weight:800;font-size:12.5px}
+.wk-route{font-size:11.5px;color:var(--ink);margin-top:3px;line-height:1.4}
+.wk-route em{font-style:normal;color:var(--muted);font-size:9.5px;font-weight:800;margin-right:3px;letter-spacing:.4px}
+.wk-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;font-size:10.5px;color:var(--muted)}
+.wk-chip{font-size:10px;font-weight:700;padding:1px 8px;border-radius:20px;white-space:nowrap}
+.wk-chip.own{background:color-mix(in srgb,var(--brand) 15%,transparent);color:var(--brand)}
+.wk-chip.charter{background:color-mix(in srgb,var(--amber) 20%,transparent);color:var(--amber)}
+.wk-chip.none{background:color-mix(in srgb,var(--red) 14%,transparent);color:var(--red)}
+.wk-chip.ex{background:color-mix(in srgb,#8f6ad8 16%,transparent);color:#8564d0}
+.wk-empty{font-size:11.5px;color:var(--muted);opacity:.65;text-align:center;padding:20px 0}
+/* statuts */
+.st{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;padding:3px 10px 3px 8px;border-radius:20px;white-space:nowrap;background:color-mix(in srgb,var(--sc,#8f9db0) 15%,transparent);color:color-mix(in srgb,var(--sc,#8f9db0) 72%,var(--ink))}
+.st i{width:6px;height:6px;border-radius:50%;background:var(--sc,#8f9db0);flex-shrink:0}
+/* onglets de filtre (segments) */
+.seg{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.seg button{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:20px;border:1px solid var(--line);background:var(--card,#fff);color:var(--muted);font-size:12px;font-weight:650;transition:all .12s}
+.seg button:hover{color:var(--ink);border-color:color-mix(in srgb,var(--brand) 40%,var(--line))}
+.seg button.on{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 2px 8px color-mix(in srgb,var(--brand) 35%,transparent)}
+.seg button b{font-size:10.5px;font-weight:800;padding:0 7px;border-radius:20px;background:color-mix(in srgb,var(--line) 80%,transparent);color:var(--muted)}
+.seg button.on b{background:rgba(255,255,255,.25);color:#fff}
+/* planning camions */
+.tr-day{border-radius:6px}
 /* ═════════ MODE SOMBRE (généré à partir des styles clairs) ═════════ */
 
 html[data-theme="dark"]{color-scheme:dark;--bg:#0b1520;--card:#142130;--ink:#e3ecf4;--muted:#93a7ba;--line:#26394c;--pale:#1b2f45;--blue:#4a9de0;--brand:#4a9de0;--green:#3fbf86;--amber:#e3a63f;--red:#ef7069;--sh1:0 1px 2px rgba(0,0,0,.35);--sh2:0 2px 6px rgba(0,0,0,.35),0 14px 34px rgba(0,0,0,.4)}
@@ -191,6 +241,8 @@ html[data-theme="dark"] .todo-row{border-top-color:#203245}
 html[data-theme="dark"] .statusbar{background:#1d3043}
 html[data-theme="dark"] .modal-backdrop{background:#02080e99}
 html[data-theme="dark"] a{color:#7cc0f5}
+html[data-theme="dark"] .seg button.on{background:#2677b4;border-color:#2677b4}
+html[data-theme="dark"] .seg button{background:#142130}
 html[data-theme="dark"] .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88) saturate(.7)}
 html[data-theme="dark"] .leaflet-container{background:#0b1520}
 html[data-theme="dark"] .leaflet-popup-content-wrapper,html[data-theme="dark"] .leaflet-popup-tip{background:var(--card);color:var(--ink)}
@@ -330,9 +382,6 @@ html[data-theme="dark"] [style*="background:#f4f9fc "]{background:#182831!import
 html[data-theme="dark"] [style*="background:#f5f7fa;"]{background:#1c232e!important}
 html[data-theme="dark"] [style$="background:#f5f7fa"]{background:#1c232e!important}
 html[data-theme="dark"] [style*="background:#f5f7fa "]{background:#1c232e!important}
-html[data-theme="dark"] [style*="background:#f5f9ff;"]{background:#182130!important}
-html[data-theme="dark"] [style$="background:#f5f9ff"]{background:#182130!important}
-html[data-theme="dark"] [style*="background:#f5f9ff "]{background:#182130!important}
 html[data-theme="dark"] [style*="background:#f5fafd;"]{background:#182730!important}
 html[data-theme="dark"] [style$="background:#f5fafd"]{background:#182730!important}
 html[data-theme="dark"] [style*="background:#f5fafd "]{background:#182730!important}
@@ -354,9 +403,6 @@ html[data-theme="dark"] [style*="background:#f9dede "]{background:#391c1c!import
 html[data-theme="dark"] [style*="background:#faeeee;"]{background:#341a1a!important}
 html[data-theme="dark"] [style$="background:#faeeee"]{background:#341a1a!important}
 html[data-theme="dark"] [style*="background:#faeeee "]{background:#341a1a!important}
-html[data-theme="dark"] [style*="background:#fafbfc;"]{background:#1d232a!important}
-html[data-theme="dark"] [style$="background:#fafbfc"]{background:#1d232a!important}
-html[data-theme="dark"] [style*="background:#fafbfc "]{background:#1d232a!important}
 html[data-theme="dark"] [style*="background:#fafcfe;"]{background:#17232e!important}
 html[data-theme="dark"] [style$="background:#fafcfe"]{background:#17232e!important}
 html[data-theme="dark"] [style*="background:#fafcfe "]{background:#17232e!important}
@@ -499,7 +545,6 @@ html[data-theme="dark"] [style*="border"][style*="#c3e6cb"]{border-color:#2c4933
 html[data-theme="dark"] [style*="border"][style*="#c5d4e0"]{border-color:#2c3c49!important}
 html[data-theme="dark"] [style*="border"][style*="#cdd"]{border-color:#2f4646!important}
 html[data-theme="dark"] [style*="border"][style*="#d0d8e4"]{border-color:#2c3849!important}
-html[data-theme="dark"] [style*="border"][style*="#d0e6f8"]{border-color:#2c3c49!important}
 html[data-theme="dark"] [style*="border"][style*="#d0e8f5"]{border-color:#2c3f49!important}
 html[data-theme="dark"] [style*="border"][style*="#d1d5db"]{border-color:#333942!important}
 html[data-theme="dark"] [style*="border"][style*="#d2e4f1"]{border-color:#2c3d49!important}
@@ -513,7 +558,6 @@ html[data-theme="dark"] [style*="border"][style*="#dde"]{border-color:#2c2c49!im
 html[data-theme="dark"] [style*="border"][style*="#dfeaf1"]{border-color:#2c3e49!important}
 html[data-theme="dark"] [style*="border"][style*="#e0e6f0"]{border-color:#2c3749!important}
 html[data-theme="dark"] [style*="border"][style*="#e0eef7"]{border-color:#2c3e49!important}
-html[data-theme="dark"] [style*="border"][style*="#e8eef4"]{border-color:#2c3b49!important}
 html[data-theme="dark"] [style*="border"][style*="#edf1f4"]{border-color:#2c3d49!important}
 html[data-theme="dark"] [style*="border"][style*="#eee"]{border-color:#3b3b3b!important}
 html[data-theme="dark"] [style*="border"][style*="#eef1f4"]{border-color:#2e3b47!important}
@@ -1798,7 +1842,8 @@ function dashboard(){
   <div class="panel"><div class="panel-title"><h2>Actions rapides</h2></div><div class="toolbar"><button class="btn soft" onclick="setView('Planning général')">Ouvrir le planning général</button><button class="btn soft" onclick="openNewMission()">Nouvelle mission</button><button class="btn soft" onclick="setView('Clients')">Gérer les clients</button><button class="btn soft" onclick="setView('Transporteurs')">Gérer les transporteurs</button></div></div>`;
 }
 
-function badge(s){return `<span class="badge ${s==='livré'||s==='chargé'||s==='payé'?'green':s==='en transport'?'blue':s==='à planifier'?'amber':''}">${esc(s)}</span>`}
+const STATUS_COLORS={'à planifier':'#e0a23e','attribué':'#8f9db0','à charger':'#5fa3d8','chargé':'#2f8ad0','en transport':'#2f8ad0','livré':'#38b07a','à facturer':'#a77bd8','facturé':'#7d6ad8','payé':'#1f8a5b','annulé':'#a9b2bc'};
+function badge(s){return `<span class="st" style="--sc:${STATUS_COLORS[s]||'#8f9db0'}"><i></i>${esc(s)}</span>`}
 
 function filterTool(){return `<div class="toolbar"><input type="search" placeholder="Rechercher client, mission, VIN, plaque…" value="${esc(search)}" oninput="search=this.value;render()"><select onchange="filterStatus=this.value;render()"><option>Tous les statuts</option>${['à planifier','attribué','à charger','en transport','livré','à facturer','facturé','payé'].map(x=>`<option ${filterStatus===x?'selected':''}>${x}</option>`).join('')}</select></div>`}
 
@@ -1833,47 +1878,34 @@ function weekCalendar(){
   const dayNames=['Lun.','Mar.','Mer.','Jeu.','Ven.','Sam.','Dim.'];
   const weekLabel=`Semaine du ${fmt(days[0])} au ${fmt(days[6])}`;
 
+  const execChip=m=>{const e=execInfo(m);const cls=e.mode==='own'?'own':(e.mode==='charter'?'charter':(e.mode==='none'?'none':'ex'));return `<span class="wk-chip ${cls}">${esc(e.label)}</span>`;};
+  const cardOf=(m,type)=>{
+    const load=type==='l',late=!load&&mapUrgency(m).left!=null&&mapUrgency(m).left<0;
+    const route=load?`<em>DE</em>${esc(place(m.pickupCountry,m.pickupCity))}${m.deliveryCity?`<br><em>VERS</em>${esc(place(m.deliveryCountry,m.deliveryCity))}`:''}`:`<em>À</em>${esc(place(m.deliveryCountry,m.deliveryCity))}`;
+    return `<div class="wk-card ${late?'late':''}" style="--c:${load?'var(--brand)':'var(--green)'}" onclick="openDetail('${esc(m.id)}')">
+      <div class="wk-t"><span class="wk-type">${load?'↑ Chargement':'↓ Livraison'}</span><span class="wk-veh">${m.cars.length} véh.</span></div>
+      <div class="wk-ref">${esc(m.ref)}</div>
+      <div class="wk-route">${route}</div>
+      <div class="wk-meta"><span>${esc(getClient(m).name||'—')}</span>${execChip(m)}</div></div>`;};
   const cols=days.map((d,i)=>{
     const loads=db.missions.filter(m=>{const p=m.pickupDate?new Date(m.pickupDate):null;return p&&sameDay(p,d);});
     const delivs=db.missions.filter(m=>{const v=m.deliveryDate?new Date(m.deliveryDate):null;return v&&sameDay(v,d);});
-    const isToday=sameDay(d,today);
-    const isWe=i>=5;
-    const cards=[
-      ...loads.map(m=>`<div onclick="openDetail('${esc(m.id)}')" style="border:1px solid #d0e6f8;border-left:3px solid #2675a9;border-radius:7px;padding:9px;margin-bottom:6px;cursor:pointer;background:white;transition:box-shadow .15s" onmouseenter="this.style.boxShadow='0 2px 8px #2675a920'" onmouseleave="this.style.boxShadow=''">
-        <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="width:7px;height:7px;border-radius:50%;background:#2675a9;flex-shrink:0"></span><strong style="font-size:11px">${esc(m.ref)}</strong></div>
-        <div style="font-size:10.5px;color:#536a7d">Chargement · ${m.cars.length} véh.</div>
-        <div style="font-size:10.5px;color:#536a7d">${esc(place(m.pickupCountry,m.pickupCity))}${m.deliveryCity?' → '+esc(place(m.deliveryCountry,m.deliveryCity)):''}</div>
-        <div style="font-size:10px;color:#8094a6;margin-top:2px">${esc(getClient(m).name||'—')} · ${esc(execInfo(m).label)}</div>
-      </div>`),
-      ...delivs.map(m=>`<div onclick="openDetail('${esc(m.id)}')" style="border:1px solid #c3e6cb;border-left:3px solid #24784d;border-radius:7px;padding:9px;margin-bottom:6px;cursor:pointer;background:white;transition:box-shadow .15s" onmouseenter="this.style.boxShadow='0 2px 8px #24784d20'" onmouseleave="this.style.boxShadow=''">
-        <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="width:7px;height:7px;border-radius:50%;background:#24784d;flex-shrink:0"></span><strong style="font-size:11px">${esc(m.ref)}</strong></div>
-        <div style="font-size:10.5px;color:#536a7d">Livraison · ${m.cars.length} véh.</div>
-        <div style="font-size:10.5px;color:#536a7d">${esc(place(m.deliveryCountry,m.deliveryCity))}</div>
-        <div style="font-size:10px;color:#8094a6;margin-top:2px">${esc(getClient(m).name||'—')} · ${esc(execInfo(m).label)}</div>
-      </div>`)
-    ];
-    return `<div style="flex:1;min-width:110px;padding:0 8px;${i<6?'border-right:1px solid #e8eef4':''}${isWe?';background:#fafbfc':''}${isToday?';background:#f5f9ff':''}">
-      <div style="font-size:11.5px;font-weight:700;color:${isToday?'#2675a9':'#60778b'};padding:0 0 9px;border-bottom:1px solid #edf1f4;margin-bottom:9px;white-space:nowrap">${dayNames[i]} ${fmtShort(d)}</div>
-      ${cards.length?cards.join(''):'<span style="font-size:11px;color:#c4cdd5">Rien de prévu</span>'}
+    const isToday=sameDay(d,today),isWe=i>=5;
+    const cards=[...loads.map(m=>cardOf(m,'l')),...delivs.map(m=>cardOf(m,'d'))];
+    return `<div class="wk-col ${isWe?'we':''} ${isToday?'today':''}">
+      <div class="wk-dayh"><div class="wk-dayn"><b>${d.getDate()}</b><span>${dayNames[i].replace('.','')}</span></div>
+        <div class="wk-counts">${loads.length?`<span class="wk-count l" title="${loads.length} chargement(s)">↑ ${loads.length}</span>`:''}${delivs.length?`<span class="wk-count d" title="${delivs.length} livraison(s)">↓ ${delivs.length}</span>`:''}</div></div>
+      ${cards.length?cards.join(''):'<div class="wk-empty">Rien de prévu</div>'}
     </div>`;
   }).join('');
 
-  return `<div style="background:white;border:1px solid var(--line);border-radius:9px;padding:18px;margin-bottom:18px">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:10px">
-      <div><div style="font-size:15px;font-weight:700">${weekLabel}</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:3px">Chargements et livraisons prévus · sélectionne une mission pour ouvrir sa fiche</div></div>
-      <div style="display:flex;gap:6px;flex-shrink:0">
-        <button class="btn" style="padding:7px 10px" onclick="weekOffset--;render()">‹</button>
-        <button class="btn" style="padding:7px 11px;font-weight:700" onclick="weekOffset=0;render()">Cette semaine</button>
-        <button class="btn" style="padding:7px 10px" onclick="weekOffset++;render()">›</button>
-      </div>
+  return `<div class="wk">
+    <div class="wk-top">
+      <div><div class="wk-title">${weekLabel}</div><div class="wk-sub">Chargements et livraisons prévus · clique sur une mission pour ouvrir sa fiche</div></div>
+      <div class="wk-nav"><button class="btn" onclick="weekOffset--;render()">‹</button><button class="btn" style="font-weight:700" onclick="weekOffset=0;render()">Cette semaine</button><button class="btn" onclick="weekOffset++;render()">›</button></div>
     </div>
-    <div style="display:flex;gap:4px;align-items:center;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #eef1f4">
-      <span style="width:9px;height:9px;border-radius:50%;background:#2675a9;display:inline-block"></span><span style="font-size:11px;margin-right:14px">Chargement</span>
-      <span style="width:9px;height:9px;border-radius:50%;background:#24784d;display:inline-block"></span><span style="font-size:11px;margin-right:auto">Livraison</span>
-      <span style="font-size:10px;color:var(--muted)">Les dates se modifient dans la fiche mission.</span>
-    </div>
-    <div style="display:flex;overflow-x:auto;margin:0 -8px;padding:0 0 4px">${cols}</div>
+    <div class="wk-legend"><span><i style="background:var(--brand)"></i>Chargement</span><span><i style="background:var(--green)"></i>Livraison</span><span><i style="background:var(--red)"></i>Livraison en retard</span><span style="margin-left:auto">Les dates se modifient dans la fiche mission.</span></div>
+    <div class="wk-grid">${cols}</div>
   </div>`;
 }
 
@@ -1909,13 +1941,17 @@ function missionTableFull(selectable=false){
   return {html:`<div class="table-wrap"><table><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`,total,missions:allMissions.length};
 }
 
+function segTabs(){
+  const sts=['à planifier','attribué','à charger','en transport','livré','à facturer','facturé','payé'];
+  const cnt={};db.missions.forEach(m=>{cnt[m.status]=(cnt[m.status]||0)+1;});
+  const tab=(label,val,n)=>`<button class="${filterStatus===val?'on':''}" onclick="filterStatus='${val}';render()">${label}<b>${n}</b></button>`;
+  return `<div class="seg">${tab('Tous','Tous les statuts',db.missions.length)}${sts.filter(x=>cnt[x]||filterStatus===x).map(x=>tab(x.charAt(0).toUpperCase()+x.slice(1),x,cnt[x]||0)).join('')}</div>`;
+}
 function advancedFilterBar(totalMissions,totalVehicles){
   const clientOpts=`<option>Tous les clients</option>${db.clients.map(x=>`<option value="${esc(x.id)}" ${filterClient===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}`;
   const carrierOpts=`<option>Tous les transporteurs</option>${db.carriers.map(x=>`<option value="${esc(x.id)}" ${filterCarrier===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}`;
   const statusOpts=['Tous les statuts','à planifier','attribué','à charger','en transport','livré','à facturer','facturé','payé'].map(x=>`<option ${filterStatus===x?'selected':''}>${x}</option>`).join('');
-  return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">
-    <span style="font-size:12px;color:var(--muted);margin-right:4px">Statut</span>
-    <select style="border:1px solid #d8e4ec;border-radius:6px;padding:6px 9px;font-size:12px;background:#fff" onchange="filterStatus=this.value;render()">${statusOpts}</select>
+  return segTabs()+`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">
     <span style="font-size:12px;color:var(--muted)">Client</span>
     <select style="border:1px solid #d8e4ec;border-radius:6px;padding:6px 9px;font-size:12px;background:#fff" onchange="filterClient=this.options[this.selectedIndex].text==='Tous les clients'?'Tous les clients':this.value;render()">${clientOpts}</select>
     <span style="font-size:12px;color:var(--muted)">Transporteur</span>
@@ -4183,18 +4219,18 @@ function toursPage(){
       const s=Math.max(0,diffDays(monday,t.startDate)),e=Math.min(6,diffDays(monday,t.endDate||t.startDate));
       let lane=lanes.findIndex(end=>end<s);if(lane<0){lane=lanes.length;lanes.push(e);}else lanes[lane]=e;
       const ms=tourMissions(t);
-      return `<div onclick="openTourDetail('${esc(t.id)}')" title="${esc(t.name)}" style="grid-column:${s+1}/${e+2};grid-row:${lane+1};background:${KIND_COLOR[t.kind]};color:#fff;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis"><b>${esc(t.name)}</b> · ${ms.length} mission${ms.length>1?'s':''} · ${fmtPts(tourPts(t))} pts${t.km?' · '+Math.round(t.km)+' km':''}${t.kind==='charter'?' · '+esc((db.carriers.find(c=>c.id===t.carrierId)||{}).name||''):''}${t.returnDay?' · ↩ '+(t.returnDay==='friday'?'ven.':'sam.'):''}</div>`;
+      return `<div onclick="openTourDetail('${esc(t.id)}')" title="${esc(t.name)}" style="grid-column:${s+1}/${e+2};grid-row:${lane+1};background:${KIND_COLOR[t.kind]};color:#fff;border-radius:8px;padding:5px 10px;font-size:11.5px;font-weight:500;box-shadow:0 1px 3px rgba(15,42,71,.25);cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis"><b>${esc(t.name)}</b> · ${ms.length} mission${ms.length>1?'s':''} · ${fmtPts(tourPts(t))} pts${t.km?' · '+Math.round(t.km)+' km':''}${t.kind==='charter'?' · '+esc((db.carriers.find(c=>c.id===t.carrierId)||{}).name||''):''}${t.returnDay?' · ↩ '+(t.returnDay==='friday'?'ven.':'sam.'):''}</div>`;
     }).join('');
     let gauge='';
     if(r.truck){
       const km=r.tours.filter(inWeek).reduce((s,t)=>s+(t.km||0),0);
       const col=km>=TOUR_KM_MIN?'#24784d':(km>0?'#9a6b18':'#a54b48');
-      gauge=`<div style="height:6px;background:#e6edf3;border-radius:3px;margin-top:5px"><div style="height:100%;width:${Math.min(100,km/TOUR_KM_MAX*100)}%;background:${col};border-radius:3px"></div></div><div style="font-size:10.5px;color:${col}">${Math.round(km).toLocaleString('fr-BE')} km / ${TOUR_KM_MIN.toLocaleString('fr-BE')}–${TOUR_KM_MAX.toLocaleString('fr-BE')}</div>`;
+      gauge=`<div style="height:7px;background:var(--line);border-radius:4px;margin-top:6px"><div style="height:100%;width:${Math.min(100,km/TOUR_KM_MAX*100)}%;background:${col};border-radius:3px"></div></div><div style="font-size:10.5px;color:${col}">${Math.round(km).toLocaleString('fr-BE')} km / ${TOUR_KM_MIN.toLocaleString('fr-BE')}–${TOUR_KM_MAX.toLocaleString('fr-BE')}</div>`;
     }
     return `<div style="display:grid;grid-template-columns:170px 1fr;gap:8px;border-top:1px solid var(--line);padding:8px 0">
       <div><strong style="font-size:13px">${esc(r.label)}</strong> <small style="color:var(--muted)">${esc(r.sub||'')}</small>${r.truck?` <a href="javascript:void(0)" onclick="openTruckForm('${esc(r.truck.id)}')" style="font-size:11px;color:var(--blue)">modifier</a>`:''}${gauge}</div>
       <div style="display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:30px;gap:3px;position:relative;min-height:36px">
-        ${days.map((d,i)=>`<div style="grid-column:${i+1};grid-row:1/span ${Math.max(1,lanes.length)};background:${[5,6].includes(i)?'#f4f7fa':'#fafcfd'};border-radius:4px"></div>`).join('')}${bars}</div></div>`;
+        ${days.map((d,i)=>`<div style="grid-column:${i+1};grid-row:1/span ${Math.max(1,lanes.length)};background:${d===todayIso()?'color-mix(in srgb,var(--brand) 13%,transparent)':([5,6].includes(i)?'color-mix(in srgb,var(--line) 75%,transparent)':'color-mix(in srgb,var(--line) 32%,transparent)')};border-radius:7px"></div>`).join('')}${bars}</div></div>`;
   };
   const all=[...db.tours].sort((a,b)=>String(b.startDate).localeCompare(String(a.startDate)));
   return heading('Planning camions','Camions gérés : tournées et planning hebdomadaire par camion.',
