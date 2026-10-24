@@ -7866,11 +7866,15 @@ const QPDF={
  pt:{t:'ORÇAMENTO',date:'Data',valid:'Válido até',to:'Para',route:'Trajeto',veh:'Veículos',qty:'Qtd.',unit:'Preço unitário sem IVA',tot:'Total sem IVA',vat:'O IVA, se aplicável, é acrescentado de acordo com o regime aplicável.',ns:'não circulante (+{n} %)',ok:'De acordo: data e assinatura',mail:{s:'Orçamento {ref}',b:'Bom dia,\n\nSegue em anexo o nosso orçamento {ref} para o transporte {route}.\nÉ válido até {until}.\n\nNão hesite em contactar-nos para qualquer questão.\n\nCom os melhores cumprimentos,'}}
 };
 function quoteLang(q){const c=qClient(q);const l=detectLang(c.country||q.deliveryCountry||'');return QPDF[l]?l:'en';}
+// la police du PDF ne connaît que le latin de base : flèche et lettres rares (ă ș ț ě ř ł ő…) sont simplifiées pour éviter les caractères parasites
+function pdfSafe(t){
+  return String(t==null?'':t).replace(/→/g,'>').replace(/[łŁđĐ]/g,c=>({'ł':'l','Ł':'L','đ':'d','Đ':'D'})[c]).replace(/[^\u0000-\u00ff€–—‘’“”•…]/g,c=>{const n=c.normalize('NFD').replace(/[\u0300-\u036f]/g,'');return /^[\u0000-\u00ff]+$/.test(n)?n:'?';});
+}
 function quotePdf(id){
   const q=db.quotes.find(x=>x.id===id)||(_qf&&_qf.id===id?_qf:null);if(!q||!window.jspdf){alert('PDF indisponible.');return;}
   const L=QPDF[quoteLang(q)],{jsPDF}=window.jspdf,doc=new jsPDF({unit:'mm',format:'a4'}),co=settings.company||{},cl=qClient(q),loc=(typeof UI_LOC!=='undefined'?UI_LOC:'fr-BE');
   const f=n=>{const[a,b]=Number(n||0).toFixed(2).split('.');return a.replace(/\B(?=(\d{3})+(?!\d))/g,' ')+','+b+' €';};
-  const T=(t,x,y,o)=>doc.text(String(t==null?'':t),x,y,o);
+  const S=pdfSafe,T=(t,x,y,o)=>doc.text(S(t==null?'':t),x,y,o);
   const pd=d=>d?new Date(d+'T12:00:00').toLocaleDateString(loc,{day:'numeric',month:'long',year:'numeric'}):'';
   const logo=co.logo||'',lw=Number(co.logoW)||0,lh=Number(co.logoH)||0;let y=18;
   if(/^data:image\/(png|jpeg);/.test(logo)&&lw&&lh){try{const mh=18,mw=60,sc=Math.min(mh/lh,mw/lw);doc.addImage(logo,/png/.test(logo.slice(0,20))?'PNG':'JPEG',15,10,lw*sc,lh*sc);y=10+lh*sc+8;}catch(_){}}
@@ -7881,7 +7885,7 @@ function quotePdf(id){
   let cy=52;doc.setFont('helvetica','bold');doc.setFontSize(10);T(L.to,115,cy);doc.setFont('helvetica','normal');doc.setFontSize(9.5);
   [cl.name,cl.street,[cl.postal,cl.city].filter(Boolean).join(' '),cl.vat?'TVA : '+cl.vat:''].filter(Boolean).forEach(t=>{cy+=5;T(t,115,cy);});
   y=Math.max(y,cy)+12;
-  doc.setFont('helvetica','bold');doc.setFontSize(10.5);T(L.route+' : '+[q.pickupCountry,q.pickupCity].filter(Boolean).join(' ')+'  →  '+[q.deliveryCountry,q.deliveryCity].filter(Boolean).join(' ')+(q.distanceKm?'   ('+q.distanceKm+' km)':''),15,y);doc.setFont('helvetica','normal');y+=9;
+  doc.setFont('helvetica','bold');doc.setFontSize(10.5);T(L.route+' : '+[q.pickupCountry,q.pickupCity].filter(Boolean).join(' ')+'  >  '+[q.deliveryCountry,q.deliveryCity].filter(Boolean).join(' ')+(q.distanceKm?'   ('+q.distanceKm+' km)':''),15,y);doc.setFont('helvetica','normal');y+=9;
   doc.setFillColor(238,243,248);doc.rect(15,y-4.5,180,7,'F');doc.setFont('helvetica','bold');doc.setFontSize(9);T(L.veh,17,y);T(L.qty,140,y,{align:'right'});T(L.unit,168,y,{align:'right'});T(L.tot,193,y,{align:'right'});doc.setFont('helvetica','normal');y+=7;
   const extra=Number((settings.tariffs||{}).nonRunningPct)||0;
   (q.vehicles||[]).forEach(v=>{
@@ -7889,9 +7893,9 @@ function quotePdf(id){
     doc.setFontSize(9);T(nm,17,y);T(1,140,y,{align:'right'});T(f(u),168,y,{align:'right'});T(f(u),193,y,{align:'right'});y+=6;doc.setDrawColor(225);doc.line(15,y-3,195,y-3);
   });
   y+=4;doc.setFont('helvetica','bold');doc.setFontSize(12);T(L.tot,150,y,{align:'right'});T(f(q.total),193,y,{align:'right'});doc.setFont('helvetica','normal');y+=10;doc.setFontSize(9);
-  [L.vat,q.notes||'',L.valid&&q.validUntil?L.valid+' '+pd(q.validUntil)+'.':''].filter(Boolean).forEach(t=>{const w=doc.splitTextToSize(t,180);doc.text(w,15,y);y+=4.4*w.length+1;});
+  [L.vat,q.notes||'',L.valid&&q.validUntil?L.valid+' '+pd(q.validUntil)+'.':''].filter(Boolean).forEach(t=>{const w=doc.splitTextToSize(S(t),180);doc.text(w,15,y);y+=4.4*w.length+1;});
   y+=14;doc.setFontSize(9.5);T(L.ok,15,y);doc.setDrawColor(150);doc.line(15,y+22,100,y+22);
-  if(co.footer){doc.setFontSize(8);doc.setTextColor(110);const w=doc.splitTextToSize(co.footer,180);doc.text(w,15,284-4*w.length);doc.setTextColor(0);}
+  if(co.footer){doc.setFontSize(8);doc.setTextColor(110);const w=doc.splitTextToSize(S(co.footer),180);doc.text(w,15,284-4*w.length);doc.setTextColor(0);}
   doc.save('Devis_'+String(q.ref).replace(/[^\w-]/g,'_')+'.pdf');
 }
 async function quoteMail(id){
