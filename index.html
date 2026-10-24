@@ -4053,8 +4053,9 @@ function cpInvoicesHtml(T){
   const sum=left.reduce((q,i)=>q+Number(i.total||0),0),cur=(inv[0]||{}).currency;
   return `<div class="cp-bar"><div style="flex:1;font-size:14.5px">${left.length?`${esc(T.inv.left)} : <b>${esc(fmt(sum,cur))}</b>`:''}</div><button class="btn" onclick="cpExport()">⬇ ${esc(T.exp)}</button></div>
   <div class="cp-card" style="--sc:#8f9db0"><div style="overflow-x:auto"><table class="cp-tbl"><thead><tr><th>${esc(T.inv.no)}</th><th>${esc(T.inv.date)}</th><th>${esc(T.inv.due)}</th><th>${esc(T.inv.st)}</th><th style="text-align:right">${esc(T.inv.total)}</th><th></th></tr></thead><tbody>
-  ${inv.map(i=>{const s=cpInvStat(i,T);return `<tr><td><b>${esc(i.number)}</b></td><td>${esc(cpDate(i.issue_date,T))}</td><td>${esc(cpDate(i.due_date,T))}</td><td><span class="st" style="--sc:${s[2]}"><i></i>${esc(s[1])}</span></td><td style="text-align:right">${esc(fmt(i.total,i.currency))}</td><td style="text-align:right"><button class="btn" onclick="cpInvoicePdf('${esc(i.id)}')">📄 ${esc(T.pdf)}</button></td></tr>`}).join('')}</tbody></table></div></div>`;
+  ${inv.map(i=>{const s=cpInvStat(i,T);return `<tr><td><b>${esc(i.number)}</b></td><td>${esc(cpDate(i.issue_date,T))}</td><td>${esc(cpDate(i.due_date,T))}</td><td><span class="st" style="--sc:${s[2]}"><i></i>${esc(s[1])}</span></td><td style="text-align:right">${esc(fmt(i.total,i.currency))}</td><td style="text-align:right;white-space:nowrap"><button class="btn" onclick="cpInvoicePdf('${esc(i.id)}')">📄 ${esc(T.pdf)}</button> <button class="btn" onclick="cpInvoiceUbl('${esc(i.id)}')" title="UBL / Peppol">UBL</button></td></tr>`}).join('')}</tbody></table></div></div>`;
 }
+function cpInvoiceUbl(id){const x=(cpData.invoices||[]).find(v=>v.id===id);if(x)ublDownload(invFromRow(x));}
 function cpInvoicePdf(id){
   try{const co=cpData.company||{};window._pdfLogo=co.logo||'';window._pdfLogoW=co.logo_w||0;window._pdfLogoH=co.logo_h||0;db.invoices=(cpData.invoices||[]).map(x=>invFromRow(x));invoicePdf(id);}catch(e){alert('PDF : '+e.message);}finally{window._pdfLogo=window._pdfLogoW=window._pdfLogoH=undefined;}
 }
@@ -4627,6 +4628,10 @@ function rulesPage(){
     <div class="field"><label>Délai de paiement (jours)</label>${inp('company.payDays',c.payDays,'num',80)}</div>
     <div class="field"><label>TVA belge par défaut (%)</label>${inp('company.vatRate',c.vatRate,'num',80)}</div>
     <div class="field wide"><label>Mention de bas de facture (conditions, intérêts de retard…)</label><input value="${esc(c.footer||'')}" style="width:100%;padding:6px" onchange="sUpd('company.footer',this.value)"></div>
+    <div class="field"><label>Journal des ventes (code)</label>${inp('company.accJournal',c.accJournal||'VEN','text',100)}</div>
+    <div class="field"><label>Compte clients</label>${inp('company.accClient',c.accClient||'400000','text',120)}</div>
+    <div class="field"><label>Compte de ventes</label>${inp('company.accSales',c.accSales||'700000','text',120)}</div>
+    <div class="field"><label>Compte de TVA à payer</label>${inp('company.accVat',c.accVat||'451000','text',120)}</div>
     <div class="field wide"><label>Logo de la société</label><div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
       ${c.logo?`<img src="${esc(c.logo)}" alt="" style="max-height:60px;max-width:240px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px">`:'<span style="color:var(--muted);font-size:12.5px">Aucun logo pour le moment.</span>'}
       <input type="file" accept="image/png,image/jpeg,image/webp" onchange="companyLogoPick(this)">${c.logo?'<button class="btn" type="button" onclick="companyLogoClear()">Retirer le logo</button>':''}</div>
@@ -6084,8 +6089,8 @@ function invoicingPage(){
   }
   const list=[...inv].sort((a,b)=>String(b.number).localeCompare(String(a.number)));
   const chip=i=>i.status==='paid'?'<span class="badge green">Payée</span>':i.status==='cancelled'?'<span class="badge">Annulée</span>':(invOverdueDays(i)>0?`<span class="badge amber" style="background:#f9dede;color:var(--red)">En retard ${invOverdueDays(i)} j</span>`:'<span class="badge blue">À payer</span>');
-  return head+warn+`<div class="panel">${list.length?`<div class="table-wrap"><table><thead><tr><th>N°</th><th>Client</th><th>Date</th><th>Échéance</th><th style="text-align:right">HT</th><th style="text-align:right">TVA</th><th style="text-align:right">TTC</th><th>Statut</th><th></th></tr></thead><tbody>${list.map(i=>`<tr><td><b>${esc(i.number)}</b></td><td>${esc((i.client||{}).name||'—')}</td><td>${pretty(i.issueDate)}</td><td>${pretty(i.dueDate)}</td><td style="text-align:right">${eur(i.subtotal)}</td><td style="text-align:right">${eur(i.vatAmount)}</td><td style="text-align:right"><b>${eur(i.total)}</b></td><td>${chip(i)}</td>
-    <td style="white-space:nowrap"><button class="btn" onclick="invoicePdf('${esc(i.id)}')">⬇ PDF</button> <button class="btn" onclick="invMail('${esc(i.id)}')">✉</button> ${i.status==='issued'?`<button class="btn primary" onclick="invPaid('${esc(i.id)}')">✓ Payée</button> <button class="btn danger" onclick="invCancel('${esc(i.id)}')">✕</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Aucune facture pour le moment.</div>'}</div>`;
+  return head+warn+`<div class="panel">${list.length?`<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"><button class="btn" onclick="invAccountingCsv()">⬇ Export comptable (journal des ventes, CSV)</button><span style="font-size:12px;color:var(--muted);align-self:center">comptes réglables dans Règles et coûts → Société</span></div><div class="table-wrap"><table><thead><tr><th>N°</th><th>Client</th><th>Date</th><th>Échéance</th><th style="text-align:right">HT</th><th style="text-align:right">TVA</th><th style="text-align:right">TTC</th><th>Statut</th><th></th></tr></thead><tbody>${list.map(i=>`<tr><td><b>${esc(i.number)}</b></td><td>${esc((i.client||{}).name||'—')}</td><td>${pretty(i.issueDate)}</td><td>${pretty(i.dueDate)}</td><td style="text-align:right">${eur(i.subtotal)}</td><td style="text-align:right">${eur(i.vatAmount)}</td><td style="text-align:right"><b>${eur(i.total)}</b></td><td>${chip(i)}</td>
+    <td style="white-space:nowrap"><button class="btn" onclick="invoicePdf('${esc(i.id)}')">⬇ PDF</button> <button class="btn" onclick="invUbl('${esc(i.id)}')" title="Facture électronique UBL (Peppol)">⬇ UBL</button> <button class="btn" onclick="invMail('${esc(i.id)}')">✉</button> ${i.status==='issued'?`<button class="btn primary" onclick="invPaid('${esc(i.id)}')">✓ Payée</button> <button class="btn danger" onclick="invCancel('${esc(i.id)}')">✕</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Aucune facture pour le moment.</div>'}</div>`;
 }
 function invStart(cid){
   const ids=[...document.querySelectorAll(`.inv-chk[data-c="${cid}"]:checked`)].map(x=>x.dataset.id);
@@ -6179,6 +6184,80 @@ function invReminder(id){
     `Invoice ${i.number} (${eur(i.total)}) is still unpaid ${d} days after its due date of ${pretty(i.dueDate)}. Please arrange payment as soon as possible.`,
     `Invoice ${i.number} (${eur(i.total)}), due ${pretty(i.dueDate)}, remains unpaid despite our reminders. We hereby give you formal notice to pay within 8 days, failing which we reserve the right to apply interest and costs and to start collection proceedings.`][lv-1]+`\n${co.iban?'\nIBAN: '+co.iban+(co.bic?' · BIC: '+co.bic:'')+'\n':''}Reference: ${i.number}\n\nBest regards,\n${co.name||''}`;
   location.href='mailto:'+encodeURIComponent((i.client||{}).email||'')+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(body);
+}
+// ─── EXPORTS COMPTABLES : facture électronique UBL (format Peppol BIS 3.0) et journal des ventes CSV ───
+const XE=v=>String(v==null?'':v).replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c]));
+const vatClean=v=>String(v||'').replace(/[\s.\-]/g,'').toUpperCase();
+const PEPPOL_SCHEME={BE:'0208',DE:'9930',FR:'9957',NL:'9944',ES:'9920',IT:'9906'};
+function ublParty(tag,x,warn,who){
+  const cc=(ccLabel(x.country)||x.country||'').toString().toUpperCase().slice(0,2),vat=vatClean(x.vat);
+  let ep='',sch='';
+  if(vat&&PEPPOL_SCHEME[vat.slice(0,2)]){sch=PEPPOL_SCHEME[vat.slice(0,2)];ep=vat.slice(0,2)==='BE'?vat.replace(/^BE/,''):vat;}
+  else if(x.email){sch='EM';ep=x.email;}
+  if(!ep)warn.push(who+' : n° de TVA ou e-mail manquant (adresse Peppol).');
+  if(!vat)warn.push(who+' : n° de TVA manquant.');
+  if(!x.street||!x.city)warn.push(who+' : adresse incomplète.');
+  return `<cac:${tag}><cac:Party>${ep?`<cbc:EndpointID schemeID="${XE(sch)}">${XE(ep)}</cbc:EndpointID>`:''}
+   <cac:PartyName><cbc:Name>${XE(x.name)}</cbc:Name></cac:PartyName>
+   <cac:PostalAddress><cbc:StreetName>${XE(x.street)}</cbc:StreetName><cbc:CityName>${XE(x.city)}</cbc:CityName><cbc:PostalZone>${XE(x.postal)}</cbc:PostalZone><cac:Country><cbc:IdentificationCode>${XE(cc||'BE')}</cbc:IdentificationCode></cac:Country></cac:PostalAddress>
+   ${vat?`<cac:PartyTaxScheme><cbc:CompanyID>${XE(vat)}</cbc:CompanyID><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:PartyTaxScheme>`:''}
+   <cac:PartyLegalEntity><cbc:RegistrationName>${XE(x.name)}</cbc:RegistrationName>${vat&&cc==='BE'?`<cbc:CompanyID schemeID="0208">${XE(vat.replace(/^BE/,''))}</cbc:CompanyID>`:''}</cac:PartyLegalEntity>
+   ${x.email||x.phone?`<cac:Contact>${x.phone?`<cbc:Telephone>${XE(x.phone)}</cbc:Telephone>`:''}${x.email?`<cbc:ElectronicMail>${XE(x.email)}</cbc:ElectronicMail>`:''}</cac:Contact>`:''}
+  </cac:Party></cac:${tag}>`;
+}
+function invoiceUbl(i){
+  const warn=[],co=i.company||{},cl=i.client||{},cur=(i.currency||'EUR').toUpperCase();
+  const r2=v=>Math.round((Number(v)||0)*100)/100,f=v=>r2(v).toFixed(2);
+  const lines=(i.lines||[]).map(l=>({d:l.desc||'Transport',q:Number(l.qty)||1,u:Number(l.unit)||0}));
+  const net=lines.reduce((q,l)=>q+r2(l.q*l.u),0),rate=Number(i.vatRate)||0,tax=r2(net*rate/100),gross=r2(net+tax);
+  if(Math.abs(gross-Number(i.total))>0.02)warn.push(`Total recalculé (${f(gross)}) différent du total enregistré (${f(i.total)}).`);
+  const ccS=(ccLabel(co.country)||co.country||'BE').toString().slice(0,2).toUpperCase(),ccC=(ccLabel(cl.country)||cl.country||'').toString().slice(0,2).toUpperCase();
+  const cat=rate>0?'S':(ccC&&ccC!==ccS?'AE':'E');
+  const reason=rate>0?'':(i.vatMention||(cat==='AE'?'Autoliquidation':'Exonération de TVA'));
+  const taxCat=`<cac:TaxCategory><cbc:ID>${cat}</cbc:ID><cbc:Percent>${f(rate)}</cbc:Percent>${reason?`<cbc:TaxExemptionReason>${XE(reason)}</cbc:TaxExemptionReason>`:''}<cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:TaxCategory>`;
+  if(!co.iban)warn.push('IBAN du vendeur manquant.');
+  const xml=`<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+ <cbc:CustomizationID>urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0</cbc:CustomizationID>
+ <cbc:ProfileID>urn:fdc:peppol.eu:2017:poacc:billing:01:1.0</cbc:ProfileID>
+ <cbc:ID>${XE(i.number)}</cbc:ID>
+ <cbc:IssueDate>${XE(i.issueDate)}</cbc:IssueDate>
+ <cbc:DueDate>${XE(i.dueDate)}</cbc:DueDate>
+ <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>
+ ${i.notes?`<cbc:Note>${XE(i.notes)}</cbc:Note>`:''}
+ <cbc:DocumentCurrencyCode>${XE(cur)}</cbc:DocumentCurrencyCode>
+ <cbc:BuyerReference>${XE(i.buyerRef||'NA')}</cbc:BuyerReference>
+ ${ublParty('AccountingSupplierParty',co,warn,'Vendeur')}
+ ${ublParty('AccountingCustomerParty',cl,warn,'Client')}
+ <cac:PaymentMeans><cbc:PaymentMeansCode>30</cbc:PaymentMeansCode><cbc:PaymentID>${XE(i.number)}</cbc:PaymentID>${co.iban?`<cac:PayeeFinancialAccount><cbc:ID>${XE(String(co.iban).replace(/\s/g,''))}</cbc:ID>${co.bic?`<cac:FinancialInstitutionBranch><cbc:ID>${XE(co.bic)}</cbc:ID></cac:FinancialInstitutionBranch>`:''}</cac:PayeeFinancialAccount>`:''}</cac:PaymentMeans>
+ <cac:PaymentTerms><cbc:Note>Paiement avant le ${XE(i.dueDate)}</cbc:Note></cac:PaymentTerms>
+ <cac:TaxTotal><cbc:TaxAmount currencyID="${cur}">${f(tax)}</cbc:TaxAmount><cac:TaxSubtotal><cbc:TaxableAmount currencyID="${cur}">${f(net)}</cbc:TaxableAmount><cbc:TaxAmount currencyID="${cur}">${f(tax)}</cbc:TaxAmount>${taxCat}</cac:TaxSubtotal></cac:TaxTotal>
+ <cac:LegalMonetaryTotal><cbc:LineExtensionAmount currencyID="${cur}">${f(net)}</cbc:LineExtensionAmount><cbc:TaxExclusiveAmount currencyID="${cur}">${f(net)}</cbc:TaxExclusiveAmount><cbc:TaxInclusiveAmount currencyID="${cur}">${f(gross)}</cbc:TaxInclusiveAmount><cbc:PayableAmount currencyID="${cur}">${f(gross)}</cbc:PayableAmount></cac:LegalMonetaryTotal>
+${lines.map((l,n)=>` <cac:InvoiceLine><cbc:ID>${n+1}</cbc:ID><cbc:InvoicedQuantity unitCode="C62">${l.q}</cbc:InvoicedQuantity><cbc:LineExtensionAmount currencyID="${cur}">${f(l.q*l.u)}</cbc:LineExtensionAmount><cac:Item><cbc:Name>${XE(String(l.d).slice(0,120))}</cbc:Name><cac:ClassifiedTaxCategory><cbc:ID>${cat}</cbc:ID><cbc:Percent>${f(rate)}</cbc:Percent><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:ClassifiedTaxCategory></cac:Item><cac:Price><cbc:PriceAmount currencyID="${cur}">${f(l.u)}</cbc:PriceAmount></cac:Price></cac:InvoiceLine>`).join('\n')}
+</Invoice>`;
+  return{xml,warn};
+}
+function ublDownload(i){
+  const{xml,warn}=invoiceUbl(i);
+  if(warn.length&&!confirm('Facture électronique : points à vérifier avant envoi à un point d\'accès Peppol ou à ta comptabilité :\n\n• '+warn.join('\n• ')+'\n\nTélécharger quand même ?'))return;
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([xml],{type:'application/xml;charset=utf-8'}));a.download='Facture_'+String(i.number).replace(/[^\w-]/g,'_')+'.xml';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
+}
+function invUbl(id){const i=db.invoices.find(x=>x.id===id);if(i)ublDownload(i);}
+// journal des ventes : une écriture client (débit TTC), une écriture de ventes (crédit HT), une de TVA (crédit)
+function invAccountingCsv(){
+  const co=settings.company||{},acC=co.accClient||'400000',acS=co.accSales||'700000',acV=co.accVat||'451000',jr=co.accJournal||'VEN';
+  const list=db.invoices.filter(i=>i.status!=='cancelled').sort((a,b)=>String(a.issueDate).localeCompare(String(b.issueDate))||String(a.number).localeCompare(String(b.number)));
+  if(!list.length){alert('Aucune facture à exporter.');return;}
+  const n=v=>(Math.round((Number(v)||0)*100)/100).toFixed(2).replace('.',',');
+  const rows=[['Journal','Date','Pièce','Compte','Libellé','Débit','Crédit','Échéance','Taux TVA','Client','N° TVA client','Statut']];
+  list.forEach(i=>{
+    const c=i.client||{},lib='Facture '+i.number+' '+(c.name||''),meta=[i.dueDate,Number(i.vatRate)||0,c.name||'',c.vat||'',i.status==='paid'?'payée':'à payer'];
+    rows.push([jr,i.issueDate,i.number,acC,lib,n(i.total),'',...meta]);
+    rows.push([jr,i.issueDate,i.number,acS,lib,'',n(i.subtotal),...meta]);
+    if(Number(i.vatAmount)>0)rows.push([jr,i.issueDate,i.number,acV,lib,'',n(i.vatAmount),...meta]);
+  });
+  const csv='﻿'+rows.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(';')).join('\r\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='journal-ventes-'+todayIso()+'.csv';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
 }
 function invoicePdf(id){
   const i=db.invoices.find(x=>x.id===id);if(!i||!window.jspdf){alert('PDF indisponible.');return;}
