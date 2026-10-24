@@ -2,6 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0e2a47"><script>try{var _t=localStorage.getItem("adTheme");if(!_t&&window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches)_t="dark";window.__adTheme=_t==="dark"?"dark":"light";}catch(e){window.__adTheme="light";}</script><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAwIDEwMDAiPjxkZWZzPjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzJmOGFkMCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzEyMzE1YSIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAwIiBoZWlnaHQ9IjEwMDAiIHJ4PSIyMjUiIGZpbGw9InVybCgjZykiLz48ZyBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iMzgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCI+PHBhdGggZD0iTTQzMCA1MDAgSDUwMCBDNTkwIDUwMCA1OTAgMjUwIDY3NiAyNTAiLz48cGF0aCBkPSJNNTAwIDUwMCBINjc2Ii8+PHBhdGggZD0iTTUwMCA1MDAgQzU5MCA1MDAgNTkwIDc1MCA2NzYgNzUwIi8+PC9nPgo8ZyBmaWxsPSJub25lIiBzdHJva2Utd2lkdGg9IjM0Ij48Y2lyY2xlIGN4PSI3NDUiIGN5PSIyNTAiIHI9IjYyIiBzdHJva2U9IiNmZmYiLz48Y2lyY2xlIGN4PSI3NDUiIGN5PSI1MDAiIHI9IjYyIiBzdHJva2U9IiNmZmE5NGQiLz48Y2lyY2xlIGN4PSI3NDUiIGN5PSI3NTAiIHI9IjYyIiBzdHJva2U9IiNmZmYiLz48L2c+CjxjaXJjbGUgY3g9IjI2NSIgY3k9IjUwMCIgcj0iMTc1IiBmaWxsPSIjZmZmIi8+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTUwIDQzOCkgc2NhbGUoMi4zKSIgZmlsbD0iIzJmOGFkMCI+PHBhdGggZD0iTTE4IDM0IEwzMCAxMiBINjggTDgyIDM0WiIvPjxyZWN0IHg9IjIiIHk9IjMwIiB3aWR0aD0iOTYiIGhlaWdodD0iMzAiIHJ4PSIxMiIvPjxjaXJjbGUgY3g9IjI2IiBjeT0iNjIiIHI9IjExIi8+PGNpcmNsZSBjeD0iNzQiIGN5PSI2MiIgcj0iMTEiLz48Y2lyY2xlIGN4PSIyNiIgY3k9IjYyIiByPSI0IiBmaWxsPSIjZmZmIi8+PGNpcmNsZSBjeD0iNzQiIGN5PSI2MiIgcj0iNCIgZmlsbD0iI2ZmZiIvPjwvZz48L3N2Zz4=">
 <title>AutoDispatch</title>
 <style>
 :root{--navy:#102d4c;--blue:#2675a9;--pale:#edf5fb;--ink:#20384e;--muted:#74879a;--line:#e2e9ef;--bg:#f4f7fa;--green:#24784d;--amber:#9a6b18;--red:#a54b48}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px Arial,Helvetica,sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid #4a9cdc;outline-offset:2px}
@@ -101,6 +102,25 @@ tbody tr:hover{background:#f7fbff}
 .sidebar{background:linear-gradient(185deg,#12315a 0%,#0e2a47 45%,#0a2038 100%)}
 .brand{font-weight:800;letter-spacing:-.6px}
 .brand small{letter-spacing:2.4px;opacity:.75}
+.cp-top{background:var(--navy);color:#fff;padding:14px 22px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.cp-card{background:#fff;border:1px solid var(--line);border-radius:14px;margin-bottom:10px;overflow:hidden}
+.cp-head{display:flex;gap:14px;align-items:center;padding:14px 16px;cursor:pointer;flex-wrap:wrap}
+.cp-card.open .cp-head{border-bottom:1px solid var(--line)}
+.cp-body{padding:14px 16px}
+.cp-lbl{font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:800;margin:14px 0 6px}
+.cp-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.cp-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:600px){.cp-cols{grid-template-columns:1fr}.cp-steps{flex-direction:column}}
+.cp-tbl{width:100%;border-collapse:collapse;font-size:13px}.cp-tbl th{text-align:left;font-size:11px;color:var(--muted);font-weight:700;padding:6px 8px;border-bottom:1px solid var(--line)}.cp-tbl td{padding:8px;border-bottom:1px solid var(--line)}
+.cp-th{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}.cp-th img{width:96px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:block}
+.cp-vid{display:inline-flex;align-items:center;padding:0 12px;height:72px;border-radius:8px;border:1px solid var(--line);background:var(--pale);font-size:12px}
+.cp-pg{margin-bottom:10px;font-size:13px}
+.cp-dmg{display:flex;gap:10px;align-items:center;margin-bottom:8px}.cp-dmg img{width:72px;height:54px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.cp-steps{display:flex;gap:6px;margin-bottom:6px}.cp-steps>div{flex:1;display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}.cp-steps i{width:24px;height:24px;border-radius:50%;background:var(--line);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:11px;font-weight:800;flex:none}.cp-steps .on{color:var(--ink);font-weight:700}.cp-steps .on i{background:#38b07a;color:#fff}.cp-steps small{display:block;font-weight:400;color:var(--muted)}
+.ad-tile{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#2f8ad0,#12315a);display:inline-flex;align-items:center;justify-content:center;flex:none;box-shadow:0 2px 8px rgba(0,0,0,.25)}.ad-tile svg{width:25px;height:auto}
+.brand{display:flex;align-items:center;gap:10px}.auth-brand{display:flex;align-items:center;gap:12px}.auth-brand .ad-tile{width:44px;height:44px;border-radius:12px}.auth-brand .ad-tile svg{width:32px}
+.brand .bt small{font-size:7.5px;letter-spacing:1.3px;white-space:nowrap}
+@media(max-width:680px){.brand:before{content:none}.brand .bt{display:none}.brand{padding:5px 0 20px;justify-content:center}}
 .nav-label{display:none}
 .nav{gap:0}
 .nav-group{margin-top:10px}
@@ -233,8 +253,8 @@ tbody tr:hover{background:#f7fbff}
 @media(prefers-color-scheme:dark){.portal-wrap{--pt-bg:#0b1520;--pt-card:#142130;--pt-ink:#e3ecf4;--pt-mut:#93a7ba;--pt-line:#26394c;--pt-soft:#1a2c3e;--pt-ok:#3fbf86;--pt-brand:#4a9de0;--pt-warn:#ef7069}}
 .pt-head{background:linear-gradient(180deg,#12315a,#0e2a47);color:#fff;padding:18px 16px 22px;border-radius:0 0 22px 22px}
 .pt-brand{display:flex;align-items:center;gap:9px;margin-bottom:14px}
-.pt-logo{width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center}
-.pt-logo svg{width:17px;height:17px}
+.pt-logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#2f8ad0,#12315a);display:flex;align-items:center;justify-content:center}
+.pt-logo svg{width:25px;height:auto}
 .pt-brand b{font-size:16px;font-weight:800;letter-spacing:-.4px}.pt-brand b i{font-style:normal;font-weight:400;color:#98c9e9}
 .pt-brand small{margin-left:auto;font-size:9.5px;letter-spacing:1.1px;opacity:.65;text-align:right;max-width:150px;line-height:1.3}
 .pt-ref{font-size:25px;font-weight:800;letter-spacing:-.8px}
@@ -397,6 +417,7 @@ html[data-theme="dark"] .portal-section.done{border-color:#2c4933;background:#19
 html[data-theme="dark"] .portal-add-photo{border:2px dashed #2c4933}
 html[data-theme="dark"] th{background:#182430}
 html[data-theme="dark"] tbody tr:hover{background:#17232f}
+html[data-theme="dark"] .cp-card{background:#212121}
 html[data-theme="dark"] .kpi{background:#212121}
 html[data-theme="dark"] .kpi em{color:#8296a7}
 html[data-theme="dark"] .kpi.alert{border-color:#492e2c}
@@ -669,7 +690,7 @@ html[data-theme="dark"] [style*="border"][style*="#fff"]{border-color:#3b3b3b!im
 <!-- ═══════════ AUTH ═══════════ -->
 <div id="auth-screen" class="auth-wrap" style="display:none">
   <div class="auth-card">
-    <div class="auth-brand">auto<span>dispatch</span><small>TRANSPORT MANAGEMENT</small></div>
+    <div class="auth-brand"><i class="ad-tile"><svg viewBox="90 180 730 640" fill="none" aria-hidden="true"><g stroke="#fff" stroke-width="40" stroke-linecap="round"><path d="M430 500H500C590 500 590 250 676 250"/><path d="M500 500H676"/><path d="M500 500C590 500 590 750 676 750"/></g><g stroke-width="36"><circle cx="745" cy="250" r="62" stroke="#fff"/><circle cx="745" cy="500" r="62" stroke="#ffa94d"/><circle cx="745" cy="750" r="62" stroke="#fff"/></g><circle cx="265" cy="500" r="175" fill="#fff"/><g transform="translate(150 438) scale(2.3)" fill="#2f8ad0"><path d="M18 34 30 12H68L82 34Z"/><rect x="2" y="30" width="96" height="30" rx="12"/><circle cx="26" cy="62" r="11"/><circle cx="74" cy="62" r="11"/><circle cx="26" cy="62" r="4" fill="#fff"/><circle cx="74" cy="62" r="4" fill="#fff"/></g></svg></i><div class="bt">auto<span>dispatch</span><small>TRANSPORT MANAGEMENT</small></div></div>
     <div class="auth-title">Connexion</div>
     <div class="field"><label>E-MAIL</label><input id="login-email" type="email" placeholder="votre@email.com" autocomplete="email"></div>
     <div class="field" style="margin-top:9px"><label>MOT DE PASSE</label><input id="login-pwd" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()"></div>
@@ -686,11 +707,12 @@ html[data-theme="dark"] [style*="border"][style*="#fff"]{border-color:#3b3b3b!im
 
 <!-- ═══════════ ESPACE TRANSPORTEUR (compte avec mot de passe) ═══════════ -->
 <div id="carrier-space" style="display:none"></div>
+<div id="client-space" style="display:none"></div>
 
 <!-- ═══════════ APP ═══════════ -->
 <div class="shell" id="app-shell" style="display:none">
   <aside class="sidebar">
-    <div class="brand">auto<span>dispatch</span><small>TRANSPORT MANAGEMENT</small></div>
+    <div class="brand"><i class="ad-tile"><svg viewBox="90 180 730 640" fill="none" aria-hidden="true"><g stroke="#fff" stroke-width="40" stroke-linecap="round"><path d="M430 500H500C590 500 590 250 676 250"/><path d="M500 500H676"/><path d="M500 500C590 500 590 750 676 750"/></g><g stroke-width="36"><circle cx="745" cy="250" r="62" stroke="#fff"/><circle cx="745" cy="500" r="62" stroke="#ffa94d"/><circle cx="745" cy="750" r="62" stroke="#fff"/></g><circle cx="265" cy="500" r="175" fill="#fff"/><g transform="translate(150 438) scale(2.3)" fill="#2f8ad0"><path d="M18 34 30 12H68L82 34Z"/><rect x="2" y="30" width="96" height="30" rx="12"/><circle cx="26" cy="62" r="11"/><circle cx="74" cy="62" r="11"/><circle cx="26" cy="62" r="4" fill="#fff"/><circle cx="74" cy="62" r="4" fill="#fff"/></g></svg></i><div class="bt">auto<span>dispatch</span><small>TRANSPORT MANAGEMENT</small></div></div>
     <div class="nav-label">ESPACE DE TRAVAIL</div>
     <nav class="nav" id="nav"></nav>
     <div class="sidebar-foot">
@@ -761,7 +783,7 @@ function auditWatch(table,op,payload,b){
 }
 function auditRecord(table,op,payload,filt){
   if(_auditOff)return;
-  if(typeof currentProfile!=='undefined'&&currentProfile&&currentProfile.role==='carrier')return;   // les actions des transporteurs sont tracées côté serveur
+  if(typeof currentProfile!=='undefined'&&currentProfile&&(currentProfile.role==='carrier'||currentProfile.role==='client'))return;   // les actions des transporteurs sont tracées côté serveur
   const rows=Array.isArray(payload)?payload:[payload||{}];
   let ids=(op==='delete'||op==='update')?[].concat(filt.id!==undefined?filt.id:(filt.mission_id!==undefined?[]:[])):rows.map(r=>r&&r.id).filter(Boolean);
   if(table==='app_settings')ids=rows.map(r=>r&&r.key).filter(Boolean);
@@ -1399,6 +1421,7 @@ async function logout(){
   db={clients:[],carriers:[],missions:[],selectedIds:[],sort:'ref',direction:1};
   document.getElementById('app-shell').style.display='none';
   const cs=document.getElementById('carrier-space');if(cs){cs.style.display='none';cs.innerHTML='';}
+  const cl=document.getElementById('client-space');if(cl){cl.style.display='none';cl.innerHTML='';}
   currentProfile=null;
   document.getElementById('auth-screen').style.display='flex';
   document.getElementById('login-err').textContent='';
@@ -1409,6 +1432,7 @@ async function initApp(){
   // rôle : transporteur → espace transporteur ; sans profil → administrateur (compte historique)
   currentProfile=await loadProfile();
   if(currentProfile&&currentProfile.role==='carrier'){await initCarrierSpace();return;}
+  if(currentProfile&&currentProfile.role==='client'){await initClientSpace();return;}
   document.getElementById('app-shell').style.display='flex';
   document.getElementById('user-info').textContent=currentUser?.email||'';
   await loadData();
@@ -2891,7 +2915,7 @@ function vehiclesPage(){
 function partnersPage(kind){
   const arr=db[kind],label=kind==='clients'?'client':'transporteur';
   return heading(kind==='clients'?'Clients':'Transporteurs',`Répertoire des ${kind==='clients'?'clients':'transporteurs'} avec coordonnées complètes.`,`<button class="btn primary" onclick="partnerForm('${kind}')">＋ Ajouter ${label}</button>`)+
-  `<div class="grid cards">${arr.map(x=>`<div class="card entity-card"><h3>${esc(x.name)}</h3><p>${esc(x.contact||'Contact non renseigné')}<br>${esc(x.email||'E-mail non renseigné')}<br>TVA ${esc(x.vat||'—')} · ${esc(x.phone||'Téléphone —')}<br>${esc([x.street,x.postal,x.city,x.country].filter(Boolean).join(', '))}</p>${kind==='carriers'?carrierDocsSummary(x):''}<div class="card-actions">${kind==='carriers'?`<button class="btn primary" onclick="openCarrierDocs('${esc(x.id)}')">📄 Documents et accès</button>`:''}<button class="btn" onclick="partnerForm('${kind}','${esc(x.id)}')">Modifier</button><button class="btn danger" onclick="deletePartner('${kind}','${esc(x.id)}')">Supprimer</button></div></div>`).join('')||'<div class="empty">Aucune fiche enregistrée.</div>'}</div>`;
+  `<div class="grid cards">${arr.map(x=>`<div class="card entity-card"><h3>${esc(x.name)}</h3><p>${esc(x.contact||'Contact non renseigné')}<br>${esc(x.email||'E-mail non renseigné')}<br>TVA ${esc(x.vat||'—')} · ${esc(x.phone||'Téléphone —')}<br>${esc([x.street,x.postal,x.city,x.country].filter(Boolean).join(', '))}</p>${kind==='carriers'?carrierDocsSummary(x):''}<div class="card-actions">${kind==='carriers'?`<button class="btn primary" onclick="openCarrierDocs('${esc(x.id)}')">📄 Documents et accès</button>`:`<button class="btn primary" onclick="openClientAccess('${esc(x.id)}')">🔑 Accès portail client</button>`}<button class="btn" onclick="partnerForm('${kind}','${esc(x.id)}')">Modifier</button><button class="btn danger" onclick="deletePartner('${kind}','${esc(x.id)}')">Supprimer</button></div></div>`).join('')||'<div class="empty">Aucune fiche enregistrée.</div>'}</div>`;
 }
 
 function documentsPage(){
@@ -3559,6 +3583,184 @@ async function handleOfferEvent(p){
 }
 
 // ─── ESPACE TRANSPORTEUR (connexion avec mot de passe) : bourse de fret, transports, documents ───
+const AD_MARK='<svg viewBox="90 180 730 640" fill="none" aria-hidden="true"><g stroke="#fff" stroke-width="40" stroke-linecap="round"><path d="M430 500H500C590 500 590 250 676 250"/><path d="M500 500H676"/><path d="M500 500C590 500 590 750 676 750"/></g><g stroke-width="36"><circle cx="745" cy="250" r="62" stroke="#fff"/><circle cx="745" cy="500" r="62" stroke="#ffa94d"/><circle cx="745" cy="750" r="62" stroke="#fff"/></g><circle cx="265" cy="500" r="175" fill="#fff"/><g transform="translate(150 438) scale(2.3)" fill="#2f8ad0"><path d="M18 34 30 12H68L82 34Z"/><rect x="2" y="30" width="96" height="30" rx="12"/><circle cx="26" cy="62" r="11"/><circle cx="74" cy="62" r="11"/><circle cx="26" cy="62" r="4" fill="#fff"/><circle cx="74" cy="62" r="4" fill="#fff"/></g></svg>';
+// ─── PORTAIL CLIENT : le client ne voit que ses missions, photos, inspections et factures (fonction serveur client_space_get) ───
+// Jamais transmis au client : prix d'achat, marge, transporteur, jetons des liens, données des autres clients.
+let cpData=null,cpTab='missions',cpOpen=null,cpQ='';
+const CP_STAGES={prep:'#e0a23e',planned:'#8f9db0',loaded:'#2f8ad0',transit:'#2f8ad0',delivered:'#38b07a',cancelled:'#a9b2bc'};
+const CP_T={
+  fr:{loc:'fr-BE',hello:'Espace client',tMissions:'Mes transports',tInvoices:'Mes factures',tAccount:'Mon compte',logout:'Déconnexion',search:'Rechercher (référence, ville, VIN, plaque)…',noMissions:'Aucun transport pour le moment.',noInvoices:'Aucune facture pour le moment.',
+    vehicles:'Véhicules',pickup:'Chargement',delivery:'Livraison',expected:'prévu le',vin:'VIN',plate:'Plaque',inspS:'Inspection',insp:'Inspection signée (PDF)',signedBy:'Signé par',photos:'Photos et vidéos',damages:'Dommages signalés',noDamage:'Aucun dommage signalé.',ordered:'Commandé',loadedS:'Chargé',deliveredS:'Livré',
+    stg:{prep:'En préparation',planned:'Planifié',loaded:'Chargé',transit:'En transport',delivered:'Livré',cancelled:'Annulé'},
+    pg:{loading:'Chargement',delivery:'Livraison',damage:'Dommages',cmr:'Document de transport'},video:'Vidéo',open:'Ouvrir',
+    inv:{no:'N°',date:'Date',due:'Échéance',st:'Statut',total:'Total TTC',paid:'Payée',unpaid:'À payer',late:'En retard',left:'Reste à payer'},
+    pwdTitle:'Changer mon mot de passe',curPwd:'Mot de passe actuel',newPwd:'Nouveau mot de passe (8 caractères minimum)',confPwd:'Confirmer le nouveau mot de passe',pwdBtn:'Changer le mot de passe',pwdOk:'Mot de passe modifié.',pwdShort:'8 caractères minimum.',pwdMismatch:'Les deux mots de passe sont différents.',pwdWrong:'Mot de passe actuel incorrect.',pwdBanner:'Pour votre sécurité, remplacez votre mot de passe temporaire par le vôtre.',pwdBannerBtn:'Changer maintenant',err:'Impossible de charger vos données. Réessayez plus tard.'},
+  en:{loc:'en-GB',hello:'Customer portal',tMissions:'My shipments',tInvoices:'My invoices',tAccount:'My account',logout:'Log out',search:'Search (reference, city, VIN, plate)…',noMissions:'No shipment yet.',noInvoices:'No invoice yet.',
+    vehicles:'Vehicles',pickup:'Pick-up',delivery:'Delivery',expected:'expected on',vin:'VIN',plate:'Plate',inspS:'Inspection',insp:'Signed inspection (PDF)',signedBy:'Signed by',photos:'Photos and videos',damages:'Reported damage',noDamage:'No damage reported.',ordered:'Ordered',loadedS:'Loaded',deliveredS:'Delivered',
+    stg:{prep:'Being prepared',planned:'Planned',loaded:'Loaded',transit:'In transit',delivered:'Delivered',cancelled:'Cancelled'},
+    pg:{loading:'Pick-up',delivery:'Delivery',damage:'Damage',cmr:'Transport document'},video:'Video',open:'Open',
+    inv:{no:'No.',date:'Date',due:'Due',st:'Status',total:'Total incl. VAT',paid:'Paid',unpaid:'To pay',late:'Overdue',left:'Outstanding'},
+    pwdTitle:'Change my password',curPwd:'Current password',newPwd:'New password (8 characters minimum)',confPwd:'Confirm the new password',pwdBtn:'Change password',pwdOk:'Password changed.',pwdShort:'8 characters minimum.',pwdMismatch:'The two passwords are different.',pwdWrong:'Current password is incorrect.',pwdBanner:'For your security, please replace your temporary password with your own.',pwdBannerBtn:'Change now',err:'Unable to load your data. Please try again later.'},
+  nl:{loc:'nl-BE',hello:'Klantenportaal',tMissions:'Mijn transporten',tInvoices:'Mijn facturen',tAccount:'Mijn account',logout:'Afmelden',search:'Zoeken (referentie, stad, VIN, nummerplaat)…',noMissions:'Nog geen transport.',noInvoices:'Nog geen factuur.',
+    vehicles:'Voertuigen',pickup:'Laden',delivery:'Levering',expected:'verwacht op',vin:'VIN',plate:'Nummerplaat',inspS:'Inspectie',insp:'Ondertekende inspectie (PDF)',signedBy:'Ondertekend door',photos:'Foto’s en video’s',damages:'Gemelde schade',noDamage:'Geen schade gemeld.',ordered:'Besteld',loadedS:'Geladen',deliveredS:'Geleverd',
+    stg:{prep:'In voorbereiding',planned:'Gepland',loaded:'Geladen',transit:'Onderweg',delivered:'Geleverd',cancelled:'Geannuleerd'},
+    pg:{loading:'Laden',delivery:'Levering',damage:'Schade',cmr:'Vervoersdocument'},video:'Video',open:'Openen',
+    inv:{no:'Nr.',date:'Datum',due:'Vervaldatum',st:'Status',total:'Totaal incl. btw',paid:'Betaald',unpaid:'Te betalen',late:'Te laat',left:'Openstaand'},
+    pwdTitle:'Mijn wachtwoord wijzigen',curPwd:'Huidig wachtwoord',newPwd:'Nieuw wachtwoord (minimaal 8 tekens)',confPwd:'Nieuw wachtwoord bevestigen',pwdBtn:'Wachtwoord wijzigen',pwdOk:'Wachtwoord gewijzigd.',pwdShort:'Minimaal 8 tekens.',pwdMismatch:'De twee wachtwoorden verschillen.',pwdWrong:'Huidig wachtwoord is onjuist.',pwdBanner:'Vervang om veiligheidsredenen uw tijdelijke wachtwoord door een eigen wachtwoord.',pwdBannerBtn:'Nu wijzigen',err:'Uw gegevens konden niet worden geladen. Probeer het later opnieuw.'},
+  de:{loc:'de-DE',hello:'Kundenportal',tMissions:'Meine Transporte',tInvoices:'Meine Rechnungen',tAccount:'Mein Konto',logout:'Abmelden',search:'Suchen (Referenz, Stadt, VIN, Kennzeichen)…',noMissions:'Noch kein Transport.',noInvoices:'Noch keine Rechnung.',
+    vehicles:'Fahrzeuge',pickup:'Abholung',delivery:'Lieferung',expected:'erwartet am',vin:'VIN',plate:'Kennzeichen',inspS:'Inspektion',insp:'Unterzeichnete Inspektion (PDF)',signedBy:'Unterzeichnet von',photos:'Fotos und Videos',damages:'Gemeldete Schäden',noDamage:'Kein Schaden gemeldet.',ordered:'Beauftragt',loadedS:'Geladen',deliveredS:'Geliefert',
+    stg:{prep:'In Vorbereitung',planned:'Geplant',loaded:'Geladen',transit:'Unterwegs',delivered:'Geliefert',cancelled:'Storniert'},
+    pg:{loading:'Abholung',delivery:'Lieferung',damage:'Schäden',cmr:'Transportdokument'},video:'Video',open:'Öffnen',
+    inv:{no:'Nr.',date:'Datum',due:'Fällig',st:'Status',total:'Gesamt inkl. MwSt.',paid:'Bezahlt',unpaid:'Zu zahlen',late:'Überfällig',left:'Offen'},
+    pwdTitle:'Mein Passwort ändern',curPwd:'Aktuelles Passwort',newPwd:'Neues Passwort (mindestens 8 Zeichen)',confPwd:'Neues Passwort bestätigen',pwdBtn:'Passwort ändern',pwdOk:'Passwort geändert.',pwdShort:'Mindestens 8 Zeichen.',pwdMismatch:'Die beiden Passwörter sind verschieden.',pwdWrong:'Aktuelles Passwort ist falsch.',pwdBanner:'Bitte ersetzen Sie aus Sicherheitsgründen Ihr temporäres Passwort durch ein eigenes.',pwdBannerBtn:'Jetzt ändern',err:'Ihre Daten konnten nicht geladen werden. Bitte versuchen Sie es später erneut.'},
+  es:{loc:'es-ES',hello:'Portal del cliente',tMissions:'Mis transportes',tInvoices:'Mis facturas',tAccount:'Mi cuenta',logout:'Cerrar sesión',search:'Buscar (referencia, ciudad, VIN, matrícula)…',noMissions:'Aún no hay transportes.',noInvoices:'Aún no hay facturas.',
+    vehicles:'Vehículos',pickup:'Carga',delivery:'Entrega',expected:'prevista el',vin:'VIN',plate:'Matrícula',inspS:'Inspección',insp:'Inspección firmada (PDF)',signedBy:'Firmado por',photos:'Fotos y vídeos',damages:'Daños notificados',noDamage:'Ningún daño notificado.',ordered:'Solicitado',loadedS:'Cargado',deliveredS:'Entregado',
+    stg:{prep:'En preparación',planned:'Planificado',loaded:'Cargado',transit:'En tránsito',delivered:'Entregado',cancelled:'Cancelado'},
+    pg:{loading:'Carga',delivery:'Entrega',damage:'Daños',cmr:'Documento de transporte'},video:'Vídeo',open:'Abrir',
+    inv:{no:'N.º',date:'Fecha',due:'Vencimiento',st:'Estado',total:'Total con IVA',paid:'Pagada',unpaid:'Por pagar',late:'Vencida',left:'Pendiente'},
+    pwdTitle:'Cambiar mi contraseña',curPwd:'Contraseña actual',newPwd:'Nueva contraseña (mínimo 8 caracteres)',confPwd:'Confirmar la nueva contraseña',pwdBtn:'Cambiar la contraseña',pwdOk:'Contraseña modificada.',pwdShort:'Mínimo 8 caracteres.',pwdMismatch:'Las dos contraseñas son diferentes.',pwdWrong:'La contraseña actual es incorrecta.',pwdBanner:'Por su seguridad, sustituya su contraseña temporal por una propia.',pwdBannerBtn:'Cambiar ahora',err:'No se pudieron cargar sus datos. Inténtelo de nuevo más tarde.'},
+  it:{loc:'it-IT',hello:'Portale clienti',tMissions:'I miei trasporti',tInvoices:'Le mie fatture',tAccount:'Il mio account',logout:'Esci',search:'Cerca (riferimento, città, VIN, targa)…',noMissions:'Nessun trasporto per ora.',noInvoices:'Nessuna fattura per ora.',
+    vehicles:'Veicoli',pickup:'Carico',delivery:'Consegna',expected:'prevista il',vin:'VIN',plate:'Targa',inspS:'Ispezione',insp:'Ispezione firmata (PDF)',signedBy:'Firmato da',photos:'Foto e video',damages:'Danni segnalati',noDamage:'Nessun danno segnalato.',ordered:'Ordinato',loadedS:'Caricato',deliveredS:'Consegnato',
+    stg:{prep:'In preparazione',planned:'Pianificato',loaded:'Caricato',transit:'In transito',delivered:'Consegnato',cancelled:'Annullato'},
+    pg:{loading:'Carico',delivery:'Consegna',damage:'Danni',cmr:'Documento di trasporto'},video:'Video',open:'Apri',
+    inv:{no:'N.',date:'Data',due:'Scadenza',st:'Stato',total:'Totale IVA incl.',paid:'Pagata',unpaid:'Da pagare',late:'Scaduta',left:'Da saldare'},
+    pwdTitle:'Cambia la mia password',curPwd:'Password attuale',newPwd:'Nuova password (minimo 8 caratteri)',confPwd:'Conferma la nuova password',pwdBtn:'Cambia password',pwdOk:'Password modificata.',pwdShort:'Minimo 8 caratteri.',pwdMismatch:'Le due password sono diverse.',pwdWrong:'La password attuale non è corretta.',pwdBanner:'Per sicurezza, sostituisca la password temporanea con una sua.',pwdBannerBtn:'Cambia ora',err:'Impossibile caricare i dati. Riprovi più tardi.'}
+};
+const cpT=()=>CP_T[detectLang((cpData&&cpData.client&&cpData.client.country)||'')]||CP_T.en;
+const cpDate=(d,T)=>d?new Date(String(d).slice(0,10)+'T12:00:00').toLocaleDateString(T.loc,{day:'numeric',month:'short',year:'numeric'}):'';
+const cpAllCars=(m,sts)=>m.cars.length&&m.cars.every(c=>sts.includes(c.status));
+function cpStage(m){
+  if(m.status==='annulé')return'cancelled';
+  if(['livré','à facturer','facturé','payé'].includes(m.status)||cpAllCars(m,['livré']))return'delivered';
+  if(m.status==='en transport'||m.cars.some(c=>c.status==='en transport'))return'transit';
+  if(m.cars.some(c=>c.status==='chargé'||c.status==='livré')||m.status==='chargé'||m.status==='en transport')return'loaded';
+  if(['attribué','à charger'].includes(m.status))return'planned';
+  return'prep';
+}
+async function initClientSpace(){
+  const host=document.getElementById('client-space');
+  document.getElementById('app-shell').style.display='none';
+  host.style.display='block';
+  host.innerHTML='<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg)"><div style="font-size:32px">⏳</div></div>';
+  try{const{data,error}=await sb.rpc('client_space_get');if(error)throw error;cpData=data;}
+  catch(e){console.warn('client_space_get :',e.message);cpData={client:{name:'—',country:''},missions:[],invoices:[],error:e.message};}
+  renderClientSpace();
+}
+function cpStageChip(m,T){const s=cpStage(m);return `<span class="st" style="--sc:${CP_STAGES[s]}"><i></i>${esc(T.stg[s])}</span>`;}
+function cpRoute(m){const a=[m.pickup_city,m.pickup_country].filter(Boolean).join(' '),b=[m.delivery_city,m.delivery_country].filter(Boolean).join(' ');return esc(a||'—')+' <span style="opacity:.55">→</span> '+esc(b||'—');}
+function cpMissionRow(m,T){
+  const open=cpOpen===m.id,ld=m.carrier_load_date||m.pickup_date,dd=m.carrier_delivery_date||m.delivery_date;
+  const veh=csVeh(m.cars);
+  return `<div class="cp-card${open?' open':''}"><div class="cp-head" onclick="cpOpen=${open?'null':`'${esc(m.id)}'`};renderClientSpace()">
+    <div style="flex:1;min-width:200px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>${esc(m.ref)}</b>${cpStageChip(m,T)}</div>
+    <div style="margin-top:4px;font-size:13.5px">${cpRoute(m)}</div>
+    <div style="margin-top:3px;font-size:12px;color:var(--muted)">${esc(veh||'')}</div></div>
+    <div style="font-size:12px;color:var(--muted);text-align:right;line-height:1.6">${ld?esc(T.pickup)+' '+esc(cpDate(ld,T))+'<br>':''}${dd?esc(T.delivery)+' '+esc(cpDate(dd,T)):''}</div></div>
+    ${open?cpMissionDetail(m,T,ld,dd):''}</div>`;
+}
+function cpSteps(m,T){
+  const st=cpStage(m),idx={prep:0,planned:0,loaded:1,transit:1,delivered:2,cancelled:0}[st];
+  const steps=[[T.ordered,m.order_date],[T.loadedS,''],[T.deliveredS,m.inspection_submitted_at]];
+  return `<div class="cp-steps">${steps.map((s,i)=>`<div class="${i<=idx&&st!=='cancelled'?'on':''}"><i>${i<=idx&&st!=='cancelled'?'✓':i+1}</i><span>${esc(s[0])}${s[1]&&i<=idx?'<small>'+esc(cpDate(s[1],T))+'</small>':''}</span></div>`).join('')}</div>`;
+}
+function cpMissionDetail(m,T,ld,dd){
+  const photoEv=(m.events||[]).filter(e=>e.photo_url||e.video_url);
+  const grp=k=>photoEv.filter(e=>k==='loading'?['loading','confirmed_loading'].includes(e.event_type):k==='delivery'?['delivery','confirmed_delivery'].includes(e.event_type):e.event_type===k);
+  const thumbs=(arr)=>arr.map(e=>e.photo_url?`<a href="${esc(e.photo_url)}" target="_blank" rel="noopener"><img loading="lazy" src="${esc(e.photo_url)}" alt=""></a>`:`<a class="cp-vid" href="${esc(e.video_url)}" target="_blank" rel="noopener">▶ ${esc(T.video)}</a>`).join('');
+  const groups=['loading','delivery','damage','cmr'].map(k=>({k,a:grp(k)})).filter(g=>g.a.length);
+  const carRows=m.cars.map(c=>{const pdf=c.inspection_pdf_url||'';return `<tr><td><b>${esc((c.make||'')+' '+(c.model||''))}</b></td><td>${esc(c.vin||'—')}</td><td>${esc(c.plate||'—')}</td><td>${pdf?`<a href="${esc(pdf)}" target="_blank" rel="noopener">📄 ${esc(T.open)}</a>`:''}</td></tr>`}).join('');
+  const dmg=(m.damages||[]);
+  return `<div class="cp-body">${cpSteps(m,T)}
+    <div class="cp-cols"><div><div class="cp-lbl">${esc(T.pickup)}</div>${esc([m.pickup_site,m.pickup_city,m.pickup_country].filter(Boolean).join(', ')||'—')}${ld?`<div class="cp-sub">${esc(T.expected)} ${esc(cpDate(ld,T))}</div>`:''}</div>
+    <div><div class="cp-lbl">${esc(T.delivery)}</div>${esc([m.delivery_site,m.delivery_city,m.delivery_country].filter(Boolean).join(', ')||'—')}${dd?`<div class="cp-sub">${esc(T.expected)} ${esc(cpDate(dd,T))}</div>`:''}</div></div>
+    <div class="cp-lbl">${esc(T.vehicles)}</div><div style="overflow-x:auto"><table class="cp-tbl"><thead><tr><th></th><th>${esc(T.vin)}</th><th>${esc(T.plate)}</th><th>${esc(T.inspS)}</th></tr></thead><tbody>${carRows}</tbody></table></div>
+    ${m.inspection_pdf_url?`<div style="margin:8px 0;font-size:13px"><a href="${esc(m.inspection_pdf_url)}" target="_blank" rel="noopener">📄 ${esc(T.insp)}</a>${m.inspection_signer?` · ${esc(T.signedBy)} ${esc(m.inspection_signer)}`:''}</div>`:''}
+    ${groups.length?`<div class="cp-lbl">${esc(T.photos)}</div>${groups.map(g=>`<div class="cp-pg"><b>${esc(T.pg[g.k])}</b><div class="cp-th">${thumbs(g.a)}</div></div>`).join('')}`:''}
+    <div class="cp-lbl">${esc(T.damages)}</div>${dmg.length?dmg.map(d=>`<div class="cp-dmg">${d.photo_url?`<a href="${esc(d.photo_url)}" target="_blank" rel="noopener"><img loading="lazy" src="${esc(d.photo_url)}" alt=""></a>`:''}<div><b>${esc(d.zone||'')}</b><div style="font-size:12.5px;color:var(--muted)">${esc(d.description||'')}</div></div></div>`).join(''):`<div style="font-size:13px;color:var(--muted)">${esc(T.noDamage)}</div>`}
+  </div>`;
+}
+function cpInvoicesHtml(T){
+  const inv=cpData.invoices||[];if(!inv.length)return `<div class="panel" style="color:var(--muted)">${esc(T.noInvoices)}</div>`;
+  const today=todayIso(),fmt=(n,cur)=>new Intl.NumberFormat(T.loc,{style:'currency',currency:cur||'EUR'}).format(n||0);
+  const stat=i=>i.status==='paid'||i.paid_date?['paid',T.inv.paid,'#38b07a']:(i.due_date&&i.due_date<today?['late',T.inv.late,'#c0443f']:['unpaid',T.inv.unpaid,'#e0a23e']);
+  const left=inv.filter(i=>!(i.status==='paid'||i.paid_date)&&i.status!=='cancelled');
+  const sum=left.reduce((q,i)=>q+Number(i.total||0),0),cur=(inv[0]||{}).currency;
+  return `<div class="panel">${left.length?`<div style="margin-bottom:12px;font-size:14px">${esc(T.inv.left)} : <b>${esc(fmt(sum,cur))}</b></div>`:''}<div style="overflow-x:auto"><table class="cp-tbl"><thead><tr><th>${esc(T.inv.no)}</th><th>${esc(T.inv.date)}</th><th>${esc(T.inv.due)}</th><th>${esc(T.inv.st)}</th><th style="text-align:right">${esc(T.inv.total)}</th></tr></thead><tbody>
+  ${inv.map(i=>{const s=stat(i);return `<tr><td><b>${esc(i.number)}</b></td><td>${esc(cpDate(i.issue_date,T))}</td><td>${esc(cpDate(i.due_date,T))}</td><td><span class="st" style="--sc:${s[2]}"><i></i>${esc(s[1])}</span></td><td style="text-align:right">${esc(fmt(i.total,i.currency))}</td></tr>`}).join('')}</tbody></table></div></div>`;
+}
+function cpAccountHtml(T){
+  return `<div class="panel"><div class="panel-title"><h2>${esc(T.pwdTitle)}</h2></div><div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">${esc(currentUser?.email||'')}</div>
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:360px"><div class="field"><label>${esc(T.curPwd)}</label><input id="cp-pw-cur" type="password" autocomplete="current-password"></div>
+  <div class="field"><label>${esc(T.newPwd)}</label><input id="cp-pw-new" type="password" autocomplete="new-password"></div>
+  <div class="field"><label>${esc(T.confPwd)}</label><input id="cp-pw-conf" type="password" autocomplete="new-password"></div>
+  <div><button class="btn primary" onclick="cpChangePassword()">${esc(T.pwdBtn)}</button></div><div id="cp-pw-msg" style="font-size:13px"></div></div></div>`;
+}
+async function cpChangePassword(){
+  const T=cpT(),msg=document.getElementById('cp-pw-msg');
+  const cur=document.getElementById('cp-pw-cur').value,n=document.getElementById('cp-pw-new').value,c=document.getElementById('cp-pw-conf').value;
+  if(n.length<8){msg.innerHTML=`<span style="color:var(--red)">${esc(T.pwdShort)}</span>`;return;}
+  if(n!==c){msg.innerHTML=`<span style="color:var(--red)">${esc(T.pwdMismatch)}</span>`;return;}
+  msg.textContent='⏳';
+  try{await changeOwnPassword(cur,n);renderClientSpace();document.getElementById('cp-pw-msg').innerHTML=`<span style="color:var(--green)">✓ ${esc(T.pwdOk)}</span>`;}
+  catch(e){msg.innerHTML=`<span style="color:var(--red)">${e.message==='PWD_WRONG'?esc(T.pwdWrong):esc(e.message)}</span>`;}
+}
+function renderClientSpace(){
+  const T=cpT(),c=cpData.client||{name:'—'},q=cpQ.trim().toLowerCase();
+  const tab=(k,l,n)=>`<button class="btn ${cpTab===k?'primary':''}" onclick="cpTab='${k}';renderClientSpace()">${esc(l)}${n?` (${n})`:''}</button>`;
+  const ms=(cpData.missions||[]).filter(m=>!q||[m.ref,m.pickup_city,m.delivery_city,...m.cars.map(x=>(x.vin||'')+' '+(x.plate||'')+' '+(x.make||'')+' '+(x.model||''))].join(' ').toLowerCase().includes(q));
+  const body=cpTab==='invoices'?cpInvoicesHtml(T):cpTab==='account'?cpAccountHtml(T):
+    `<div class="field" style="margin-bottom:12px"><input id="cp-q" type="search" placeholder="${esc(T.search)}" value="${esc(cpQ)}" oninput="cpQ=this.value;cpSearchKeep()"></div>${ms.map(m=>cpMissionRow(m,T)).join('')||`<div class="panel" style="color:var(--muted)">${esc(T.noMissions)}</div>`}`;
+  document.getElementById('client-space').innerHTML=`<div class="cp-top"><i class="ad-tile">${AD_MARK}</i><div style="font-weight:800;font-size:18px">auto<span style="color:#5ab0e8;font-weight:400">dispatch</span></div><div style="opacity:.8;font-size:13px">${esc(T.hello)} · <b>${esc(c.name)}</b></div><div style="flex:1"></div><button class="btn" onclick="logout()">${esc(T.logout)}</button></div>
+  <div style="max-width:860px;margin:0 auto;padding:18px 16px"><div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">${tab('missions',T.tMissions,(cpData.missions||[]).length)}${tab('invoices',T.tInvoices)}${tab('account',T.tAccount)}</div>
+  ${cpData.error?`<div class="tp-al red">${esc(T.err)}</div>`:''}
+  ${(currentUser&&currentUser.user_metadata&&currentUser.user_metadata.password_changed)?'':`<div class="tp-al amb" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="flex:1">🔑 ${esc(T.pwdBanner)}</span><button class="btn" onclick="cpTab='account';renderClientSpace()">${esc(T.pwdBannerBtn)}</button></div>`}
+  ${body}</div>`;
+}
+// la recherche ne reconstruit que la liste (le champ garde le focus)
+function cpSearchKeep(){
+  const el=document.getElementById('cp-q'),pos=el?el.selectionStart:0;renderClientSpace();
+  const n=document.getElementById('cp-q');if(n){n.focus();try{n.setSelectionRange(pos,pos);}catch(_){}}
+}
+
+// ─── ADMIN : accès au portail client (même mécanique que les transporteurs) ───
+function openClientAccess(cid){
+  const c=db.clients.find(x=>x.id===cid);if(!c)return;
+  const users=db.profiles.filter(p=>p.role==='client'&&p.client_id===cid);
+  document.getElementById('modal-content').innerHTML=`<div class="modal-header"><div><h2>${esc(c.name)}</h2><p>Accès au portail client : suivi des transports, photos, inspections et factures. Le client ne voit jamais tes prix d'achat ni tes transporteurs.</p></div><button class="x" onclick="closeModal()">×</button></div>
+  <div class="form-grid"><div class="form-section">UTILISATEURS AYANT ACCÈS</div>
+  ${users.map(u=>`<div class="field wide"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:5px 0;border-bottom:1px solid var(--line)"><span style="flex:1;min-width:200px">🔑 <b>${esc(u.email||'')}</b></span><button class="btn" type="button" onclick="clientAccessPassword('${esc(u.user_id)}')">Nouveau mot de passe</button><button class="btn danger" type="button" onclick="clientAccessDelete('${esc(u.user_id)}','${esc(cid)}')">Supprimer</button></div></div>`).join('')||'<div class="field wide" style="color:var(--muted);font-size:12.5px">Aucun accès pour le moment.</div>'}
+  <div class="form-section">AJOUTER UN UTILISATEUR</div>
+  <div class="field"><label>E-mail de connexion</label><input id="ca-email" type="email" value="${esc(users.length?'':(c.email||''))}"></div>
+  <div class="field"><label>Mot de passe (temporaire)</label><input id="ca-pass" type="text" placeholder="8 caractères minimum"></div>
+  <div class="field wide"><div style="display:flex;gap:6px"><button class="btn" type="button" onclick="document.getElementById('ca-pass').value=genPassword()">Générer un mot de passe</button><button class="btn primary" type="button" onclick="clientAccessCreate('${esc(cid)}')">Créer l'accès</button></div><div style="font-size:11px;color:var(--muted);margin-top:4px">Communique l'e-mail et le mot de passe au client. Il se connecte sur la même adresse que toi et arrive sur son portail. Il pourra changer son mot de passe lui-même.</div></div>
+  </div><div id="form-error"></div><div class="modal-footer"><button class="btn" onclick="closeModal()">Fermer</button></div>`;
+  document.getElementById('modal').classList.add('open');
+}
+async function clientAccessCreate(cid){
+  const email=val('ca-email'),password=val('ca-pass');
+  if(!email||password.length<8){_cdErr('Indique un e-mail et un mot de passe de 8 caractères minimum.');return;}
+  setLoading(true);
+  try{
+    const r=await callCarrierAccounts({action:'create',role:'client',email,password,client_id:cid});
+    db.profiles.push({user_id:r.user_id,role:'client',client_id:cid,email});
+    openClientAccess(cid);
+    alert('✓ Accès créé.\n\nAdresse : '+window.location.origin+window.location.pathname+'\nE-mail : '+email+'\nMot de passe temporaire : '+password+'\n\nNote-le maintenant : il ne sera plus affiché.');
+  }catch(e){_cdErr(e.message);}
+  setLoading(false);
+}
+async function clientAccessPassword(uid){
+  const password=val('ca-pass');if(password.length<8){_cdErr('Écris d\'abord un mot de passe de 8 caractères minimum dans le champ « Mot de passe », puis clique ici.');return;}
+  setLoading(true);
+  try{await callCarrierAccounts({action:'set_password',user_id:uid,password});alert('✓ Mot de passe changé : '+password);}catch(e){_cdErr(e.message);}
+  setLoading(false);
+}
+async function clientAccessDelete(uid,cid){
+  if(!confirm('Supprimer cet accès ? Cet utilisateur ne pourra plus se connecter.'))return;
+  setLoading(true);
+  try{await callCarrierAccounts({action:'delete',user_id:uid});db.profiles=db.profiles.filter(p=>p.user_id!==uid);openClientAccess(cid);}catch(e){_cdErr(e.message);}
+  setLoading(false);
+}
+
 let csTab='bourse',csLots=[],csOffers=[],csTransports=[];
 async function initCarrierSpace(){
   const host=document.getElementById('carrier-space');
@@ -6698,7 +6900,7 @@ function renderCarrierPortal(){
       <div class="pt-acts">${full?`<a class="pt-act" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(full)}" target="_blank" rel="noopener" aria-label="GPS"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-8z"/></svg></a>`:''}${ph?`<a class="pt-act" href="tel:${ph}" aria-label="Tel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg></a>`:''}</div></div>`;};
   portal.innerHTML=`
     <div class="pt-head">
-      <div class="pt-brand"><span class="pt-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5"/></svg></span><b>auto<i>dispatch</i></b><small>${L.portal_subtitle}</small></div>
+      <div class="pt-brand"><span class="pt-logo"><svg viewBox="90 180 730 640" fill="none" aria-hidden="true"><g stroke="#fff" stroke-width="40" stroke-linecap="round"><path d="M430 500H500C590 500 590 250 676 250"/><path d="M500 500H676"/><path d="M500 500C590 500 590 750 676 750"/></g><g stroke-width="36"><circle cx="745" cy="250" r="62" stroke="#fff"/><circle cx="745" cy="500" r="62" stroke="#ffa94d"/><circle cx="745" cy="750" r="62" stroke="#fff"/></g><circle cx="265" cy="500" r="175" fill="#fff"/><g transform="translate(150 438) scale(2.3)" fill="#2f8ad0"><path d="M18 34 30 12H68L82 34Z"/><rect x="2" y="30" width="96" height="30" rx="12"/><circle cx="26" cy="62" r="11"/><circle cx="74" cy="62" r="11"/><circle cx="26" cy="62" r="4" fill="#fff"/><circle cx="74" cy="62" r="4" fill="#fff"/></g></svg></span><b>auto<i>dispatch</i></b><small>${L.portal_subtitle}</small></div>
       <div class="pt-ref">${esc(m.ref)}</div>
       <div class="pt-client">${esc(m.clients?.name||'—')}</div>
       <div class="pt-route">
