@@ -2394,17 +2394,17 @@ function missionTableFull(selectable=false){
   return {html:`<div class="table-wrap"><table><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`,total,missions:allMissions.length};
 }
 
-function segTabs(){
+function segTabs(byVeh){
   const sts=['à planifier','attribué','à charger','en transport','livré','à facturer','facturé','payé'];
-  const cnt={};db.missions.forEach(m=>{cnt[m.status]=(cnt[m.status]||0)+1;});
+  const cnt={};db.missions.forEach(m=>{cnt[m.status]=(cnt[m.status]||0)+(byVeh?m.cars.length:1);});
   const tab=(label,val,n)=>`<button class="${filterStatus===val?'on':''}" onclick="filterStatus='${val}';render()">${label}<b>${n}</b></button>`;
-  return `<div class="seg">${tab('Tous','Tous les statuts',db.missions.length)}${sts.filter(x=>cnt[x]||filterStatus===x).map(x=>tab(x.charAt(0).toUpperCase()+x.slice(1),x,cnt[x]||0)).join('')}</div>`;
+  return `<div class="seg">${tab('Tous','Tous les statuts',byVeh?db.missions.reduce((n,m)=>n+m.cars.length,0):db.missions.length)}${sts.filter(x=>cnt[x]||filterStatus===x).map(x=>tab(x.charAt(0).toUpperCase()+x.slice(1),x,cnt[x]||0)).join('')}</div>`;
 }
-function advancedFilterBar(totalMissions,totalVehicles){
+function advancedFilterBar(totalMissions,totalVehicles,byVeh){
   const clientOpts=`<option value="Tous les clients">Tous les clients</option>${db.clients.map(x=>`<option value="${esc(x.id)}" ${filterClient===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}`;
   const carrierOpts=`<option value="Tous les transporteurs">Tous les transporteurs</option>${db.carriers.map(x=>`<option value="${esc(x.id)}" ${filterCarrier===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}`;
   const statusOpts=['Tous les statuts','à planifier','attribué','à charger','en transport','livré','à facturer','facturé','payé'].map(x=>`<option value="${x}" ${filterStatus===x?'selected':''}>${x}</option>`).join('');
-  return segTabs()+`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+  return segTabs(byVeh)+`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">
     <span style="font-size:12px;color:var(--muted)">Client</span>
     <select style="border:1px solid #d8e4ec;border-radius:6px;padding:6px 9px;font-size:12px;background:#fff" onchange="filterClient=this.value;render()">${clientOpts}</select>
     <span style="font-size:12px;color:var(--muted)">Transporteur</span>
@@ -3251,7 +3251,7 @@ function vehiclesPage(){
   const tbl=missionTableFull(false);
   const totalM=db.missions.length;const totalV=db.missions.reduce((n,m)=>n+m.cars.length,0);
   return heading('Véhicules',`${totalM} mission${totalM!==1?'s':''} · ${totalV} véhicule${totalV!==1?'s':''} · VIN et plaques sur des colonnes séparées · filtre sous les titres, tri en touchant un titre`)+
-  `<div class="panel"><div style="border-bottom:1px solid var(--line);padding-bottom:13px;margin-bottom:13px">${advancedFilterBar(tbl.missions,tbl.total)}</div>${tbl.html}</div>`;
+  `<div class="panel"><div style="border-bottom:1px solid var(--line);padding-bottom:13px;margin-bottom:13px">${advancedFilterBar(tbl.missions,tbl.total,true)}</div>${tbl.html}</div>`;
 }
 
 function partnersPage(kind){
