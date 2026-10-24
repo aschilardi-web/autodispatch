@@ -976,6 +976,8 @@ function adSha256(msg){
 }
 const AD_COMPANIES={
   // 'empreinte-sha256-du-code-en-majuscules':{url:'https://xxxx.supabase.co',anon:'clé anon publique'},
+  // société de démonstration (données fictives) : lien ?c=DEMO — « hidden » = ne fait pas apparaître le champ Code société pour tout le monde
+  '4ff006ca6b88e752f08cb7881714505ceb3d2079eea432acfda8e158e0d1d82e':{url:'https://raqohzcrlgpccakptlzp.supabase.co',anon:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJhcW9oemNybGdwY2Nha3B0bHpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA5MjU0ODEsImV4cCI6MjEwNjUwMTQ4MX0.RQrPQ7EEHDpqegfbzbR3i3LBnB7FopCjCuGksR-CK1E',hidden:true,demo:true},
 };
 const AD_DEFAULT={url:'https://srmesytesdspwdtumnfj.supabase.co',anon:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNybWVzeXRlc2RzcHdkdHVtbmZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1ODMyMDEsImV4cCI6MjEwNjE1OTIwMX0.NpngBYSzBUNf7_OI516YhmtwzvPGPewlPRTPwbPwYoI'};
 const adNormCode=c=>String(c||'').trim().toUpperCase().replace(/\s+/g,'');
@@ -991,6 +993,10 @@ const AD_CODE=(()=>{
   return c&&adLookup(c)?c:'';
 })();
 const AD_CFG=(AD_CODE&&adLookup(AD_CODE))||AD_DEFAULT;
+if(AD_CFG.demo){
+  const _b=()=>{const d=document.createElement('div');d.id='demo-pill';d.style.cssText='position:fixed;left:10px;bottom:10px;z-index:99999;background:#7a4fb0;color:#fff;font:600 12px/1 system-ui,sans-serif;padding:8px 12px;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,.3)';d.innerHTML='🎬 DÉMONSTRATION · données fictives · <a href="#" style="color:#fff;text-decoration:underline" onclick="try{localStorage.removeItem(\'adCompanyCode\');}catch(_){}location.href=location.pathname;return false">quitter</a>';document.body.appendChild(d);};
+  if(document.body)_b();else document.addEventListener('DOMContentLoaded',_b);
+}
 const adC=()=>AD_CODE?'&c='+encodeURIComponent(AD_CODE):'';   // à ajouter aux liens envoyés aux chauffeurs et aux clients
 const SUPABASE_URL=AD_CFG.url;
 const SUPABASE_ANON=AD_CFG.anon;
@@ -1735,7 +1741,7 @@ async function checkAuth(){
 // champ « Code société » : visible dès que plusieurs sociétés existent (ou si un code a été demandé par le lien)
 function adInitCodeField(){
   const wrap=document.getElementById('login-code-wrap');if(!wrap)return;
-  if(Object.keys(AD_COMPANIES).length||AD_CODE||AD_BADCODE){
+  if(Object.values(AD_COMPANIES).some(c=>!c.hidden)||AD_CODE||AD_BADCODE){
     wrap.style.display='block';document.getElementById('login-code').value=AD_CODE;
     if(AD_BADCODE)document.getElementById('login-err').textContent='Code société inconnu. Vérifie le code reçu.';
   }
