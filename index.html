@@ -155,6 +155,7 @@ tbody tr:hover{background:#f7fbff}
 .cp-vt td{white-space:nowrap}
 .cp-help{margin-top:22px;padding:14px 18px;background:#fff;border:1px solid var(--line);border-radius:12px;font-size:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}.cp-help a{color:var(--blue);font-weight:600;text-decoration:none}
 @media(max-width:820px){.cp-kpis{grid-template-columns:1fr 1fr}.cp-kpi b{font-size:22px}}
+.field.missing input,.field.missing select{border-color:#c0443f!important;background:#fdeceb;box-shadow:0 0 0 3px rgba(192,68,63,.16)}.field.missing label{color:#c0443f}
 .ad-tile{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#2f8ad0,#12315a);display:inline-flex;align-items:center;justify-content:center;flex:none;box-shadow:0 2px 8px rgba(0,0,0,.25)}.ad-tile svg{width:25px;height:auto}
 .brand{display:flex;align-items:center;gap:10px}.auth-brand{display:flex;align-items:center;gap:12px}.auth-brand .ad-tile{width:44px;height:44px;border-radius:12px}.auth-brand .ad-tile svg{width:32px}
 .brand .bt small{font-size:7.5px;letter-spacing:1.3px;white-space:nowrap}
@@ -469,6 +470,8 @@ html[data-theme="dark"] .cp-card.late .cp-dates .late{color:#d0736f}
 html[data-theme="dark"] .cp-tbl td.late{color:#d0736f}
 html[data-theme="dark"] .cp-doc{background:#212121}
 html[data-theme="dark"] .cp-help{background:#212121}
+html[data-theme="dark"] .field.missing input,html[data-theme="dark"] .field.missing select{background:#341b1a}
+html[data-theme="dark"] .field.missing label{color:#d0736f}
 html[data-theme="dark"] .kpi{background:#212121}
 html[data-theme="dark"] .kpi em{color:#8296a7}
 html[data-theme="dark"] .kpi.alert{border-color:#492e2c}
@@ -580,6 +583,9 @@ html[data-theme="dark"] [style*="background:#fce8e8 "]{background:#351a1a!import
 html[data-theme="dark"] [style*="background:#fde8e6;"]{background:#351d1a!important}
 html[data-theme="dark"] [style$="background:#fde8e6"]{background:#351d1a!important}
 html[data-theme="dark"] [style*="background:#fde8e6 "]{background:#351d1a!important}
+html[data-theme="dark"] [style*="background:#fdeceb;"]{background:#341b1a!important}
+html[data-theme="dark"] [style$="background:#fdeceb"]{background:#341b1a!important}
+html[data-theme="dark"] [style*="background:#fdeceb "]{background:#341b1a!important}
 html[data-theme="dark"] [style*="background:#fff;"]{background:#212121!important}
 html[data-theme="dark"] [style$="background:#fff"]{background:#212121!important}
 html[data-theme="dark"] [style*="background:#fff "]{background:#212121!important}
@@ -6378,6 +6384,7 @@ function wireCatSuggest(){
     const sg=suggestCategory(mk,md);if(sg)sel.value=sg;
   };
 }
+document.addEventListener('input',e=>{const f=e.target&&e.target.closest&&e.target.closest('.field.missing');if(f&&e.target.value)f.classList.remove('missing');},true);
 function openMissionForm(id){
   editingMission=id||null;
   const m=id?db.missions.find(x=>x.id===id):null;
@@ -6396,7 +6403,15 @@ function addVehicleField(){
 async function saveMission(){
   const err=document.getElementById('form-error');
   const vin=val('f-vin').toUpperCase();
-  if(!val('f-client')||!val('f-picksite')||!val('f-pickstreet')||!val('f-pickpostal')||!val('f-pickcity')||!val('f-delivsite')||!val('f-delivstreet')||!val('f-delivpostal')||!val('f-delivcity')||!val('f-make')||!val('f-model')){err.innerHTML='<div class="notice error">Complète le client, les noms de site, les deux adresses et la marque / le modèle.</div>';return;}
+  // champs obligatoires : on surligne ceux qui manquent
+  const REQ={'f-client':'Client','f-picksite':'Chargement : site / nom','f-pickstreet':'Chargement : rue et numéro','f-pickpostal':'Chargement : code postal','f-pickcity':'Chargement : ville','f-delivsite':'Livraison : site / nom','f-delivstreet':'Livraison : rue et numéro','f-delivpostal':'Livraison : code postal','f-delivcity':'Livraison : ville','f-make':'Marque','f-model':'Modèle'};
+  document.querySelectorAll('#modal-content .field.missing').forEach(f=>f.classList.remove('missing'));
+  const missing=Object.keys(REQ).filter(id=>!val(id));
+  if(missing.length){
+    missing.forEach(id=>{const el=document.getElementById(id);const f=el&&el.closest('.field');if(f)f.classList.add('missing');});
+    const first=document.getElementById(missing[0]);if(first){first.scrollIntoView({block:'center',behavior:'smooth'});try{first.focus({preventScroll:true});}catch(_){}}
+    err.innerHTML='<div class="notice error">À compléter (surlignés en rouge) : '+missing.map(id=>esc(REQ[id])).join(', ')+'.</div>';return;
+  }
   if(vin&&!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)){err.innerHTML='<div class="notice error">Le VIN doit faire 17 caractères sans I, O ni Q.</div>';return;}
   const old=editingMission?db.missions.find(x=>x.id===editingMission):null;
   let cars=old?[...old.cars]:[];
@@ -6430,7 +6445,9 @@ async function saveMission(){
   if(old&&m.distanceKm===old.distanceKm&&['pickupStreet','pickupPostal','pickupCity','pickupCountry','deliveryStreet','deliveryPostal','deliveryCity','deliveryCountry'].some(k=>(old[k]||'')!==(m[k]||'')))m.distanceKm=null;
   if(m.distanceKm==null){try{m.distanceKm=await computeDistanceKm(m);}catch(e){console.warn('Calcul km impossible:',e.message);}}
   const saveErr=await dbUpsertMission(m);
-  if(saveErr){setLoading(false);alert('⚠ Mission NON enregistrée : '+saveErr.message);return;}
+  if(saveErr){setLoading(false);
+    if(/missions_client_id_fkey/.test(saveErr.message||'')){alert("⚠ Mission NON enregistrée : ce client n'existe plus (la liste affichée est périmée).\n\nRecharge la page (Cmd+Maj+R), puis choisis un client dans la liste.");return;}
+    alert('⚠ Mission NON enregistrée : '+saveErr.message);return;}
   for(const c of m.cars)await dbUpsertCar(c,m.id);
   for(const n of m.notifications)await dbUpsertNotif(n,m.id);
   setLoading(false);
