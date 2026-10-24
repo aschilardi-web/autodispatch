@@ -102,21 +102,59 @@ tbody tr:hover{background:#f7fbff}
 .sidebar{background:linear-gradient(185deg,#12315a 0%,#0e2a47 45%,#0a2038 100%)}
 .brand{font-weight:800;letter-spacing:-.6px}
 .brand small{letter-spacing:2.4px;opacity:.75}
-.cp-top{background:var(--navy);color:#fff;padding:14px 22px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.cp-card{background:#fff;border:1px solid var(--line);border-radius:14px;margin-bottom:10px;overflow:hidden}
-.cp-head{display:flex;gap:14px;align-items:center;padding:14px 16px;cursor:pointer;flex-wrap:wrap}
+.cp-top{background:linear-gradient(135deg,#0e2a47,#1a4a7a);color:#fff;padding:0 0 64px}
+.cp-in{max-width:1080px;margin:0 auto;padding:0 20px}
+.cp-top .cp-in:first-child{display:flex;align-items:center;gap:12px;padding-top:18px;padding-bottom:18px;flex-wrap:wrap}
+.cp-brand{font-weight:800;font-size:20px;letter-spacing:-.5px}.cp-brand span{color:#8fcaf2;font-weight:400}
+.cp-user{display:flex;flex-direction:column;text-align:right;line-height:1.25;font-size:12px;opacity:.9}.cp-user b{font-size:13.5px}
+.cp-hero{padding-top:14px}.cp-hero h1{margin:0 0 18px;font-size:28px;font-weight:800;letter-spacing:-.6px}
+.cp-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.cp-kpi{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:14px 18px}
+.cp-kpi b{display:block;font-size:30px;font-weight:800;letter-spacing:-.8px;line-height:1.1}.cp-kpi span{font-size:12.5px;opacity:.8;letter-spacing:.3px}
+.cp-kpi.warn{background:rgba(255,190,80,.16);border-color:rgba(255,190,80,.4)}
+.cp-wrap{max-width:1080px;margin:-34px auto 40px;padding:0 20px;position:relative}
+.cp-tabs{display:inline-flex;gap:4px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:16px;box-shadow:var(--sh1)}
+.cp-tabs button{border:0;background:transparent;padding:9px 18px;border-radius:9px;font:inherit;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer}
+.cp-tabs button.on{background:var(--brand);color:#fff}
+.cp-warn{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:#fff7e6;border:1px solid #f0d9a8;color:#8a5a12;border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:13.5px}.cp-warn span{flex:1}
+.cp-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.cp-pills{display:flex;gap:6px;flex-wrap:wrap}.cp-pills button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 14px;font:inherit;font-size:13.5px;font-weight:600;color:var(--ink);cursor:pointer}.cp-pills button b{margin-left:4px;color:var(--muted);font-weight:700}.cp-pills button.on{background:var(--navy);border-color:var(--navy);color:#fff}.cp-pills button.on b{color:#bcd3e6}
+.cp-bar input{flex:1;min-width:220px;border:1px solid var(--line);border-radius:10px;padding:10px 14px;font:inherit;font-size:14px;background:#fff}
+.cp-card{background:#fff;border:1px solid var(--line);border-left:4px solid var(--sc,#8f9db0);border-radius:14px;margin-bottom:12px;overflow:hidden;box-shadow:var(--sh1)}
+.cp-card:hover{box-shadow:var(--sh2)}
+.cp-head{display:grid;grid-template-columns:minmax(220px,1.2fr) minmax(260px,1.3fr) auto;gap:20px;align-items:center;padding:18px 22px;cursor:pointer}
 .cp-card.open .cp-head{border-bottom:1px solid var(--line)}
-.cp-body{padding:14px 16px}
-.cp-lbl{font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:800;margin:14px 0 6px}
-.cp-sub{font-size:12px;color:var(--muted);margin-top:2px}
-.cp-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media(max-width:600px){.cp-cols{grid-template-columns:1fr}.cp-steps{flex-direction:column}}
-.cp-tbl{width:100%;border-collapse:collapse;font-size:13px}.cp-tbl th{text-align:left;font-size:11px;color:var(--muted);font-weight:700;padding:6px 8px;border-bottom:1px solid var(--line)}.cp-tbl td{padding:8px;border-bottom:1px solid var(--line)}
-.cp-th{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}.cp-th img{width:96px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:block}
-.cp-vid{display:inline-flex;align-items:center;padding:0 12px;height:72px;border-radius:8px;border:1px solid var(--line);background:var(--pale);font-size:12px}
-.cp-pg{margin-bottom:10px;font-size:13px}
-.cp-dmg{display:flex;gap:10px;align-items:center;margin-bottom:8px}.cp-dmg img{width:72px;height:54px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
-.cp-steps{display:flex;gap:6px;margin-bottom:6px}.cp-steps>div{flex:1;display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}.cp-steps i{width:24px;height:24px;border-radius:50%;background:var(--line);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:11px;font-weight:800;flex:none}.cp-steps .on{color:var(--ink);font-weight:700}.cp-steps .on i{background:#38b07a;color:#fff}.cp-steps small{display:block;font-weight:400;color:var(--muted)}
+.cp-l1{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:16px}
+.cp-route{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:15.5px;font-weight:600;flex-wrap:wrap}.cp-arrow{flex:none;width:28px;height:2px;background:var(--line);position:relative}.cp-arrow:after{content:'';position:absolute;right:-1px;top:-3px;border:4px solid transparent;border-left:6px solid var(--muted)}
+.cp-veh{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}.cp-veh span{background:var(--pale);color:var(--ink);border-radius:7px;padding:3px 9px;font-size:12.5px}
+.cp-dates{display:flex;gap:18px;align-items:center;font-size:14px;font-weight:600;text-align:right}.cp-dates small{display:block;font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:2px}.cp-chev{color:var(--muted);font-size:14px;margin-left:4px}
+.cp-steps{display:flex;align-items:flex-start;gap:0;position:relative}
+.cp-steps>div{flex:1;display:flex;flex-direction:column;align-items:center;text-align:center;position:relative;font-size:12px;color:var(--muted);gap:6px}
+.cp-steps>div:not(:first-child):before{content:'';position:absolute;top:11px;right:50%;width:100%;height:3px;background:var(--line);z-index:0}
+.cp-steps>div.on:not(:first-child):before{background:#38b07a}
+.cp-steps i{position:relative;z-index:1;width:24px;height:24px;border-radius:50%;background:#fff;border:3px solid var(--line);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:11px;font-weight:800;color:#fff}
+.cp-steps .on i{background:#38b07a;border-color:#38b07a}.cp-steps .cur i{box-shadow:0 0 0 5px rgba(56,176,122,.2)}
+.cp-steps .on{color:var(--ink);font-weight:700}.cp-steps small{display:block;font-weight:400;color:var(--muted);font-size:11px}.cp-steps.off{opacity:.45}
+.cp-body{padding:6px 22px 20px}
+.cp-lbl{font-size:11px;letter-spacing:1.3px;text-transform:uppercase;color:var(--muted);font-weight:800;margin:18px 0 8px}
+.cp-sub{font-size:12.5px;color:var(--muted);margin-top:3px}
+.cp-cols{display:grid;grid-template-columns:1fr 1fr;gap:20px;font-size:14.5px;margin-top:12px}
+.cp-tbl{width:100%;border-collapse:collapse;font-size:14px}.cp-tbl th{text-align:left;font-size:11px;color:var(--muted);font-weight:700;padding:8px 10px;border-bottom:1px solid var(--line);letter-spacing:.5px;text-transform:uppercase}.cp-tbl td{padding:10px;border-bottom:1px solid var(--line)}
+.cp-th{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}.cp-th img{width:120px;height:90px;object-fit:cover;border-radius:10px;border:1px solid var(--line);display:block}
+.cp-vid{display:inline-flex;align-items:center;padding:0 14px;height:90px;border-radius:10px;border:1px solid var(--line);background:var(--pale);font-size:13px}
+.cp-pg{margin-bottom:12px;font-size:14px}
+.cp-dmg{display:flex;gap:12px;align-items:center;margin-bottom:10px}.cp-dmg img{width:84px;height:64px;object-fit:cover;border-radius:9px;border:1px solid var(--line)}
+.cp-empty{background:#fff;border:1px dashed var(--line);border-radius:14px;padding:36px;text-align:center;color:var(--muted)}
+@media(max-width:820px){.cp-head{grid-template-columns:1fr;gap:14px}.cp-dates{justify-content:space-between;text-align:left}.cp-cols{grid-template-columns:1fr}.cp-kpis{grid-template-columns:1fr 1fr 1fr;gap:8px}.cp-kpi{padding:10px 12px}.cp-kpi b{font-size:20px}.cp-hero h1{font-size:22px}.cp-user{display:none}}
+.cp-kpis{grid-template-columns:repeat(4,1fr)}
+.cp-kpi.bad{background:rgba(255,110,100,.18);border-color:rgba(255,120,110,.5)}
+.cp-pills button.red b{color:#c0443f}.cp-pills button.red.on{background:#c0443f;border-color:#c0443f}.cp-pills button.red.on b{color:#fff}
+.cp-card.late .cp-dates .late{color:#c0443f}.cp-tbl td.late{color:#c0443f;font-weight:700}
+.cp-doc{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:9px;padding:6px 10px;font-size:12.5px;font-weight:600;color:var(--blue);background:#fff;text-decoration:none;white-space:nowrap}.cp-doc:hover{background:var(--pale);text-decoration:none}
+.cp-tbl th.sort{cursor:pointer;user-select:none}.cp-tbl th.sort:hover{color:var(--ink)}
+.cp-vt td{white-space:nowrap}
+.cp-help{margin-top:22px;padding:14px 18px;background:#fff;border:1px solid var(--line);border-radius:12px;font-size:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}.cp-help a{color:var(--blue);font-weight:600;text-decoration:none}
+@media(max-width:820px){.cp-kpis{grid-template-columns:1fr 1fr}.cp-kpi b{font-size:22px}}
 .ad-tile{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#2f8ad0,#12315a);display:inline-flex;align-items:center;justify-content:center;flex:none;box-shadow:0 2px 8px rgba(0,0,0,.25)}.ad-tile svg{width:25px;height:auto}
 .brand{display:flex;align-items:center;gap:10px}.auth-brand{display:flex;align-items:center;gap:12px}.auth-brand .ad-tile{width:44px;height:44px;border-radius:12px}.auth-brand .ad-tile svg{width:32px}
 .brand .bt small{font-size:7.5px;letter-spacing:1.3px;white-space:nowrap}
@@ -417,7 +455,18 @@ html[data-theme="dark"] .portal-section.done{border-color:#2c4933;background:#19
 html[data-theme="dark"] .portal-add-photo{border:2px dashed #2c4933}
 html[data-theme="dark"] th{background:#182430}
 html[data-theme="dark"] tbody tr:hover{background:#17232f}
+html[data-theme="dark"] .cp-tabs{background:#212121}
+html[data-theme="dark"] .cp-warn{background:#352c1a;border:1px solid #49402c;color:#e0c295}
+html[data-theme="dark"] .cp-pills button{background:#212121}
+html[data-theme="dark"] .cp-bar input{background:#212121}
 html[data-theme="dark"] .cp-card{background:#212121}
+html[data-theme="dark"] .cp-steps i{background:#212121}
+html[data-theme="dark"] .cp-empty{background:#212121}
+html[data-theme="dark"] .cp-pills button.red b{color:#d0736f}
+html[data-theme="dark"] .cp-card.late .cp-dates .late{color:#d0736f}
+html[data-theme="dark"] .cp-tbl td.late{color:#d0736f}
+html[data-theme="dark"] .cp-doc{background:#212121}
+html[data-theme="dark"] .cp-help{background:#212121}
 html[data-theme="dark"] .kpi{background:#212121}
 html[data-theme="dark"] .kpi em{color:#8296a7}
 html[data-theme="dark"] .kpi.alert{border-color:#492e2c}
@@ -533,6 +582,9 @@ html[data-theme="dark"] [style*="background:#fff3cd "]{background:#3d361e!import
 html[data-theme="dark"] [style*="background:#fff4df;"]{background:#372d1b!important}
 html[data-theme="dark"] [style$="background:#fff4df"]{background:#372d1b!important}
 html[data-theme="dark"] [style*="background:#fff4df "]{background:#372d1b!important}
+html[data-theme="dark"] [style*="background:#fff7e6;"]{background:#352c1a!important}
+html[data-theme="dark"] [style$="background:#fff7e6"]{background:#352c1a!important}
+html[data-theme="dark"] [style*="background:#fff7e6 "]{background:#352c1a!important}
 html[data-theme="dark"] [style*="background:#fff7ed;"]{background:#322719!important}
 html[data-theme="dark"] [style$="background:#fff7ed"]{background:#322719!important}
 html[data-theme="dark"] [style*="background:#fff7ed "]{background:#322719!important}
@@ -626,6 +678,9 @@ html[data-theme="dark"] [style*=" color:#8094a6"]{color:#8296a7!important}
 html[data-theme="dark"] [style^="color:#888"]{color:#9b9b9b!important}
 html[data-theme="dark"] [style*=";color:#888"]{color:#9b9b9b!important}
 html[data-theme="dark"] [style*=" color:#888"]{color:#9b9b9b!important}
+html[data-theme="dark"] [style^="color:#8a5a12"]{color:#e0c295!important}
+html[data-theme="dark"] [style*=";color:#8a5a12"]{color:#e0c295!important}
+html[data-theme="dark"] [style*=" color:#8a5a12"]{color:#e0c295!important}
 html[data-theme="dark"] [style^="color:#999"]{color:#919191!important}
 html[data-theme="dark"] [style*=";color:#999"]{color:#919191!important}
 html[data-theme="dark"] [style*=" color:#999"]{color:#919191!important}
@@ -641,6 +696,9 @@ html[data-theme="dark"] [style*=" color:#a54b48"]{color:#c88381!important}
 html[data-theme="dark"] [style^="color:#c0392b"]{color:#d67d73!important}
 html[data-theme="dark"] [style*=";color:#c0392b"]{color:#d67d73!important}
 html[data-theme="dark"] [style*=" color:#c0392b"]{color:#d67d73!important}
+html[data-theme="dark"] [style^="color:#c0443f"]{color:#d0736f!important}
+html[data-theme="dark"] [style*=";color:#c0443f"]{color:#d0736f!important}
+html[data-theme="dark"] [style*=" color:#c0443f"]{color:#d0736f!important}
 html[data-theme="dark"] [style^="color:#c05621"]{color:#d89878!important}
 html[data-theme="dark"] [style*=";color:#c05621"]{color:#d89878!important}
 html[data-theme="dark"] [style*=" color:#c05621"]{color:#d89878!important}
@@ -675,6 +733,7 @@ html[data-theme="dark"] [style*="border"][style*="#e0e6f0"]{border-color:#2c3749
 html[data-theme="dark"] [style*="border"][style*="#edf1f4"]{border-color:#2c3d49!important}
 html[data-theme="dark"] [style*="border"][style*="#eee"]{border-color:#3b3b3b!important}
 html[data-theme="dark"] [style*="border"][style*="#eef1f4"]{border-color:#2e3b47!important}
+html[data-theme="dark"] [style*="border"][style*="#f0d9a8"]{border-color:#49402c!important}
 html[data-theme="dark"] [style*="border"][style*="#f0f0f0"]{border-color:#3b3b3b!important}
 html[data-theme="dark"] [style*="border"][style*="#f1dba8"]{border-color:#49402c!important}
 html[data-theme="dark"] [style*="border"][style*="#f3c9c6"]{border-color:#492e2c!important}
@@ -3586,40 +3645,40 @@ async function handleOfferEvent(p){
 const AD_MARK='<svg viewBox="90 180 730 640" fill="none" aria-hidden="true"><g stroke="#fff" stroke-width="40" stroke-linecap="round"><path d="M430 500H500C590 500 590 250 676 250"/><path d="M500 500H676"/><path d="M500 500C590 500 590 750 676 750"/></g><g stroke-width="36"><circle cx="745" cy="250" r="62" stroke="#fff"/><circle cx="745" cy="500" r="62" stroke="#ffa94d"/><circle cx="745" cy="750" r="62" stroke="#fff"/></g><circle cx="265" cy="500" r="175" fill="#fff"/><g transform="translate(150 438) scale(2.3)" fill="#2f8ad0"><path d="M18 34 30 12H68L82 34Z"/><rect x="2" y="30" width="96" height="30" rx="12"/><circle cx="26" cy="62" r="11"/><circle cx="74" cy="62" r="11"/><circle cx="26" cy="62" r="4" fill="#fff"/><circle cx="74" cy="62" r="4" fill="#fff"/></g></svg>';
 // ─── PORTAIL CLIENT : le client ne voit que ses missions, photos, inspections et factures (fonction serveur client_space_get) ───
 // Jamais transmis au client : prix d'achat, marge, transporteur, jetons des liens, données des autres clients.
-let cpData=null,cpTab='missions',cpOpen=null,cpQ='';
+let cpData=null,cpTab='missions',cpOpen=null,cpQ='',cpSort={k:'eta',d:1};
 const CP_STAGES={prep:'#e0a23e',planned:'#8f9db0',loaded:'#2f8ad0',transit:'#2f8ad0',delivered:'#38b07a',cancelled:'#a9b2bc'};
 const CP_T={
-  fr:{loc:'fr-BE',hello:'Espace client',tMissions:'Mes transports',tInvoices:'Mes factures',tAccount:'Mon compte',logout:'Déconnexion',search:'Rechercher (référence, ville, VIN, plaque)…',noMissions:'Aucun transport pour le moment.',noInvoices:'Aucune facture pour le moment.',
+  fr:{loc:'fr-BE',fAll:'Tous',fAct:'En cours',fDone:'Livrés',kInv:'À payer',kTitle:'Vue d\'ensemble',fLate:'En retard',tVeh:'Véhicules',cMission:'Mission',cRoute:'Trajet',help:'Une question ?',exp:'Exporter (CSV)',pdf:'PDF',noVeh:'Aucun véhicule.',hello:'Espace client',tMissions:'Mes transports',tInvoices:'Mes factures',tAccount:'Mon compte',logout:'Déconnexion',search:'Rechercher (référence, ville, VIN, plaque)…',noMissions:'Aucun transport pour le moment.',noInvoices:'Aucune facture pour le moment.',
     vehicles:'Véhicules',pickup:'Chargement',delivery:'Livraison',expected:'prévu le',vin:'VIN',plate:'Plaque',inspS:'Inspection',insp:'Inspection signée (PDF)',signedBy:'Signé par',photos:'Photos et vidéos',damages:'Dommages signalés',noDamage:'Aucun dommage signalé.',ordered:'Commandé',loadedS:'Chargé',deliveredS:'Livré',
     stg:{prep:'En préparation',planned:'Planifié',loaded:'Chargé',transit:'En transport',delivered:'Livré',cancelled:'Annulé'},
     pg:{loading:'Chargement',delivery:'Livraison',damage:'Dommages',cmr:'Document de transport'},video:'Vidéo',open:'Ouvrir',
     inv:{no:'N°',date:'Date',due:'Échéance',st:'Statut',total:'Total TTC',paid:'Payée',unpaid:'À payer',late:'En retard',left:'Reste à payer'},
     pwdTitle:'Changer mon mot de passe',curPwd:'Mot de passe actuel',newPwd:'Nouveau mot de passe (8 caractères minimum)',confPwd:'Confirmer le nouveau mot de passe',pwdBtn:'Changer le mot de passe',pwdOk:'Mot de passe modifié.',pwdShort:'8 caractères minimum.',pwdMismatch:'Les deux mots de passe sont différents.',pwdWrong:'Mot de passe actuel incorrect.',pwdBanner:'Pour votre sécurité, remplacez votre mot de passe temporaire par le vôtre.',pwdBannerBtn:'Changer maintenant',err:'Impossible de charger vos données. Réessayez plus tard.'},
-  en:{loc:'en-GB',hello:'Customer portal',tMissions:'My shipments',tInvoices:'My invoices',tAccount:'My account',logout:'Log out',search:'Search (reference, city, VIN, plate)…',noMissions:'No shipment yet.',noInvoices:'No invoice yet.',
+  en:{loc:'en-GB',fAll:'All',fAct:'In progress',fDone:'Delivered',kInv:'To pay',kTitle:'Overview',fLate:'Late',tVeh:'Vehicles',cMission:'Shipment',cRoute:'Route',help:'Questions?',exp:'Export (CSV)',pdf:'PDF',noVeh:'No vehicle.',hello:'Customer portal',tMissions:'My shipments',tInvoices:'My invoices',tAccount:'My account',logout:'Log out',search:'Search (reference, city, VIN, plate)…',noMissions:'No shipment yet.',noInvoices:'No invoice yet.',
     vehicles:'Vehicles',pickup:'Pick-up',delivery:'Delivery',expected:'expected on',vin:'VIN',plate:'Plate',inspS:'Inspection',insp:'Signed inspection (PDF)',signedBy:'Signed by',photos:'Photos and videos',damages:'Reported damage',noDamage:'No damage reported.',ordered:'Ordered',loadedS:'Loaded',deliveredS:'Delivered',
     stg:{prep:'Being prepared',planned:'Planned',loaded:'Loaded',transit:'In transit',delivered:'Delivered',cancelled:'Cancelled'},
     pg:{loading:'Pick-up',delivery:'Delivery',damage:'Damage',cmr:'Transport document'},video:'Video',open:'Open',
     inv:{no:'No.',date:'Date',due:'Due',st:'Status',total:'Total incl. VAT',paid:'Paid',unpaid:'To pay',late:'Overdue',left:'Outstanding'},
     pwdTitle:'Change my password',curPwd:'Current password',newPwd:'New password (8 characters minimum)',confPwd:'Confirm the new password',pwdBtn:'Change password',pwdOk:'Password changed.',pwdShort:'8 characters minimum.',pwdMismatch:'The two passwords are different.',pwdWrong:'Current password is incorrect.',pwdBanner:'For your security, please replace your temporary password with your own.',pwdBannerBtn:'Change now',err:'Unable to load your data. Please try again later.'},
-  nl:{loc:'nl-BE',hello:'Klantenportaal',tMissions:'Mijn transporten',tInvoices:'Mijn facturen',tAccount:'Mijn account',logout:'Afmelden',search:'Zoeken (referentie, stad, VIN, nummerplaat)…',noMissions:'Nog geen transport.',noInvoices:'Nog geen factuur.',
+  nl:{loc:'nl-BE',fAll:'Alle',fAct:'Lopend',fDone:'Geleverd',kInv:'Te betalen',kTitle:'Overzicht',fLate:'Te laat',tVeh:'Voertuigen',cMission:'Transport',cRoute:'Route',help:'Vragen?',exp:'Exporteren (CSV)',pdf:'PDF',noVeh:'Geen voertuig.',hello:'Klantenportaal',tMissions:'Mijn transporten',tInvoices:'Mijn facturen',tAccount:'Mijn account',logout:'Afmelden',search:'Zoeken (referentie, stad, VIN, nummerplaat)…',noMissions:'Nog geen transport.',noInvoices:'Nog geen factuur.',
     vehicles:'Voertuigen',pickup:'Laden',delivery:'Levering',expected:'verwacht op',vin:'VIN',plate:'Nummerplaat',inspS:'Inspectie',insp:'Ondertekende inspectie (PDF)',signedBy:'Ondertekend door',photos:'Foto’s en video’s',damages:'Gemelde schade',noDamage:'Geen schade gemeld.',ordered:'Besteld',loadedS:'Geladen',deliveredS:'Geleverd',
     stg:{prep:'In voorbereiding',planned:'Gepland',loaded:'Geladen',transit:'Onderweg',delivered:'Geleverd',cancelled:'Geannuleerd'},
     pg:{loading:'Laden',delivery:'Levering',damage:'Schade',cmr:'Vervoersdocument'},video:'Video',open:'Openen',
     inv:{no:'Nr.',date:'Datum',due:'Vervaldatum',st:'Status',total:'Totaal incl. btw',paid:'Betaald',unpaid:'Te betalen',late:'Te laat',left:'Openstaand'},
     pwdTitle:'Mijn wachtwoord wijzigen',curPwd:'Huidig wachtwoord',newPwd:'Nieuw wachtwoord (minimaal 8 tekens)',confPwd:'Nieuw wachtwoord bevestigen',pwdBtn:'Wachtwoord wijzigen',pwdOk:'Wachtwoord gewijzigd.',pwdShort:'Minimaal 8 tekens.',pwdMismatch:'De twee wachtwoorden verschillen.',pwdWrong:'Huidig wachtwoord is onjuist.',pwdBanner:'Vervang om veiligheidsredenen uw tijdelijke wachtwoord door een eigen wachtwoord.',pwdBannerBtn:'Nu wijzigen',err:'Uw gegevens konden niet worden geladen. Probeer het later opnieuw.'},
-  de:{loc:'de-DE',hello:'Kundenportal',tMissions:'Meine Transporte',tInvoices:'Meine Rechnungen',tAccount:'Mein Konto',logout:'Abmelden',search:'Suchen (Referenz, Stadt, VIN, Kennzeichen)…',noMissions:'Noch kein Transport.',noInvoices:'Noch keine Rechnung.',
+  de:{loc:'de-DE',fAll:'Alle',fAct:'Laufend',fDone:'Geliefert',kInv:'Zu zahlen',kTitle:'Übersicht',fLate:'Verspätet',tVeh:'Fahrzeuge',cMission:'Transport',cRoute:'Strecke',help:'Fragen?',exp:'Exportieren (CSV)',pdf:'PDF',noVeh:'Kein Fahrzeug.',hello:'Kundenportal',tMissions:'Meine Transporte',tInvoices:'Meine Rechnungen',tAccount:'Mein Konto',logout:'Abmelden',search:'Suchen (Referenz, Stadt, VIN, Kennzeichen)…',noMissions:'Noch kein Transport.',noInvoices:'Noch keine Rechnung.',
     vehicles:'Fahrzeuge',pickup:'Abholung',delivery:'Lieferung',expected:'erwartet am',vin:'VIN',plate:'Kennzeichen',inspS:'Inspektion',insp:'Unterzeichnete Inspektion (PDF)',signedBy:'Unterzeichnet von',photos:'Fotos und Videos',damages:'Gemeldete Schäden',noDamage:'Kein Schaden gemeldet.',ordered:'Beauftragt',loadedS:'Geladen',deliveredS:'Geliefert',
     stg:{prep:'In Vorbereitung',planned:'Geplant',loaded:'Geladen',transit:'Unterwegs',delivered:'Geliefert',cancelled:'Storniert'},
     pg:{loading:'Abholung',delivery:'Lieferung',damage:'Schäden',cmr:'Transportdokument'},video:'Video',open:'Öffnen',
     inv:{no:'Nr.',date:'Datum',due:'Fällig',st:'Status',total:'Gesamt inkl. MwSt.',paid:'Bezahlt',unpaid:'Zu zahlen',late:'Überfällig',left:'Offen'},
     pwdTitle:'Mein Passwort ändern',curPwd:'Aktuelles Passwort',newPwd:'Neues Passwort (mindestens 8 Zeichen)',confPwd:'Neues Passwort bestätigen',pwdBtn:'Passwort ändern',pwdOk:'Passwort geändert.',pwdShort:'Mindestens 8 Zeichen.',pwdMismatch:'Die beiden Passwörter sind verschieden.',pwdWrong:'Aktuelles Passwort ist falsch.',pwdBanner:'Bitte ersetzen Sie aus Sicherheitsgründen Ihr temporäres Passwort durch ein eigenes.',pwdBannerBtn:'Jetzt ändern',err:'Ihre Daten konnten nicht geladen werden. Bitte versuchen Sie es später erneut.'},
-  es:{loc:'es-ES',hello:'Portal del cliente',tMissions:'Mis transportes',tInvoices:'Mis facturas',tAccount:'Mi cuenta',logout:'Cerrar sesión',search:'Buscar (referencia, ciudad, VIN, matrícula)…',noMissions:'Aún no hay transportes.',noInvoices:'Aún no hay facturas.',
+  es:{loc:'es-ES',fAll:'Todos',fAct:'En curso',fDone:'Entregados',kInv:'Por pagar',kTitle:'Resumen',fLate:'Con retraso',tVeh:'Vehículos',cMission:'Transporte',cRoute:'Ruta',help:'¿Preguntas?',exp:'Exportar (CSV)',pdf:'PDF',noVeh:'Ningún vehículo.',hello:'Portal del cliente',tMissions:'Mis transportes',tInvoices:'Mis facturas',tAccount:'Mi cuenta',logout:'Cerrar sesión',search:'Buscar (referencia, ciudad, VIN, matrícula)…',noMissions:'Aún no hay transportes.',noInvoices:'Aún no hay facturas.',
     vehicles:'Vehículos',pickup:'Carga',delivery:'Entrega',expected:'prevista el',vin:'VIN',plate:'Matrícula',inspS:'Inspección',insp:'Inspección firmada (PDF)',signedBy:'Firmado por',photos:'Fotos y vídeos',damages:'Daños notificados',noDamage:'Ningún daño notificado.',ordered:'Solicitado',loadedS:'Cargado',deliveredS:'Entregado',
     stg:{prep:'En preparación',planned:'Planificado',loaded:'Cargado',transit:'En tránsito',delivered:'Entregado',cancelled:'Cancelado'},
     pg:{loading:'Carga',delivery:'Entrega',damage:'Daños',cmr:'Documento de transporte'},video:'Vídeo',open:'Abrir',
     inv:{no:'N.º',date:'Fecha',due:'Vencimiento',st:'Estado',total:'Total con IVA',paid:'Pagada',unpaid:'Por pagar',late:'Vencida',left:'Pendiente'},
     pwdTitle:'Cambiar mi contraseña',curPwd:'Contraseña actual',newPwd:'Nueva contraseña (mínimo 8 caracteres)',confPwd:'Confirmar la nueva contraseña',pwdBtn:'Cambiar la contraseña',pwdOk:'Contraseña modificada.',pwdShort:'Mínimo 8 caracteres.',pwdMismatch:'Las dos contraseñas son diferentes.',pwdWrong:'La contraseña actual es incorrecta.',pwdBanner:'Por su seguridad, sustituya su contraseña temporal por una propia.',pwdBannerBtn:'Cambiar ahora',err:'No se pudieron cargar sus datos. Inténtelo de nuevo más tarde.'},
-  it:{loc:'it-IT',hello:'Portale clienti',tMissions:'I miei trasporti',tInvoices:'Le mie fatture',tAccount:'Il mio account',logout:'Esci',search:'Cerca (riferimento, città, VIN, targa)…',noMissions:'Nessun trasporto per ora.',noInvoices:'Nessuna fattura per ora.',
+  it:{loc:'it-IT',fAll:'Tutti',fAct:'In corso',fDone:'Consegnati',kInv:'Da pagare',kTitle:'Panoramica',fLate:'In ritardo',tVeh:'Veicoli',cMission:'Trasporto',cRoute:'Percorso',help:'Domande?',exp:'Esporta (CSV)',pdf:'PDF',noVeh:'Nessun veicolo.',hello:'Portale clienti',tMissions:'I miei trasporti',tInvoices:'Le mie fatture',tAccount:'Il mio account',logout:'Esci',search:'Cerca (riferimento, città, VIN, targa)…',noMissions:'Nessun trasporto per ora.',noInvoices:'Nessuna fattura per ora.',
     vehicles:'Veicoli',pickup:'Carico',delivery:'Consegna',expected:'prevista il',vin:'VIN',plate:'Targa',inspS:'Ispezione',insp:'Ispezione firmata (PDF)',signedBy:'Firmato da',photos:'Foto e video',damages:'Danni segnalati',noDamage:'Nessun danno segnalato.',ordered:'Ordinato',loadedS:'Caricato',deliveredS:'Consegnato',
     stg:{prep:'In preparazione',planned:'Pianificato',loaded:'Caricato',transit:'In transito',delivered:'Consegnato',cancelled:'Annullato'},
     pg:{loading:'Carico',delivery:'Consegna',damage:'Danni',cmr:'Documento di trasporto'},video:'Video',open:'Apri',
@@ -3646,22 +3705,28 @@ async function initClientSpace(){
   catch(e){console.warn('client_space_get :',e.message);cpData={client:{name:'—',country:''},missions:[],invoices:[],error:e.message};}
   renderClientSpace();
 }
+const cpDue=m=>m.carrier_delivery_date||m.delivery_date||'';
+const cpLate=m=>{const s=cpStage(m),d=cpDue(m);return!['delivered','cancelled'].includes(s)&&!!d&&d<todayIso();};
+const cpDocUrl=m=>m.inspection_pdf_url||((m.cars||[]).find(c=>c.inspection_pdf_url)||{}).inspection_pdf_url||'';
 function cpStageChip(m,T){const s=cpStage(m);return `<span class="st" style="--sc:${CP_STAGES[s]}"><i></i>${esc(T.stg[s])}</span>`;}
-function cpRoute(m){const a=[m.pickup_city,m.pickup_country].filter(Boolean).join(' '),b=[m.delivery_city,m.delivery_country].filter(Boolean).join(' ');return esc(a||'—')+' <span style="opacity:.55">→</span> '+esc(b||'—');}
-function cpMissionRow(m,T){
-  const open=cpOpen===m.id,ld=m.carrier_load_date||m.pickup_date,dd=m.carrier_delivery_date||m.delivery_date;
-  const veh=csVeh(m.cars);
-  return `<div class="cp-card${open?' open':''}"><div class="cp-head" onclick="cpOpen=${open?'null':`'${esc(m.id)}'`};renderClientSpace()">
-    <div style="flex:1;min-width:200px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>${esc(m.ref)}</b>${cpStageChip(m,T)}</div>
-    <div style="margin-top:4px;font-size:13.5px">${cpRoute(m)}</div>
-    <div style="margin-top:3px;font-size:12px;color:var(--muted)">${esc(veh||'')}</div></div>
-    <div style="font-size:12px;color:var(--muted);text-align:right;line-height:1.6">${ld?esc(T.pickup)+' '+esc(cpDate(ld,T))+'<br>':''}${dd?esc(T.delivery)+' '+esc(cpDate(dd,T)):''}</div></div>
-    ${open?cpMissionDetail(m,T,ld,dd):''}</div>`;
-}
+const cpLateChip=T=>`<span class="st" style="--sc:#c0443f"><i></i>${esc(T.fLate)}</span>`;
+function cpRoute(m){const a=[m.pickup_city,m.pickup_country].filter(Boolean).join(' '),b=[m.delivery_city,m.delivery_country].filter(Boolean).join(' ');return `<span class="cp-city">${esc(a||'—')}</span><span class="cp-arrow"></span><span class="cp-city">${esc(b||'—')}</span>`;}
 function cpSteps(m,T){
-  const st=cpStage(m),idx={prep:0,planned:0,loaded:1,transit:1,delivered:2,cancelled:0}[st];
-  const steps=[[T.ordered,m.order_date],[T.loadedS,''],[T.deliveredS,m.inspection_submitted_at]];
-  return `<div class="cp-steps">${steps.map((s,i)=>`<div class="${i<=idx&&st!=='cancelled'?'on':''}"><i>${i<=idx&&st!=='cancelled'?'✓':i+1}</i><span>${esc(s[0])}${s[1]&&i<=idx?'<small>'+esc(cpDate(s[1],T))+'</small>':''}</span></div>`).join('')}</div>`;
+  const st=cpStage(m),idx={prep:0,planned:0,loaded:1,transit:1,delivered:2,cancelled:-1}[st];
+  const dd=cpDue(m);
+  const steps=[[T.ordered,m.order_date],[T.loadedS,''],[T.deliveredS,st==='delivered'?dd:'']];
+  return `<div class="cp-steps${st==='cancelled'?' off':''}">${steps.map((x,i)=>`<div class="${i<=idx?'on':''}${i===idx&&st!=='delivered'?' cur':''}"><i>${i<=idx?'✓':''}</i><span>${esc(x[0])}${x[1]&&i<=idx?'<small>'+esc(cpDate(x[1],T))+'</small>':''}</span></div>`).join('')}</div>`;
+}
+function cpMissionRow(m,T){
+  const open=cpOpen===m.id,ld=m.carrier_load_date||m.pickup_date,dd=cpDue(m),st=cpStage(m),late=cpLate(m),doc=cpDocUrl(m);
+  const veh=(m.cars||[]).map(c=>esc(((c.make||'')+' '+(c.model||'')).trim())).filter(Boolean);
+  return `<div class="cp-card${open?' open':''}${late?' late':''}" style="--sc:${late?'#c0443f':CP_STAGES[st]}"><div class="cp-head" onclick="cpOpen=${open?'null':`'${esc(m.id)}'`};renderClientSpace()">
+    <div class="cp-main"><div class="cp-l1"><b>${esc(m.ref)}</b>${cpStageChip(m,T)}${late?cpLateChip(T):''}</div>
+      <div class="cp-route">${cpRoute(m)}</div>
+      <div class="cp-veh">${veh.map(v=>`<span>${v}</span>`).join('')}</div></div>
+    <div class="cp-prog">${cpSteps(m,T)}</div>
+    <div class="cp-dates">${ld?`<div><small>${esc(T.pickup)}</small>${esc(cpDate(ld,T))}</div>`:''}${dd?`<div class="${late?'late':''}"><small>${esc(T.delivery)}</small>${esc(cpDate(dd,T))}</div>`:''}${doc?`<a class="cp-doc" href="${esc(doc)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">📄 ${esc(T.inspS)}</a>`:''}<span class="cp-chev">${open?'▴':'▾'}</span></div></div>
+    ${open?cpMissionDetail(m,T,ld,dd):''}</div>`;
 }
 function cpMissionDetail(m,T,ld,dd){
   const photoEv=(m.events||[]).filter(e=>e.photo_url||e.video_url);
@@ -3670,7 +3735,7 @@ function cpMissionDetail(m,T,ld,dd){
   const groups=['loading','delivery','damage','cmr'].map(k=>({k,a:grp(k)})).filter(g=>g.a.length);
   const carRows=m.cars.map(c=>{const pdf=c.inspection_pdf_url||'';return `<tr><td><b>${esc((c.make||'')+' '+(c.model||''))}</b></td><td>${esc(c.vin||'—')}</td><td>${esc(c.plate||'—')}</td><td>${pdf?`<a href="${esc(pdf)}" target="_blank" rel="noopener">📄 ${esc(T.open)}</a>`:''}</td></tr>`}).join('');
   const dmg=(m.damages||[]);
-  return `<div class="cp-body">${cpSteps(m,T)}
+  return `<div class="cp-body">
     <div class="cp-cols"><div><div class="cp-lbl">${esc(T.pickup)}</div>${esc([m.pickup_site,m.pickup_city,m.pickup_country].filter(Boolean).join(', ')||'—')}${ld?`<div class="cp-sub">${esc(T.expected)} ${esc(cpDate(ld,T))}</div>`:''}</div>
     <div><div class="cp-lbl">${esc(T.delivery)}</div>${esc([m.delivery_site,m.delivery_city,m.delivery_country].filter(Boolean).join(', ')||'—')}${dd?`<div class="cp-sub">${esc(T.expected)} ${esc(cpDate(dd,T))}</div>`:''}</div></div>
     <div class="cp-lbl">${esc(T.vehicles)}</div><div style="overflow-x:auto"><table class="cp-tbl"><thead><tr><th></th><th>${esc(T.vin)}</th><th>${esc(T.plate)}</th><th>${esc(T.inspS)}</th></tr></thead><tbody>${carRows}</tbody></table></div>
@@ -3679,14 +3744,60 @@ function cpMissionDetail(m,T,ld,dd){
     <div class="cp-lbl">${esc(T.damages)}</div>${dmg.length?dmg.map(d=>`<div class="cp-dmg">${d.photo_url?`<a href="${esc(d.photo_url)}" target="_blank" rel="noopener"><img loading="lazy" src="${esc(d.photo_url)}" alt=""></a>`:''}<div><b>${esc(d.zone||'')}</b><div style="font-size:12.5px;color:var(--muted)">${esc(d.description||'')}</div></div></div>`).join(''):`<div style="font-size:13px;color:var(--muted)">${esc(T.noDamage)}</div>`}
   </div>`;
 }
+function cpInvStat(i,T){const today=todayIso();return i.status==='paid'||i.paid_date?['paid',T.inv.paid,'#38b07a']:(i.due_date&&i.due_date<today?['late',T.inv.late,'#c0443f']:['unpaid',T.inv.unpaid,'#e0a23e']);}
 function cpInvoicesHtml(T){
-  const inv=cpData.invoices||[];if(!inv.length)return `<div class="panel" style="color:var(--muted)">${esc(T.noInvoices)}</div>`;
-  const today=todayIso(),fmt=(n,cur)=>new Intl.NumberFormat(T.loc,{style:'currency',currency:cur||'EUR'}).format(n||0);
-  const stat=i=>i.status==='paid'||i.paid_date?['paid',T.inv.paid,'#38b07a']:(i.due_date&&i.due_date<today?['late',T.inv.late,'#c0443f']:['unpaid',T.inv.unpaid,'#e0a23e']);
+  const inv=cpData.invoices||[];if(!inv.length)return `<div class="cp-empty">${esc(T.noInvoices)}</div>`;
+  const fmt=(n,cur)=>new Intl.NumberFormat(T.loc,{style:'currency',currency:cur||'EUR'}).format(n||0);
   const left=inv.filter(i=>!(i.status==='paid'||i.paid_date)&&i.status!=='cancelled');
   const sum=left.reduce((q,i)=>q+Number(i.total||0),0),cur=(inv[0]||{}).currency;
-  return `<div class="panel">${left.length?`<div style="margin-bottom:12px;font-size:14px">${esc(T.inv.left)} : <b>${esc(fmt(sum,cur))}</b></div>`:''}<div style="overflow-x:auto"><table class="cp-tbl"><thead><tr><th>${esc(T.inv.no)}</th><th>${esc(T.inv.date)}</th><th>${esc(T.inv.due)}</th><th>${esc(T.inv.st)}</th><th style="text-align:right">${esc(T.inv.total)}</th></tr></thead><tbody>
-  ${inv.map(i=>{const s=stat(i);return `<tr><td><b>${esc(i.number)}</b></td><td>${esc(cpDate(i.issue_date,T))}</td><td>${esc(cpDate(i.due_date,T))}</td><td><span class="st" style="--sc:${s[2]}"><i></i>${esc(s[1])}</span></td><td style="text-align:right">${esc(fmt(i.total,i.currency))}</td></tr>`}).join('')}</tbody></table></div></div>`;
+  return `<div class="cp-bar"><div style="flex:1;font-size:14.5px">${left.length?`${esc(T.inv.left)} : <b>${esc(fmt(sum,cur))}</b>`:''}</div><button class="btn" onclick="cpExport()">⬇ ${esc(T.exp)}</button></div>
+  <div class="cp-card" style="--sc:#8f9db0"><div style="overflow-x:auto"><table class="cp-tbl"><thead><tr><th>${esc(T.inv.no)}</th><th>${esc(T.inv.date)}</th><th>${esc(T.inv.due)}</th><th>${esc(T.inv.st)}</th><th style="text-align:right">${esc(T.inv.total)}</th><th></th></tr></thead><tbody>
+  ${inv.map(i=>{const s=cpInvStat(i,T);return `<tr><td><b>${esc(i.number)}</b></td><td>${esc(cpDate(i.issue_date,T))}</td><td>${esc(cpDate(i.due_date,T))}</td><td><span class="st" style="--sc:${s[2]}"><i></i>${esc(s[1])}</span></td><td style="text-align:right">${esc(fmt(i.total,i.currency))}</td><td style="text-align:right"><button class="btn" onclick="cpInvoicePdf('${esc(i.id)}')">📄 ${esc(T.pdf)}</button></td></tr>`}).join('')}</tbody></table></div></div>`;
+}
+function cpInvoicePdf(id){
+  try{db.invoices=(cpData.invoices||[]).map(x=>invFromRow(x));invoicePdf(id);}catch(e){alert('PDF : '+e.message);}
+}
+// ── vue par véhicule : une ligne par véhicule, triable ──
+const cpStOrder={prep:0,planned:1,loaded:2,transit:3,delivered:4,cancelled:5};
+function cpCarStage(m,c){
+  const ms=cpStage(m);if(ms==='cancelled')return'cancelled';
+  if(c.status==='livré'||ms==='delivered')return'delivered';
+  if(c.status==='en transport'||m.status==='en transport')return'transit';
+  if(c.status==='chargé')return'loaded';
+  return['attribué','à charger'].includes(m.status)?'planned':'prep';
+}
+function cpVehRows(){
+  const q=cpQ.trim().toLowerCase(),rows=[];
+  (cpData.missions||[]).forEach(m=>(m.cars||[]).forEach(c=>{
+    const st=cpCarStage(m,c),late=!['delivered','cancelled'].includes(st)&&!!cpDue(m)&&cpDue(m)<todayIso();
+    const ok=cpFilter==='all'||(cpFilter==='active'?!['delivered','cancelled'].includes(st):cpFilter==='done'?st==='delivered':late);
+    const txt=[m.ref,m.pickup_city,m.delivery_city,c.vin,c.plate,c.make,c.model].join(' ').toLowerCase();
+    if(ok&&(!q||txt.includes(q)))rows.push({m,c,st,late,name:((c.make||'')+' '+(c.model||'')).trim(),eta:cpDue(m)});
+  }));
+  const k=cpSort.k,d=cpSort.d,key=r=>k==='veh'?r.name.toLowerCase():k==='ref'?r.m.ref:k==='st'?cpStOrder[r.st]:r.eta||'9999';
+  rows.sort((a,b)=>{const x=key(a),y=key(b);return(x<y?-1:x>y?1:0)*d;});
+  return rows;
+}
+function cpSortBy(k){cpSort={k,d:cpSort.k===k?-cpSort.d:1};renderClientSpace();}
+function cpGoMission(id){cpTab='missions';cpOpen=id;cpFilter='all';cpQ='';renderClientSpace();}
+function cpVehiclesHtml(T){
+  const rows=cpVehRows(),th=(k,l)=>`<th class="sort" onclick="cpSortBy('${k}')">${esc(l)}${cpSort.k===k?(cpSort.d>0?' ▲':' ▼'):''}</th>`;
+  if(!rows.length)return `<div class="cp-empty">${esc(T.noVeh)}</div>`;
+  return `<div class="cp-card" style="--sc:#8f9db0"><div style="overflow-x:auto"><table class="cp-tbl cp-vt"><thead><tr>${th('veh',T.vehicles)}<th>${esc(T.vin)}</th><th>${esc(T.plate)}</th>${th('ref',T.cMission)}<th>${esc(T.cRoute)}</th>${th('st',T.inv.st)}${th('eta',T.delivery)}<th></th></tr></thead><tbody>
+  ${rows.map(r=>{const m=r.m,c=r.c,doc=c.inspection_pdf_url||m.inspection_pdf_url||'';return `<tr><td><b>${esc(r.name||'—')}</b></td><td>${esc(c.vin||'—')}</td><td>${esc(c.plate||'—')}</td><td><a href="#" onclick="cpGoMission('${esc(m.id)}');return false">${esc(m.ref)}</a></td><td>${esc([m.pickup_city,m.delivery_city].filter(Boolean).join(' → '))}</td>
+  <td><span class="st" style="--sc:${CP_STAGES[r.st]}"><i></i>${esc(T.stg[r.st])}</span>${r.late?' '+cpLateChip(T):''}</td><td class="${r.late?'late':''}">${esc(cpDate(r.eta,T))}</td><td>${doc?`<a href="${esc(doc)}" target="_blank" rel="noopener">📄</a>`:''}</td></tr>`;}).join('')}</tbody></table></div></div>`;
+}
+// ── export Excel (CSV avec ; et accents) ──
+function cpDownload(name,rows){
+  const csv='﻿'+rows.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(';')).join('\r\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
+}
+function cpExport(){
+  const T=cpT();
+  if(cpTab==='invoices'){
+    cpDownload('factures.csv',[[T.inv.no,T.inv.date,T.inv.due,T.inv.st,'HT','TVA','TTC']].concat((cpData.invoices||[]).map(i=>[i.number,i.issue_date,i.due_date,cpInvStat(i,T)[1],i.subtotal,i.vat_amount,i.total])));return;
+  }
+  cpDownload('vehicules.csv',[[T.cMission,T.vehicles,T.vin,T.plate,T.inv.st,T.pickup,T.delivery,T.cRoute]].concat(cpVehRows().map(r=>[r.m.ref,r.name,r.c.vin||'',r.c.plate||'',T.stg[r.st]+(r.late?' / '+T.fLate:''),r.m.carrier_load_date||r.m.pickup_date||'',r.eta,[r.m.pickup_city,r.m.delivery_city].filter(Boolean).join(' → ')])));
 }
 function cpAccountHtml(T){
   return `<div class="panel"><div class="panel-title"><h2>${esc(T.pwdTitle)}</h2></div><div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">${esc(currentUser?.email||'')}</div>
@@ -3704,17 +3815,29 @@ async function cpChangePassword(){
   try{await changeOwnPassword(cur,n);renderClientSpace();document.getElementById('cp-pw-msg').innerHTML=`<span style="color:var(--green)">✓ ${esc(T.pwdOk)}</span>`;}
   catch(e){msg.innerHTML=`<span style="color:var(--red)">${e.message==='PWD_WRONG'?esc(T.pwdWrong):esc(e.message)}</span>`;}
 }
+let cpFilter='all';
 function renderClientSpace(){
-  const T=cpT(),c=cpData.client||{name:'—'},q=cpQ.trim().toLowerCase();
-  const tab=(k,l,n)=>`<button class="btn ${cpTab===k?'primary':''}" onclick="cpTab='${k}';renderClientSpace()">${esc(l)}${n?` (${n})`:''}</button>`;
-  const ms=(cpData.missions||[]).filter(m=>!q||[m.ref,m.pickup_city,m.delivery_city,...m.cars.map(x=>(x.vin||'')+' '+(x.plate||'')+' '+(x.make||'')+' '+(x.model||''))].join(' ').toLowerCase().includes(q));
-  const body=cpTab==='invoices'?cpInvoicesHtml(T):cpTab==='account'?cpAccountHtml(T):
-    `<div class="field" style="margin-bottom:12px"><input id="cp-q" type="search" placeholder="${esc(T.search)}" value="${esc(cpQ)}" oninput="cpQ=this.value;cpSearchKeep()"></div>${ms.map(m=>cpMissionRow(m,T)).join('')||`<div class="panel" style="color:var(--muted)">${esc(T.noMissions)}</div>`}`;
-  document.getElementById('client-space').innerHTML=`<div class="cp-top"><i class="ad-tile">${AD_MARK}</i><div style="font-weight:800;font-size:18px">auto<span style="color:#5ab0e8;font-weight:400">dispatch</span></div><div style="opacity:.8;font-size:13px">${esc(T.hello)} · <b>${esc(c.name)}</b></div><div style="flex:1"></div><button class="btn" onclick="logout()">${esc(T.logout)}</button></div>
-  <div style="max-width:860px;margin:0 auto;padding:18px 16px"><div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">${tab('missions',T.tMissions,(cpData.missions||[]).length)}${tab('invoices',T.tInvoices)}${tab('account',T.tAccount)}</div>
+  const T=cpT(),c=cpData.client||{name:'—'},co=cpData.company||{},q=cpQ.trim().toLowerCase(),all=cpData.missions||[];
+  const done=m=>cpStage(m)==='delivered',act=m=>!['delivered','cancelled'].includes(cpStage(m));
+  const nAct=all.filter(act).length,nDone=all.filter(done).length,nLate=all.filter(cpLate).length;
+  const inv=cpData.invoices||[],unpaid=inv.filter(i=>!(i.status==='paid'||i.paid_date)&&i.status!=='cancelled');
+  const sumDue=unpaid.reduce((n,i)=>n+Number(i.total||0),0),cur=(inv[0]||{}).currency||'EUR';
+  const money=n=>new Intl.NumberFormat(T.loc,{style:'currency',currency:cur,maximumFractionDigits:0}).format(n||0);
+  const tab=(k,l)=>`<button class="${cpTab===k?'on':''}" onclick="cpTab='${k}';renderClientSpace()">${esc(l)}</button>`;
+  const pill=(k,l,n)=>`<button class="${cpFilter===k?'on':''}${k==='late'?' red':''}" onclick="cpFilter='${k}';renderClientSpace()">${esc(l)} <b>${n}</b></button>`;
+  const ms=all.filter(m=>(cpFilter==='all'||(cpFilter==='active'?act(m):cpFilter==='done'?done(m):cpLate(m)))&&(!q||[m.ref,m.pickup_city,m.delivery_city,...m.cars.map(x=>(x.vin||'')+' '+(x.plate||'')+' '+(x.make||'')+' '+(x.model||''))].join(' ').toLowerCase().includes(q)));
+  const bar=`<div class="cp-bar"><div class="cp-pills">${pill('all',T.fAll,all.length)}${pill('active',T.fAct,nAct)}${nLate?pill('late',T.fLate,nLate):''}${pill('done',T.fDone,nDone)}</div><input id="cp-q" type="search" placeholder="${esc(T.search)}" value="${esc(cpQ)}" oninput="cpQ=this.value;cpSearchKeep()"><button class="btn" onclick="cpExport()">⬇ ${esc(T.exp)}</button></div>`;
+  const body=cpTab==='invoices'?cpInvoicesHtml(T):cpTab==='account'?cpAccountHtml(T):cpTab==='vehicles'?bar+cpVehiclesHtml(T):
+    bar+(ms.map(m=>cpMissionRow(m,T)).join('')||`<div class="cp-empty">${esc(T.noMissions)}</div>`);
+  const contact=[co.phone?`<a href="tel:${esc(String(co.phone).replace(/[^\d+]/g,''))}">📞 ${esc(co.phone)}</a>`:'',co.email?`<a href="mailto:${esc(co.email)}">✉ ${esc(co.email)}</a>`:''].filter(Boolean).join(' &nbsp; ');
+  document.getElementById('client-space').innerHTML=`<div class="cp-top"><div class="cp-in"><i class="ad-tile">${AD_MARK}</i><div class="cp-brand">${esc(co.name||'autodispatch')}</div><div style="flex:1"></div><div class="cp-user"><span>${esc(T.hello)}</span><b>${esc(c.name)}</b></div><button class="btn" onclick="logout()">${esc(T.logout)}</button></div>
+    <div class="cp-in cp-hero"><h1>${esc(c.name)}</h1><div class="cp-kpis">
+      <div class="cp-kpi"><b>${nAct}</b><span>${esc(T.fAct)}</span></div><div class="cp-kpi${nLate?' bad':''}"><b>${nLate}</b><span>${esc(T.fLate)}</span></div><div class="cp-kpi"><b>${nDone}</b><span>${esc(T.fDone)}</span></div><div class="cp-kpi${sumDue?' warn':''}"><b>${esc(money(sumDue))}</b><span>${esc(T.kInv)}${unpaid.length?' · '+unpaid.length:''}</span></div></div></div></div>
+  <div class="cp-wrap"><div class="cp-tabs">${tab('missions',T.tMissions)}${tab('vehicles',T.tVeh)}${tab('invoices',T.tInvoices)}${tab('account',T.tAccount)}</div>
   ${cpData.error?`<div class="tp-al red">${esc(T.err)}</div>`:''}
-  ${(currentUser&&currentUser.user_metadata&&currentUser.user_metadata.password_changed)?'':`<div class="tp-al amb" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="flex:1">🔑 ${esc(T.pwdBanner)}</span><button class="btn" onclick="cpTab='account';renderClientSpace()">${esc(T.pwdBannerBtn)}</button></div>`}
-  ${body}</div>`;
+  ${(currentUser&&currentUser.user_metadata&&currentUser.user_metadata.password_changed)?'':`<div class="cp-warn"><span>🔑 ${esc(T.pwdBanner)}</span><button class="btn" onclick="cpTab='account';renderClientSpace()">${esc(T.pwdBannerBtn)}</button></div>`}
+  ${body}
+  ${contact?`<div class="cp-help"><b>${esc(T.help)}</b> ${esc(co.name||'')} &nbsp; ${contact}</div>`:''}</div>`;
 }
 // la recherche ne reconstruit que la liste (le champ garde le focus)
 function cpSearchKeep(){
