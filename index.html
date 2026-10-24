@@ -122,10 +122,10 @@ tbody tr:hover{background:#f7fbff}
 .cp-bar input{flex:1;min-width:220px;border:1px solid var(--line);border-radius:10px;padding:10px 14px;font:inherit;font-size:14px;background:#fff}
 .cp-card{background:#fff;border:1px solid var(--line);border-left:4px solid var(--sc,#8f9db0);border-radius:14px;margin-bottom:12px;overflow:hidden;box-shadow:var(--sh1)}
 .cp-card:hover{box-shadow:var(--sh2)}
-.cp-head{display:grid;grid-template-columns:minmax(220px,1.2fr) minmax(260px,1.3fr) auto;gap:20px;align-items:center;padding:18px 22px;cursor:pointer}
+.cp-head{display:grid;grid-template-columns:minmax(300px,1.6fr) minmax(240px,1fr) auto;gap:20px;align-items:center;padding:18px 22px;cursor:pointer}
 .cp-card.open .cp-head{border-bottom:1px solid var(--line)}
 .cp-l1{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:16px}
-.cp-route{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:15.5px;font-weight:600;flex-wrap:wrap}.cp-arrow{flex:none;width:28px;height:2px;background:var(--line);position:relative}.cp-arrow:after{content:'';position:absolute;right:-1px;top:-3px;border:4px solid transparent;border-left:6px solid var(--muted)}
+.cp-route{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:15.5px;font-weight:600;flex-wrap:wrap}.cp-leg{display:inline-flex;align-items:center;gap:10px;white-space:nowrap}.cp-tbl a{color:var(--blue)}.cp-arrow{flex:none;width:28px;height:2px;background:var(--line);position:relative}.cp-arrow:after{content:'';position:absolute;right:-1px;top:-3px;border:4px solid transparent;border-left:6px solid var(--muted)}
 .cp-veh{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}.cp-veh span{background:var(--pale);color:var(--ink);border-radius:7px;padding:3px 9px;font-size:12.5px}
 .cp-dates{display:flex;gap:18px;align-items:center;font-size:14px;font-weight:600;text-align:right}.cp-dates small{display:block;font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:2px}.cp-chev{color:var(--muted);font-size:14px;margin-left:4px}
 .cp-steps{display:flex;align-items:flex-start;gap:0;position:relative}
@@ -3710,7 +3710,7 @@ const cpLate=m=>{const s=cpStage(m),d=cpDue(m);return!['delivered','cancelled'].
 const cpDocUrl=m=>m.inspection_pdf_url||((m.cars||[]).find(c=>c.inspection_pdf_url)||{}).inspection_pdf_url||'';
 function cpStageChip(m,T){const s=cpStage(m);return `<span class="st" style="--sc:${CP_STAGES[s]}"><i></i>${esc(T.stg[s])}</span>`;}
 const cpLateChip=T=>`<span class="st" style="--sc:#c0443f"><i></i>${esc(T.fLate)}</span>`;
-function cpRoute(m){const a=[m.pickup_city,m.pickup_country].filter(Boolean).join(' '),b=[m.delivery_city,m.delivery_country].filter(Boolean).join(' ');return `<span class="cp-city">${esc(a||'—')}</span><span class="cp-arrow"></span><span class="cp-city">${esc(b||'—')}</span>`;}
+function cpRoute(m){const a=[m.pickup_city,m.pickup_country].filter(Boolean).join(' '),b=[m.delivery_city,m.delivery_country].filter(Boolean).join(' ');return `<span class="cp-city">${esc(a||'—')}</span><span class="cp-leg"><span class="cp-arrow"></span><span class="cp-city">${esc(b||'—')}</span></span>`;}
 function cpSteps(m,T){
   const st=cpStage(m),idx={prep:0,planned:0,loaded:1,transit:1,delivered:2,cancelled:-1}[st];
   const dd=cpDue(m);
@@ -3819,14 +3819,15 @@ let cpFilter='all';
 function renderClientSpace(){
   const T=cpT(),c=cpData.client||{name:'—'},co=cpData.company||{},q=cpQ.trim().toLowerCase(),all=cpData.missions||[];
   const done=m=>cpStage(m)==='delivered',act=m=>!['delivered','cancelled'].includes(cpStage(m));
-  const nAct=all.filter(act).length,nDone=all.filter(done).length,nLate=all.filter(cpLate).length;
+  const vAll=[];all.forEach(m=>(m.cars||[]).forEach(c=>{const st=cpCarStage(m,c);vAll.push({st,late:!['delivered','cancelled'].includes(st)&&!!cpDue(m)&&cpDue(m)<todayIso()});}));
+  const byV=cpTab==='vehicles',nAll=byV?vAll.length:all.length,nAct=byV?vAll.filter(x=>!['delivered','cancelled'].includes(x.st)).length:all.filter(act).length,nDone=byV?vAll.filter(x=>x.st==='delivered').length:all.filter(done).length,nLate=byV?vAll.filter(x=>x.late).length:all.filter(cpLate).length;
   const inv=cpData.invoices||[],unpaid=inv.filter(i=>!(i.status==='paid'||i.paid_date)&&i.status!=='cancelled');
   const sumDue=unpaid.reduce((n,i)=>n+Number(i.total||0),0),cur=(inv[0]||{}).currency||'EUR';
   const money=n=>new Intl.NumberFormat(T.loc,{style:'currency',currency:cur,maximumFractionDigits:0}).format(n||0);
   const tab=(k,l)=>`<button class="${cpTab===k?'on':''}" onclick="cpTab='${k}';renderClientSpace()">${esc(l)}</button>`;
   const pill=(k,l,n)=>`<button class="${cpFilter===k?'on':''}${k==='late'?' red':''}" onclick="cpFilter='${k}';renderClientSpace()">${esc(l)} <b>${n}</b></button>`;
   const ms=all.filter(m=>(cpFilter==='all'||(cpFilter==='active'?act(m):cpFilter==='done'?done(m):cpLate(m)))&&(!q||[m.ref,m.pickup_city,m.delivery_city,...m.cars.map(x=>(x.vin||'')+' '+(x.plate||'')+' '+(x.make||'')+' '+(x.model||''))].join(' ').toLowerCase().includes(q)));
-  const bar=`<div class="cp-bar"><div class="cp-pills">${pill('all',T.fAll,all.length)}${pill('active',T.fAct,nAct)}${nLate?pill('late',T.fLate,nLate):''}${pill('done',T.fDone,nDone)}</div><input id="cp-q" type="search" placeholder="${esc(T.search)}" value="${esc(cpQ)}" oninput="cpQ=this.value;cpSearchKeep()"><button class="btn" onclick="cpExport()">⬇ ${esc(T.exp)}</button></div>`;
+  const bar=`<div class="cp-bar"><div class="cp-pills">${pill('all',T.fAll,nAll)}${pill('active',T.fAct,nAct)}${nLate?pill('late',T.fLate,nLate):''}${pill('done',T.fDone,nDone)}</div><input id="cp-q" type="search" placeholder="${esc(T.search)}" value="${esc(cpQ)}" oninput="cpQ=this.value;cpSearchKeep()"><button class="btn" onclick="cpExport()">⬇ ${esc(T.exp)}</button></div>`;
   const body=cpTab==='invoices'?cpInvoicesHtml(T):cpTab==='account'?cpAccountHtml(T):cpTab==='vehicles'?bar+cpVehiclesHtml(T):
     bar+(ms.map(m=>cpMissionRow(m,T)).join('')||`<div class="cp-empty">${esc(T.noMissions)}</div>`);
   const contact=[co.phone?`<a href="tel:${esc(String(co.phone).replace(/[^\d+]/g,''))}">📞 ${esc(co.phone)}</a>`:'',co.email?`<a href="mailto:${esc(co.email)}">✉ ${esc(co.email)}</a>`:''].filter(Boolean).join(' &nbsp; ');
