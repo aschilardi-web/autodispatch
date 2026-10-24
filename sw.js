@@ -1,6 +1,6 @@
 // AutoDispatch — service worker (portail chauffeur hors connexion)
 // Rôle : pouvoir rouvrir la page du chauffeur sans réseau. Il ne touche JAMAIS aux appels vers la base de données.
-const V = 'ad-shell-v1';
+const V = 'ad-shell-v2';
 const CDN = /^(cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com|unpkg\.com|fonts\.googleapis\.com|fonts\.gstatic\.com)$/;
 
 self.addEventListener('install', () => self.skipWaiting());
@@ -20,7 +20,7 @@ self.addEventListener('fetch', e => {
     const key = new Request(u.origin + u.pathname);
     e.respondWith((async () => {
       try {
-        const res = await timeout(fetch(r), 6000);
+        const res = await timeout(fetch(r, { cache: 'no-cache' }), 6000);   // revérifie toujours auprès du serveur (jamais une copie périmée du cache HTTP)
         if (res && res.ok) { const c = res.clone(); caches.open(V).then(x => x.put(key, c)); }
         return res;
       } catch (_) {
