@@ -105,6 +105,7 @@ tbody tr:hover{background:#f7fbff}
 .cp-top{background:linear-gradient(135deg,#0e2a47,#1a4a7a);color:#fff;padding:0 0 64px}
 .cp-in{max-width:1080px;margin:0 auto;padding:0 20px}
 .cp-top .cp-in:first-child{display:flex;align-items:center;gap:12px;padding-top:18px;padding-bottom:18px;flex-wrap:wrap}
+.cp-logo{flex:none;height:44px;width:auto;max-width:220px;object-fit:contain;background:#fff;border-radius:10px;padding:5px 12px}
 .cp-brand{font-weight:800;font-size:20px;letter-spacing:-.5px}.cp-brand span{color:#8fcaf2;font-weight:400}
 .cp-user{display:flex;flex-direction:column;text-align:right;line-height:1.25;font-size:12px;opacity:.9}.cp-user b{font-size:13.5px}
 .cp-hero{padding-top:14px}.cp-hero h1{margin:0 0 18px;font-size:28px;font-weight:800;letter-spacing:-.6px}
@@ -460,6 +461,7 @@ html[data-theme="dark"] .portal-section.done{border-color:#2c4933;background:#19
 html[data-theme="dark"] .portal-add-photo{border:2px dashed #2c4933}
 html[data-theme="dark"] th{background:#182430}
 html[data-theme="dark"] tbody tr:hover{background:#17232f}
+html[data-theme="dark"] .cp-logo{background:#212121}
 html[data-theme="dark"] .cp-tabs{background:#212121}
 html[data-theme="dark"] .cp-warn{background:#352c1a;border:1px solid #49402c;color:#e0c295}
 html[data-theme="dark"] .cp-pills button{background:#212121}
@@ -3950,7 +3952,7 @@ function cpInvoicesHtml(T){
   ${inv.map(i=>{const s=cpInvStat(i,T);return `<tr><td><b>${esc(i.number)}</b></td><td>${esc(cpDate(i.issue_date,T))}</td><td>${esc(cpDate(i.due_date,T))}</td><td><span class="st" style="--sc:${s[2]}"><i></i>${esc(s[1])}</span></td><td style="text-align:right">${esc(fmt(i.total,i.currency))}</td><td style="text-align:right"><button class="btn" onclick="cpInvoicePdf('${esc(i.id)}')">📄 ${esc(T.pdf)}</button></td></tr>`}).join('')}</tbody></table></div></div>`;
 }
 function cpInvoicePdf(id){
-  try{db.invoices=(cpData.invoices||[]).map(x=>invFromRow(x));invoicePdf(id);}catch(e){alert('PDF : '+e.message);}
+  try{const co=cpData.company||{};window._pdfLogo=co.logo||'';window._pdfLogoW=co.logo_w||0;window._pdfLogoH=co.logo_h||0;db.invoices=(cpData.invoices||[]).map(x=>invFromRow(x));invoicePdf(id);}catch(e){alert('PDF : '+e.message);}finally{window._pdfLogo=window._pdfLogoW=window._pdfLogoH=undefined;}
 }
 // ── vue par véhicule : une ligne par véhicule, triable ──
 const cpStOrder={prep:0,planned:1,loaded:2,transit:3,delivered:4,cancelled:5};
@@ -4026,7 +4028,7 @@ function renderClientSpace(){
   const body=cpTab==='invoices'?cpInvoicesHtml(T):cpTab==='account'?cpAccountHtml(T):cpTab==='vehicles'?bar+cpVehiclesHtml(T):
     bar+(ms.map(m=>cpMissionRow(m,T)).join('')||`<div class="cp-empty">${esc(T.noMissions)}</div>`);
   const contact=[co.phone?`<a href="tel:${esc(String(co.phone).replace(/[^\d+]/g,''))}">📞 ${esc(co.phone)}</a>`:'',co.email?`<a href="mailto:${esc(co.email)}">✉ ${esc(co.email)}</a>`:''].filter(Boolean).join(' &nbsp; ');
-  document.getElementById('client-space').innerHTML=`<div class="cp-top"><div class="cp-in"><i class="ad-tile">${AD_MARK}</i><div class="cp-brand">${esc(co.name||'autodispatch')}</div><div style="flex:1"></div><div class="cp-user"><span>${esc(T.hello)}</span><b>${esc(c.name)}</b></div><button class="btn" onclick="logout()">${esc(T.logout)}</button></div>
+  document.getElementById('client-space').innerHTML=`<div class="cp-top"><div class="cp-in">${co.logo&&/^data:image\//.test(co.logo)?`<img class="cp-logo" src="${esc(co.logo)}" alt="${esc(co.name||'')}">`:`<i class="ad-tile">${AD_MARK}</i><div class="cp-brand">${esc(co.name||'autodispatch')}</div>`}<div style="flex:1"></div><div class="cp-user"><span>${esc(T.hello)}</span><b>${esc(c.name)}</b></div><button class="btn" onclick="logout()">${esc(T.logout)}</button></div>
     <div class="cp-in cp-hero"><h1>${esc(c.name)}</h1><div class="cp-kpis">
       <div class="cp-kpi"><b>${nAct}</b><span>${esc(T.fAct)}</span></div><div class="cp-kpi${nLate?' bad':''}"><b>${nLate}</b><span>${esc(T.fLate)}</span></div><div class="cp-kpi"><b>${nDone}</b><span>${esc(T.fDone)}</span></div><div class="cp-kpi${sumDue?' warn':''}"><b>${esc(money(sumDue))}</b><span>${esc(T.kInv)}${unpaid.length?' · '+unpaid.length:''}</span></div></div></div></div>
   <div class="cp-wrap"><div class="cp-tabs">${tab('missions',T.tMissions)}${tab('vehicles',T.tVeh)}${tab('invoices',T.tInvoices)}${tab('account',T.tAccount)}</div>
@@ -4363,6 +4365,25 @@ async function saveSetting(key){
   if(error){alert('Réglage non enregistré : '+error.message+'\n(le script SQL 13 a-t-il été lancé ?)');return false;}
   return true;
 }
+// logo de la société : redimensionné et stocké dans les réglages (affiché sur les factures et dans le portail client)
+function companyLogoPick(input){
+  const f=input.files&&input.files[0];if(!f)return;
+  if(f.size>4*1024*1024){alert('Image trop lourde (4 Mo maximum).');input.value='';return;}
+  const url=URL.createObjectURL(f),img=new Image();
+  img.onload=()=>{
+    const MAXW=520,MAXH=180,r=Math.min(1,MAXW/img.width,MAXH/img.height),w=Math.max(1,Math.round(img.width*r)),h=Math.max(1,Math.round(img.height*r));
+    const cv=document.createElement('canvas');cv.width=w;cv.height=h;const x=cv.getContext('2d');
+    const png=/png|webp/.test(f.type);if(!png){x.fillStyle='#fff';x.fillRect(0,0,w,h);}
+    x.drawImage(img,0,0,w,h);URL.revokeObjectURL(url);
+    let out=png?cv.toDataURL('image/png'):cv.toDataURL('image/jpeg',.9);
+    if(out.length>160000)out=cv.toDataURL('image/jpeg',.8);   // logo très détaillé : on allège
+    if(out.length>260000){alert('Ce logo est trop détaillé. Utilise une image plus simple ou plus petite.');input.value='';return;}
+    sUpd('company.logo',out);sUpd('company.logoW',w,'num');sUpd('company.logoH',h,'num');render();
+  };
+  img.onerror=()=>{URL.revokeObjectURL(url);alert('Image illisible.');input.value='';};
+  img.src=url;
+}
+function companyLogoClear(){sUpd('company.logo','');sUpd('company.logoW',0,'num');sUpd('company.logoH',0,'num');render();}
 function sUpd(path,v,type){
   const p=path.split('.');let o=settings;
   for(let i=0;i<p.length-1;i++){if(o[p[i]]===undefined)o[p[i]]={};o=o[p[i]];}
@@ -4500,7 +4521,11 @@ function rulesPage(){
     <div class="field"><label>BIC</label>${inp('company.bic',c.bic,'text',140)}</div>
     <div class="field"><label>Délai de paiement (jours)</label>${inp('company.payDays',c.payDays,'num',80)}</div>
     <div class="field"><label>TVA belge par défaut (%)</label>${inp('company.vatRate',c.vatRate,'num',80)}</div>
-    <div class="field wide"><label>Mention de bas de facture (conditions, intérêts de retard…)</label><input value="${esc(c.footer||'')}" style="width:100%;padding:6px" onchange="sUpd('company.footer',this.value)"></div></div>
+    <div class="field wide"><label>Mention de bas de facture (conditions, intérêts de retard…)</label><input value="${esc(c.footer||'')}" style="width:100%;padding:6px" onchange="sUpd('company.footer',this.value)"></div>
+    <div class="field wide"><label>Logo de la société</label><div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+      ${c.logo?`<img src="${esc(c.logo)}" alt="" style="max-height:60px;max-width:240px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px">`:'<span style="color:var(--muted);font-size:12.5px">Aucun logo pour le moment.</span>'}
+      <input type="file" accept="image/png,image/jpeg,image/webp" onchange="companyLogoPick(this)">${c.logo?'<button class="btn" type="button" onclick="companyLogoClear()">Retirer le logo</button>':''}</div>
+      <small style="color:var(--muted)">PNG, JPEG ou WebP, de préférence sur fond transparent ou blanc. Il apparaît sur tes factures PDF et en haut du portail de tes clients. N'oublie pas d'enregistrer.</small></div></div>
     ${saveBar('company')}</div>`;
   }
   if(rulesTab==='depot'){
@@ -6051,7 +6076,12 @@ function invoicePdf(id){
   const{jsPDF}=window.jspdf,doc=new jsPDF({unit:'mm',format:'a4'}),co=i.company||{},cl=i.client||{};
   const f=n=>{const[a,b]=Number(n||0).toFixed(2).split('.');return a.replace(/\B(?=(\d{3})+(?!\d))/g,' ')+','+b+' €';};
   const T=(t,x,y,o)=>doc.text(String(t==null?'':t),x,y,o);
-  let y=18;doc.setFont('helvetica','bold');doc.setFontSize(15);T(co.name||'',15,y);
+  const logo=window._pdfLogo||((typeof settings!=='undefined'&&settings.company)||{}).logo||'',lw=Number(window._pdfLogoW||((typeof settings!=='undefined'&&settings.company)||{}).logoW)||0,lh=Number(window._pdfLogoH||((typeof settings!=='undefined'&&settings.company)||{}).logoH)||0;
+  let y=18;
+  if(/^data:image\/(png|jpeg);/.test(logo)&&lw&&lh){
+    try{const mh=18,mw=60,sc=Math.min(mh/lh,mw/lw);doc.addImage(logo,/png/.test(logo.slice(0,20))?'PNG':'JPEG',15,10,lw*sc,lh*sc);y=10+lh*sc+8;}catch(_){}
+  }
+  doc.setFont('helvetica','bold');doc.setFontSize(15);T(co.name||'',15,y);
   doc.setFont('helvetica','normal');doc.setFontSize(9);
   [co.street,[co.postal,co.city].filter(Boolean).join(' '),co.country?ccName(co.country):'',co.vat?'TVA : '+co.vat:'',[co.email,co.phone].filter(Boolean).join(' · ')].filter(Boolean).forEach(t=>{y+=4.6;T(t,15,y);});
   doc.setFont('helvetica','bold');doc.setFontSize(20);T('FACTURE',195,20,{align:'right'});
