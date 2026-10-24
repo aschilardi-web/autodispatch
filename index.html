@@ -156,6 +156,8 @@ tbody tr:hover{background:#f7fbff}
 .cp-help{margin-top:22px;padding:14px 18px;background:#fff;border:1px solid var(--line);border-radius:12px;font-size:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}.cp-help a{color:var(--blue);font-weight:600;text-decoration:none}
 @media(max-width:820px){.cp-kpis{grid-template-columns:1fr 1fr}.cp-kpi b{font-size:22px}}
 .field.missing input,.field.missing select{border-color:#c0443f!important;background:#fdeceb;box-shadow:0 0 0 3px rgba(192,68,63,.16)}.field.missing label{color:#c0443f}
+.mfa-code{letter-spacing:8px;text-align:center;font-size:22px;font-weight:700}
+body.role-reader .btn.primary,body.role-reader .btn.danger,body.role-bureau .btn.danger{display:none!important}
 .ad-tile{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#2f8ad0,#12315a);display:inline-flex;align-items:center;justify-content:center;flex:none;box-shadow:0 2px 8px rgba(0,0,0,.25)}.ad-tile svg{width:25px;height:auto}
 .brand{display:flex;align-items:center;gap:10px}.auth-brand{display:flex;align-items:center;gap:12px}.auth-brand .ad-tile{width:44px;height:44px;border-radius:12px}.auth-brand .ad-tile svg{width:32px}
 .brand .bt small{font-size:7.5px;letter-spacing:1.3px;white-space:nowrap}
@@ -767,6 +769,7 @@ html[data-theme="dark"] [style*="border"][style*="#fff"]{border-color:#3b3b3b!im
 <body>
 
 <div class="loading-bar" id="loading-bar"></div>
+<div id="mfa-screen" class="auth-wrap" style="display:none;z-index:9000"></div>
 
 <!-- ═══════════ AUTH ═══════════ -->
 <div id="auth-screen" class="auth-wrap" style="display:none">
@@ -799,6 +802,7 @@ html[data-theme="dark"] [style*="border"][style*="#fff"]{border-color:#3b3b3b!im
     <div class="sidebar-foot">
       <div id="user-info" style="margin-bottom:10px;word-break:break-all"></div>
       <button onclick="openChangePassword()" style="width:100%;background:transparent;border:1px solid #294d6c;color:#acc2d4;border-radius:6px;padding:8px;font-size:11px;font-weight:600;cursor:pointer;margin-bottom:6px">🔑 Mon mot de passe</button>
+      <button onclick="openMfa()" style="width:100%;background:transparent;border:1px solid #294d6c;color:#acc2d4;border-radius:6px;padding:8px;font-size:11px;font-weight:600;cursor:pointer;margin-bottom:6px">🛡 Double authentification</button>
       <button onclick="logout()" style="width:100%;background:transparent;border:1px solid #294d6c;color:#acc2d4;border-radius:6px;padding:8px;font-size:11px;font-weight:600;cursor:pointer">Déconnexion</button>
     </div>
   </aside>
@@ -849,6 +853,7 @@ let _auditOff=false;
 const _sbRaw=sb.from.bind(sb);
 Object.defineProperty(sb,'from',{configurable:true,writable:true,value:function(table){
   const q=_sbRaw(table);
+  ['insert','update','upsert','delete'].forEach(op=>{const f0=q[op];if(typeof f0!=='function')return;q[op]=function(...a){const b0=f0.apply(q,a);try{rlsWatch(b0);}catch(_){}return b0;};});
   if(!AUDIT_TABLES[table]||_auditOff)return q;
   ['insert','update','upsert','delete'].forEach(op=>{
     const f=q[op];if(typeof f!=='function')return;
@@ -1452,6 +1457,110 @@ const pretty=d=>d?new Date(d+'T12:00:00').toLocaleDateString('fr-BE',{day:'numer
 const val=id=>document.getElementById(id)?.value.trim()||'';
 const setLoading=on=>document.getElementById('loading-bar').classList.toggle('on',on);
 
+// ─── DOUBLE AUTHENTIFICATION (code à 6 chiffres) ET RÔLES ───
+// Obligatoire pour l'administrateur ; facultative pour bureau / lecture seule. La base de données applique la règle (voir 21a/21b).
+const ROLE_LABELS={admin:'Administrateur',bureau:'Bureau',reader:'Lecture seule'};
+const myRole=()=>(currentProfile&&currentProfile.role)||'admin';
+function mfaShow(inner){
+  const s=document.getElementById('mfa-screen'),brand=(document.querySelector('#auth-screen .auth-brand')||{}).outerHTML||'';
+  s.innerHTML=`<div class="auth-card">${brand}${inner}</div>`;s.style.display='flex';return s;
+}
+const mfaHide=()=>{const s=document.getElementById('mfa-screen');s.style.display='none';s.innerHTML='';};
+async function mfaFactors(){const lf=await sb.auth.mfa.listFactors();return{all:(lf.data&&lf.data.all)||[],ok:(lf.data&&lf.data.totp)||[]};}
+// appelée après la connexion : demande le code, ou impose l'activation à l'administrateur
+async function mfaGate(){
+  if(currentProfile&&(currentProfile.role==='carrier'||currentProfile.role==='client'))return;
+  let aal,ok=[];
+  try{aal=(await sb.auth.mfa.getAuthenticatorAssuranceLevel()).data;ok=(await mfaFactors()).ok;}catch(_){return;}   // service indisponible : on ne bloque pas l'écran
+  if(ok.length&&aal&&aal.currentLevel!=='aal2')return mfaChallenge(ok[0].id);
+  if(!ok.length&&myRole()==='admin')return mfaEnroll(true);
+}
+function mfaChallenge(factorId){
+  return new Promise(resolve=>{
+    mfaShow(`<div class="auth-title">Code de vérification</div><p style="font-size:13px;color:var(--muted);margin:0 0 14px">Ouvre ton application d'authentification (Google ou Microsoft Authenticator) et saisis le code à 6 chiffres affiché pour AutoDispatch.</p>
+    <div class="field"><label>CODE À 6 CHIFFRES</label><input id="mfa-code" class="mfa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••"></div>
+    <div class="auth-err" id="mfa-err"></div><button class="btn primary" id="mfa-go" style="width:100%">Valider</button>
+    <button class="btn" style="width:100%;margin-top:8px" onclick="logout()">Se déconnecter</button>`);
+    const inp=document.getElementById('mfa-code'),err=document.getElementById('mfa-err');inp.focus();
+    const go=async()=>{
+      const code=inp.value.replace(/\D/g,'');if(code.length!==6){err.textContent='Saisis les 6 chiffres.';return;}
+      err.textContent='⏳';
+      const{error}=await sb.auth.mfa.challengeAndVerify({factorId,code});
+      if(error){err.textContent='Code incorrect ou expiré. Réessaie avec le code actuel.';inp.select();return;}
+      mfaHide();resolve();
+    };
+    document.getElementById('mfa-go').onclick=go;inp.onkeydown=e=>{if(e.key==='Enter')go();};
+    inp.oninput=()=>{if(inp.value.replace(/\D/g,'').length===6)go();};
+  });
+}
+function mfaEnroll(forced){
+  return new Promise(async resolve=>{
+    mfaShow('<div style="text-align:center;padding:20px;font-size:28px">⏳</div>');
+    let factor;
+    try{
+      for(const f of (await mfaFactors()).all)if(f.status==='unverified')await sb.auth.mfa.unenroll({factorId:f.id});   // nettoie un essai abandonné
+      const{data,error}=await sb.auth.mfa.enroll({factorType:'totp',friendlyName:'AutoDispatch '+new Date().toISOString().slice(0,16),issuer:'AutoDispatch'});
+      if(error)throw error;factor=data;
+    }catch(e){
+      mfaShow(`<div class="auth-title">Double authentification</div><div class="auth-err">Activation impossible : ${esc(e.message)}</div><button class="btn" style="width:100%" onclick="${forced?'logout()':'mfaHide()'}">${forced?'Se déconnecter':'Fermer'}</button>`);
+      return;
+    }
+    mfaShow(`<div class="auth-title">${forced?'Active la double authentification':'Activer la double authentification'}</div>
+    <ol style="font-size:13px;color:var(--ink);padding-left:18px;margin:0 0 12px;line-height:1.6"><li>Installe <b>Google Authenticator</b> ou <b>Microsoft Authenticator</b> sur ton téléphone.</li><li>Scanne ce code (ou saisis la clé ci-dessous).</li><li>Saisis le code à 6 chiffres affiché.</li></ol>
+    <div style="text-align:center"><img src="${esc(factor.totp.qr_code)}" alt="QR" style="width:180px;height:180px;background:#fff;border-radius:10px;padding:6px"></div>
+    <div style="font-size:11px;text-align:center;margin:6px 0 12px;word-break:break-all;color:var(--muted)">Clé : <b>${esc(factor.totp.secret)}</b></div>
+    <div class="field"><label>CODE À 6 CHIFFRES</label><input id="mfa-code" class="mfa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••"></div>
+    <div class="auth-err" id="mfa-err"></div><button class="btn primary" id="mfa-go" style="width:100%">Activer</button>
+    <button class="btn" style="width:100%;margin-top:8px" onclick="${forced?'logout()':'mfaHide()'}">${forced?'Se déconnecter':'Annuler'}</button>
+    ${forced?'<p style="font-size:11px;color:var(--muted);margin:10px 0 0">Si tu perds ton téléphone, la double authentification se réinitialise depuis le tableau de bord Supabase (Authentication → Users).</p>':''}`);
+    const inp=document.getElementById('mfa-code'),err=document.getElementById('mfa-err');
+    const go=async()=>{
+      const code=inp.value.replace(/\D/g,'');if(code.length!==6){err.textContent='Saisis les 6 chiffres.';return;}
+      err.textContent='⏳';
+      const{error}=await sb.auth.mfa.challengeAndVerify({factorId:factor.id,code});
+      if(error){err.textContent='Code incorrect. Vérifie l\'heure du téléphone et réessaie.';inp.select();return;}
+      mfaHide();if(!forced)alert('✓ Double authentification activée.');resolve();
+    };
+    document.getElementById('mfa-go').onclick=go;inp.onkeydown=e=>{if(e.key==='Enter')go();};
+  });
+}
+// bouton « Double authentification » du menu
+async function openMfa(){
+  let f;try{f=await mfaFactors();}catch(e){alert('Indisponible : '+e.message);return;}
+  if(!f.ok.length)return mfaEnroll(false);
+  const admin=myRole()==='admin';
+  mfaShow(`<div class="auth-title">Double authentification</div><div class="notice" style="margin-bottom:14px">✓ Activée sur ce compte.</div>
+    <button class="btn" style="width:100%" onclick="mfaChange()">Changer de téléphone</button>
+    ${admin?'<p style="font-size:12px;color:var(--muted);margin:10px 0">Obligatoire pour un compte administrateur : elle ne peut pas être désactivée.</p>':'<button class="btn danger" style="width:100%;margin-top:8px" onclick="mfaDisable()">Désactiver</button>'}
+    <button class="btn" style="width:100%;margin-top:8px" onclick="mfaHide()">Fermer</button>`);
+}
+async function mfaChange(){
+  try{for(const x of (await mfaFactors()).ok){const{error}=await sb.auth.mfa.unenroll({factorId:x.id});if(error)throw error;}}
+  catch(e){alert('Impossible : '+e.message);return;}
+  mfaEnroll(myRole()==='admin');
+}
+async function mfaDisable(){
+  if(!confirm('Désactiver la double authentification ?'))return;
+  try{for(const x of (await mfaFactors()).ok){const{error}=await sb.auth.mfa.unenroll({factorId:x.id});if(error)throw error;}mfaHide();alert('Double authentification désactivée.');}
+  catch(e){alert('Impossible : '+e.message);}
+}
+// rôle : étiquette dans le menu + classe sur la page
+function applyRole(){
+  const r=myRole();
+  document.body.classList.remove('role-admin','role-bureau','role-reader');document.body.classList.add('role-'+r);
+  window._roleLabel=r!=='admin'?' · '+(ROLE_LABELS[r]||r):'';
+  const u=document.getElementById('user-info');if(u)u.textContent=(currentUser?.email||'')+window._roleLabel;
+  try{renderNav();}catch(_){}
+}
+// une écriture refusée par la base (droits insuffisants) ne doit pas rester silencieuse
+let _rlsAt=0;
+function rlsWatch(b){
+  const t0=b.then;if(typeof t0!=='function')return;
+  b.then=function(res,rej){return t0.call(b,r=>{
+    try{if(r&&r.error&&(r.error.code==='42501'||/row-level security|permission denied/i.test(r.error.message||''))&&Date.now()-_rlsAt>2500){_rlsAt=Date.now();portalToast('Action non autorisée pour ton rôle ('+(ROLE_LABELS[myRole()]||myRole())+').');}}catch(_){}
+    return res?res(r):r;},rej);};
+}
+
 // ─── AUTH & ROUTING ──────────────────────────────────────────────
 async function checkAuth(){
   // Portail transporteur : pas de login requis
@@ -1503,6 +1612,7 @@ async function logout(){
   document.getElementById('app-shell').style.display='none';
   const cs=document.getElementById('carrier-space');if(cs){cs.style.display='none';cs.innerHTML='';}
   const cl=document.getElementById('client-space');if(cl){cl.style.display='none';cl.innerHTML='';}
+  const mf=document.getElementById('mfa-screen');if(mf){mf.style.display='none';mf.innerHTML='';}
   currentProfile=null;
   document.getElementById('auth-screen').style.display='flex';
   document.getElementById('login-err').textContent='';
@@ -1514,8 +1624,10 @@ async function initApp(){
   currentProfile=await loadProfile();
   if(currentProfile&&currentProfile.role==='carrier'){await initCarrierSpace();return;}
   if(currentProfile&&currentProfile.role==='client'){await initClientSpace();return;}
+  await mfaGate();   // code à 6 chiffres (ou activation imposée à l'administrateur)
+  applyRole();
   document.getElementById('app-shell').style.display='flex';
-  document.getElementById('user-info').textContent=currentUser?.email||'';
+  document.getElementById('user-info').textContent=(currentUser?.email||'')+(window._roleLabel||'');
   await loadData();
   boot();
   autoRefreshFuel();   // actualise le gasoil s'il date de plus d'un mois
@@ -1862,7 +1974,9 @@ function renderNav(){
   const known=new Set(NAV.map(x=>x[0]));
   const used=new Set();
   const grp=NAV_GROUPS.map(([id,label,items])=>{
-    const its=items.filter(n=>known.has(n));its.forEach(n=>used.add(n));
+    const hideN=n=>n==='Règles et coûts'&&myRole()!=='admin';
+    items.filter(hideN).forEach(n=>used.add(n));   // masqué : ne doit pas réapparaître dans « autres »
+    const its=items.filter(n=>known.has(n)&&!hideN(n));its.forEach(n=>used.add(n));
     return `<div class="nav-group ${_navClosed.includes(id)?'closed':''}" data-g="${id}"><button class="nav-group-h" onclick="toggleNavGroup('${id}')"><span>${label}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-items">${its.map(n=>`<button class="nav-item" data-name="${esc(n)}" onclick="setView(this.dataset.name)"><span class="icon">${navIcon(n)}</span><span class="label">${esc(n)}</span><span class="nbadge" data-b="${esc(n)}" style="display:none"></span></button>`).join('')}</div></div>`;
   });
   const rest=NAV.map(x=>x[0]).filter(n=>!used.has(n));   // toute nouvelle page non classée reste visible
