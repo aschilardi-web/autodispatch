@@ -312,6 +312,8 @@ tbody tr:hover{background:#f7fbff}
 .pt-act svg{width:20px;height:20px}
 .pt-act:active{transform:scale(.94)}
 .pt-main{max-width:640px;margin:0 auto;padding:14px 14px 90px}
+.pt-off{margin:10px 14px 0;padding:11px 14px;border-radius:12px;background:#fff4dc;color:#7a5410;border:1px solid #f0d9a8;font-size:12.5px;display:flex;gap:10px;align-items:center;justify-content:space-between;line-height:1.35}.pt-off.bad{background:#fde8e6;color:#9b2f27;border-color:#f3c4bf}.pt-off button{flex:none;border:1px solid currentColor;background:transparent;color:inherit;border-radius:9px;padding:6px 12px;font-size:12px;font-weight:700}
+@media(prefers-color-scheme:dark){.pt-off{background:#3a2d12;color:#e8cf95;border-color:#5a4720}.pt-off.bad{background:#3a1a18;color:#f1a6a0;border-color:#5a2a26}}
 .pt-tip{display:flex;gap:10px;align-items:flex-start;font-size:12.5px;color:var(--pt-mut);background:var(--pt-card);border:1px solid var(--pt-line);border-radius:14px;padding:12px 14px;margin-bottom:14px;line-height:1.45}
 .pt-car{background:var(--pt-card);border:1px solid var(--pt-line);border-radius:18px;padding:16px;margin-bottom:16px;box-shadow:0 1px 2px rgba(15,42,71,.05)}
 .pt-ch{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
@@ -477,6 +479,8 @@ html[data-theme="dark"] .todo-row b.c{color:#8296a7}
 html[data-theme="dark"] .statusbar{background:#1e2831}
 html[data-theme="dark"] .legend{color:#a0b1c2}
 html[data-theme="dark"] .week .lab{color:#8698a9}
+html[data-theme="dark"] .pt-off{background:#382f1c;color:#e2c99d;border:1px solid #49402c}
+html[data-theme="dark"] .pt-off.bad{background:#351d1a;color:#dc8b85;border-color:#492f2c}
 html[data-theme="dark"] #map-list{background:#212121}
 html[data-theme="dark"] .map-item.chk{background:#1e361e}
 html[data-theme="dark"] .mf-list{background:#212121}
@@ -573,12 +577,18 @@ html[data-theme="dark"] [style*="background:#fafcfe "]{background:#17232e!import
 html[data-theme="dark"] [style*="background:#fce8e8;"]{background:#351a1a!important}
 html[data-theme="dark"] [style$="background:#fce8e8"]{background:#351a1a!important}
 html[data-theme="dark"] [style*="background:#fce8e8 "]{background:#351a1a!important}
+html[data-theme="dark"] [style*="background:#fde8e6;"]{background:#351d1a!important}
+html[data-theme="dark"] [style$="background:#fde8e6"]{background:#351d1a!important}
+html[data-theme="dark"] [style*="background:#fde8e6 "]{background:#351d1a!important}
 html[data-theme="dark"] [style*="background:#fff;"]{background:#212121!important}
 html[data-theme="dark"] [style$="background:#fff"]{background:#212121!important}
 html[data-theme="dark"] [style*="background:#fff "]{background:#212121!important}
 html[data-theme="dark"] [style*="background:#fff3cd;"]{background:#3d361e!important}
 html[data-theme="dark"] [style$="background:#fff3cd"]{background:#3d361e!important}
 html[data-theme="dark"] [style*="background:#fff3cd "]{background:#3d361e!important}
+html[data-theme="dark"] [style*="background:#fff4dc;"]{background:#382f1c!important}
+html[data-theme="dark"] [style$="background:#fff4dc"]{background:#382f1c!important}
+html[data-theme="dark"] [style*="background:#fff4dc "]{background:#382f1c!important}
 html[data-theme="dark"] [style*="background:#fff4df;"]{background:#372d1b!important}
 html[data-theme="dark"] [style$="background:#fff4df"]{background:#372d1b!important}
 html[data-theme="dark"] [style*="background:#fff4df "]{background:#372d1b!important}
@@ -666,6 +676,9 @@ html[data-theme="dark"] [style*=" color:#777"]{color:#a4a4a4!important}
 html[data-theme="dark"] [style^="color:#7799b4"]{color:#7497b2!important}
 html[data-theme="dark"] [style*=";color:#7799b4"]{color:#7497b2!important}
 html[data-theme="dark"] [style*=" color:#7799b4"]{color:#7497b2!important}
+html[data-theme="dark"] [style^="color:#7a5410"]{color:#e2c99d!important}
+html[data-theme="dark"] [style*=";color:#7a5410"]{color:#e2c99d!important}
+html[data-theme="dark"] [style*=" color:#7a5410"]{color:#e2c99d!important}
 html[data-theme="dark"] [style^="color:#7a8ea1"]{color:#8698a9!important}
 html[data-theme="dark"] [style*=";color:#7a8ea1"]{color:#8698a9!important}
 html[data-theme="dark"] [style*=" color:#7a8ea1"]{color:#8698a9!important}
@@ -687,6 +700,9 @@ html[data-theme="dark"] [style*=" color:#999"]{color:#919191!important}
 html[data-theme="dark"] [style^="color:#9a6b18"]{color:#ddc08c!important}
 html[data-theme="dark"] [style*=";color:#9a6b18"]{color:#ddc08c!important}
 html[data-theme="dark"] [style*=" color:#9a6b18"]{color:#ddc08c!important}
+html[data-theme="dark"] [style^="color:#9b2f27"]{color:#dc8b85!important}
+html[data-theme="dark"] [style*=";color:#9b2f27"]{color:#dc8b85!important}
+html[data-theme="dark"] [style*=" color:#9b2f27"]{color:#dc8b85!important}
 html[data-theme="dark"] [style^="color:#a0522d"]{color:#da9d80!important}
 html[data-theme="dark"] [style*=";color:#a0522d"]{color:#da9d80!important}
 html[data-theme="dark"] [style*=" color:#a0522d"]{color:#da9d80!important}
@@ -6978,22 +6994,180 @@ async function addDoc(mid,vid,file){
 //  PORTAIL TRANSPORTEUR — accès sans login via ?t=TOKEN
 // ══════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════
+// PORTAIL TRANSPORTEUR HORS CONNEXION
+// Photos, « pas de photo » et confirmations sont d'abord enregistrées sur le téléphone (IndexedDB),
+// puis envoyées dans l'ordre, avec reprise automatique dès que le réseau revient.
+// ═══════════════════════════════════════════════════════════════════
+const PQ_T={
+  fr:{off:'Hors connexion — vos photos sont enregistrées sur ce téléphone et seront envoyées dès le retour du réseau.',wait:'{n} élément(s) en attente d\'envoi…',retry:'Réessayer',failed:'{n} élément(s) n\'ont pas pu être envoyés.',sent:'✓ Tout est envoyé.',vid:'Vidéo : une connexion est nécessaire. Réessayez avec du réseau.'},
+  en:{off:'Offline — your photos are saved on this phone and will be sent as soon as the network returns.',wait:'{n} item(s) waiting to be sent…',retry:'Retry',failed:'{n} item(s) could not be sent.',sent:'✓ Everything has been sent.',vid:'Video: a connection is required. Please retry with network.'},
+  nl:{off:'Offline — uw foto’s worden op deze telefoon bewaard en verzonden zodra het netwerk terug is.',wait:'{n} item(s) wachten op verzending…',retry:'Opnieuw proberen',failed:'{n} item(s) konden niet worden verzonden.',sent:'✓ Alles is verzonden.',vid:'Video: een verbinding is nodig. Probeer opnieuw met netwerk.'},
+  de:{off:'Offline — Ihre Fotos sind auf diesem Telefon gespeichert und werden gesendet, sobald das Netz zurück ist.',wait:'{n} Element(e) warten auf den Versand…',retry:'Erneut versuchen',failed:'{n} Element(e) konnten nicht gesendet werden.',sent:'✓ Alles wurde gesendet.',vid:'Video: Verbindung erforderlich. Bitte mit Netz erneut versuchen.'},
+  es:{off:'Sin conexión — sus fotos se guardan en este teléfono y se enviarán en cuanto vuelva la red.',wait:'{n} elemento(s) pendiente(s) de envío…',retry:'Reintentar',failed:'{n} elemento(s) no se pudieron enviar.',sent:'✓ Todo enviado.',vid:'Vídeo: se necesita conexión. Inténtelo de nuevo con red.'},
+  it:{off:'Offline — le foto sono salvate su questo telefono e verranno inviate appena torna la rete.',wait:'{n} elemento/i in attesa di invio…',retry:'Riprova',failed:'{n} elemento/i non è stato possibile inviare.',sent:'✓ Tutto inviato.',vid:'Video: serve una connessione. Riprovi con la rete.'},
+  pl:{off:'Brak połączenia — zdjęcia są zapisane w telefonie i zostaną wysłane po powrocie sieci.',wait:'{n} element(ów) czeka na wysłanie…',retry:'Spróbuj ponownie',failed:'Nie udało się wysłać: {n}.',sent:'✓ Wszystko wysłane.'},
+  ro:{off:'Fără conexiune — pozele sunt salvate pe telefon și vor fi trimise când revine rețeaua.',wait:'{n} element(e) în așteptare…',retry:'Reîncearcă',failed:'{n} element(e) nu au putut fi trimise.',sent:'✓ Totul a fost trimis.'},
+  cs:{off:'Offline — fotky jsou uloženy v telefonu a odešlou se, jakmile se vrátí síť.',wait:'{n} položek čeká na odeslání…',retry:'Zkusit znovu',failed:'{n} položek se nepodařilo odeslat.',sent:'✓ Vše odesláno.'},
+  sk:{off:'Offline — fotky sú uložené v telefóne a odošlú sa, keď sa vráti sieť.',wait:'{n} položiek čaká na odoslanie…',retry:'Skúsiť znova',failed:'{n} položiek sa nepodarilo odoslať.',sent:'✓ Všetko odoslané.'},
+  hu:{off:'Nincs kapcsolat — a fotók a telefonon vannak mentve, és a hálózat visszatértekor elküldjük őket.',wait:'{n} elem vár küldésre…',retry:'Újra',failed:'{n} elemet nem sikerült elküldeni.',sent:'✓ Minden elküldve.'},
+  bg:{off:'Няма връзка — снимките са запазени в телефона и ще бъдат изпратени, щом мрежата се върне.',wait:'{n} елемента чакат изпращане…',retry:'Опитай отново',failed:'{n} елемента не можаха да бъдат изпратени.',sent:'✓ Всичко е изпратено.'},
+  sl:{off:'Brez povezave — fotografije so shranjene v telefonu in bodo poslane, ko se omrežje vrne.',wait:'{n} elementov čaka na pošiljanje…',retry:'Poskusi znova',failed:'{n} elementov ni bilo mogoče poslati.',sent:'✓ Vse je poslano.'},
+  hr:{off:'Bez veze — fotografije su spremljene na telefonu i bit će poslane kad se mreža vrati.',wait:'{n} stavki čeka slanje…',retry:'Pokušaj ponovno',failed:'{n} stavki nije moguće poslati.',sent:'✓ Sve je poslano.'},
+  sr:{off:'Bez veze — fotografije su sačuvane na telefonu i biće poslate kad se mreža vrati.',wait:'{n} stavki čeka slanje…',retry:'Pokušaj ponovo',failed:'{n} stavki nije moguće poslati.',sent:'✓ Sve je poslato.'},
+  lt:{off:'Nėra ryšio — nuotraukos išsaugotos telefone ir bus išsiųstos, kai tik grįš tinklas.',wait:'{n} elementų laukia siuntimo…',retry:'Bandyti dar kartą',failed:'{n} elementų nepavyko išsiųsti.',sent:'✓ Viskas išsiųsta.'},
+  lv:{off:'Nav savienojuma — fotoattēli saglabāti tālrunī un tiks nosūtīti, tiklīdz tīkls atgriezīsies.',wait:'{n} elementi gaida nosūtīšanu…',retry:'Mēģināt vēlreiz',failed:'{n} elementus neizdevās nosūtīt.',sent:'✓ Viss nosūtīts.'},
+  et:{off:'Ühendus puudub — fotod on telefonis salvestatud ja saadetakse, kui võrk taastub.',wait:'{n} üksust ootab saatmist…',retry:'Proovi uuesti',failed:'{n} üksust ei õnnestunud saata.',sent:'✓ Kõik on saadetud.'}
+};
+const pqT=()=>{const t=PQ_T[portalLang()]||PQ_T.en;return k=>t[k]||PQ_T.en[k];};
+let _pqDb=null,_pqRunning=false,_pqTimer=null,_pqHadWork=false,pqCount={wait:0,failed:0};
+const pqReq=r=>new Promise((res,rej)=>{r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});
+function pqOpen(){
+  if(_pqDb)return Promise.resolve(_pqDb);
+  return new Promise((res,rej)=>{
+    if(!window.indexedDB)return rej(new Error('IndexedDB indisponible'));
+    const r=indexedDB.open('adPortalQueue',1);
+    r.onupgradeneeded=()=>r.result.createObjectStore('ops',{keyPath:'id'});
+    r.onsuccess=()=>{_pqDb=r.result;res(_pqDb);};r.onerror=()=>rej(r.error);
+  });
+}
+const pqAll=async()=>pqReq((await pqOpen()).transaction('ops').objectStore('ops').getAll());
+const pqPut=async op=>pqReq((await pqOpen()).transaction('ops','readwrite').objectStore('ops').put(op));
+const pqDel=async id=>pqReq((await pqOpen()).transaction('ops','readwrite').objectStore('ops').delete(id));
+async function pqMine(){return(await pqAll()).filter(o=>o.token===CARRIER_TOKEN).sort((a,b)=>a.seq-b.seq);}
+async function pqRecount(){try{const o=await pqMine();pqCount={wait:o.filter(x=>!x.failed).length,failed:o.filter(x=>x.failed).length};}catch(_){pqCount={wait:0,failed:0};}}
+// erreur réseau ou serveur momentanément indisponible → on réessaiera plus tard
+function pqIsNet(e){
+  const m=String((e&&(e.message||e.error_description))||e||''),st=Number((e&&(e.status||e.statusCode))||0);
+  return navigator.onLine===false||st>=500||st===429||/failed to fetch|networkerror|network request failed|load failed|timed? ?out|aborted|offline|fetch/i.test(m)||(e&&(e.name==='TypeError'||e.name==='StorageUnknownError'));
+}
+// affichage immédiat (optimiste) de ce qui est en file d'attente
+function pqLocalApply(op){
+  if(op.type==='photo'){op.url=URL.createObjectURL(op.blob);portalEvents.push({id:'q_'+op.id,car_id:op.carId,event_type:op.eventType,notes:op.photoKey,photo_url:op.url,pending:true});}
+  else if(op.type==='skip')portalEvents.push({id:'q_'+op.id,car_id:op.carId,event_type:op.eventType,notes:op.photoKey,photo_url:null,pending:true});
+  else if(op.type==='confirm'){
+    portalEvents.push({id:'q_'+op.id,car_id:op.carId,event_type:'confirmed_'+op.eventType,photo_url:null,pending:true});
+    const car=portalCars.find(c=>c.id===op.carId);if(car)car.status=op.eventType==='loading'?'chargé':'livré';
+  }
+}
+function pqLocalDone(op,ev){
+  const i=portalEvents.findIndex(e=>e.id==='q_'+op.id);
+  if(i>=0){
+    if((op.type==='photo'||op.type==='skip')&&ev&&ev.id){if(op.url)try{URL.revokeObjectURL(op.url);}catch(_){}portalEvents[i]=ev;}
+    else portalEvents[i].pending=false;
+  }
+}
+async function pqRemoteHas(url){
+  try{const{data}=await sb.rpc('portal_get',{p_token:CARRIER_TOKEN});return!!(data&&(data.events||[]).some(e=>e.photo_url===url));}catch(_){return false;}
+}
+async function pqExec(op){
+  if(op.type==='photo'){
+    if(!op.uploaded){
+      const{error}=await sb.storage.from('carrier-photos').upload(op.path,op.blob,{contentType:'image/jpeg'});
+      if(error&&!/already exists|duplicate/i.test(error.message||''))throw error;
+      op.uploaded=true;await pqPut(op);
+    }
+    const{data:{publicUrl}}=sb.storage.from('carrier-photos').getPublicUrl(op.path);
+    if(op.tries>0&&await pqRemoteHas(publicUrl))return null;   // déjà enregistrée lors d'un essai précédent
+    const{data:ev,error}=await sb.rpc('portal_add_event',{p_token:op.token,p_car_id:op.carId,p_event_type:op.eventType,p_photo_url:publicUrl,p_notes:op.photoKey});
+    if(error)throw error;return ev;
+  }
+  if(op.type==='skip'){
+    const{data:ev,error}=await sb.rpc('portal_add_event',{p_token:op.token,p_car_id:op.carId,p_event_type:op.eventType,p_photo_url:null,p_notes:op.photoKey});
+    if(error)throw error;return ev;
+  }
+  if(op.type==='confirm'){
+    const{error}=await sb.rpc('portal_confirm',{p_token:op.token,p_car_id:op.carId,p_phase:op.eventType});
+    if(error)throw error;return null;
+  }
+}
+async function pqRun(){
+  if(_pqRunning)return;_pqRunning=true;
+  let ops=[];
+  try{ops=await pqMine();}catch(_){_pqRunning=false;return;}
+  const todo=ops.filter(o=>!o.failed);
+  if(todo.length)_pqHadWork=true;
+  try{
+    for(const op of todo){
+      try{
+        const ev=await pqExec(op);
+        await pqDel(op.id);pqLocalDone(op,ev);
+      }catch(e){
+        if(pqIsNet(e))break;                       // pas de réseau : on s'arrête, reprise automatique
+        op.tries=(op.tries||0)+1;
+        if(op.tries>=3){op.failed=true;op.error=String((e&&e.message)||e);}
+        await pqPut(op);
+      }
+    }
+  }finally{
+    _pqRunning=false;await pqRecount();
+    if(_pqHadWork&&pqCount.wait===0&&pqCount.failed===0){_pqHadWork=false;portalToast(pqT()('sent'),false);}
+    renderCarrierPortal();pqSchedule();
+  }
+}
+function pqSchedule(){clearTimeout(_pqTimer);if(pqCount.wait>0)_pqTimer=setTimeout(pqRun,12000);}
+async function pqRetryNow(){
+  try{const ops=await pqMine();for(const o of ops)if(o.failed){o.failed=false;o.tries=0;await pqPut(o);}}catch(_){}
+  await pqRecount();renderCarrierPortal();pqRun();
+}
+// ajoute une opération : enregistrée sur le téléphone avant tout envoi
+async function pqEnqueue(op){
+  op.id=Date.now()+'_'+Math.random().toString(36).slice(2,8);op.token=CARRIER_TOKEN;op.seq=Date.now();op.tries=0;
+  await pqPut(op);pqLocalApply(op);await pqRecount();_pqHadWork=true;renderCarrierPortal();pqRun();
+}
+// au chargement : ce qui attend encore sur le téléphone réapparaît tout de suite
+async function pqRestore(){
+  try{
+    const ops=await pqMine();
+    ops.forEach(op=>{if(!portalEvents.some(e=>e.id==='q_'+op.id))pqLocalApply(op);});
+    await pqRecount();if(ops.length){_pqHadWork=true;renderCarrierPortal();pqRun();}
+  }catch(_){}
+}
+function pqBannerHtml(){
+  const t=pqT(),off=navigator.onLine===false;
+  if(!off&&!pqCount.wait&&!pqCount.failed)return'';
+  const rd=n=>n.replace('{n}',pqCount.wait+pqCount.failed);
+  let msg,cls='pt-off';
+  if(pqCount.failed){msg='⚠ '+t('failed').replace('{n}',pqCount.failed);cls='pt-off bad';}
+  else if(off)msg='📴 '+t('off')+(pqCount.wait?' ('+pqCount.wait+')':'');
+  else msg='⏳ '+t('wait').replace('{n}',pqCount.wait);
+  return `<div class="${cls}"><span>${esc(msg)}</span>${off&&!pqCount.failed?'':`<button type="button" onclick="pqRetryNow()">${esc(t('retry'))}</button>`}</div>`;
+}
+window.addEventListener('online',()=>{if(typeof CARRIER_TOKEN!=='undefined'&&CARRIER_TOKEN)pqRun();});
+window.addEventListener('offline',()=>{if(typeof CARRIER_TOKEN!=='undefined'&&CARRIER_TOKEN&&document.getElementById('carrier-portal')?.style.display==='block')renderCarrierPortal();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&typeof CARRIER_TOKEN!=='undefined'&&CARRIER_TOKEN&&portalMission)pqRun();});
+
 async function initCarrierPortal(){
   const portal=document.getElementById('carrier-portal');
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('app-shell').style.display='none';
   portal.style.display='block';
   setLoading(true);
+  const ck='adPortalCache_'+CARRIER_TOKEN;
+  try{
+    if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
+  }catch(_){}
   try{
     // Récupère la mission par son token (anon, pas d'auth)
-    const {data:pk,error}=await sb.rpc('portal_get',{p_token:CARRIER_TOKEN});
-    if(error)throw error;
+    let pk=null;
+    try{
+      const {data,error}=await sb.rpc('portal_get',{p_token:CARRIER_TOKEN});
+      if(error)throw error;
+      pk=data;
+      if(pk&&pk.mission)try{localStorage.setItem(ck,JSON.stringify(pk));}catch(_){}
+    }catch(e){
+      // pas de réseau : on réaffiche la dernière version connue de la mission
+      if(!pqIsNet(e))throw e;
+      try{pk=JSON.parse(localStorage.getItem(ck)||'null');}catch(_){pk=null;}
+      if(!pk)throw e;
+    }
     if(!pk||!pk.mission){renderPortalError('Lien invalide ou expiré.');setLoading(false);return;}
     portalMission=pk.mission;
     portalCars=pk.cars||[];
     portalEvents=pk.events||[];
     portalDocs=pk.docs||[];
     renderCarrierPortal();
+    await pqRestore();
   }catch(e){
     renderPortalError('Erreur : '+e.message);
   }
@@ -7032,6 +7206,7 @@ function renderCarrierPortal(){
         ${stop('b',L.delivery,m.delivery_site,m.delivery_city,m.delivery_street,m.delivery_postal,m.delivery_country,m.delivery_date,m.delivery_contact)}
       </div>
     </div>
+    ${pqBannerHtml()}
     <div class="pt-main">
       <div class="pt-tip"><span>📋</span><span>${L.tip.replace(/^📋\s*/,'')}</span></div>
       ${portalCars.map(car=>renderCarPortalCard(car,lang,L)).join('')}
@@ -7147,6 +7322,7 @@ async function portalUploadVideo(carId,eventType,input){
   const rawFile=input.files[0];
   if(!rawFile)return;
   input.value='';
+  if(navigator.onLine===false){portalToast(pqT()('vid'));return;}
   const progWrap=document.getElementById(`vid-progress-${carId}-${eventType}`);
   const progBar=document.getElementById(`vid-progress-bar-${carId}-${eventType}`);
   const progLabel=document.getElementById(`vid-progress-label-${carId}-${eventType}`);
@@ -7241,27 +7417,35 @@ async function portalUploadPhoto(carId,eventType,input,photoKey){
     // Watermark + compression
     const dataUrl=await watermarkPhoto(rawFile,ts,lat,lng,zoneLabel);
     const blob=await(await fetch(dataUrl)).blob();
-    const file=new File([blob],rawFile.name,{type:'image/jpeg'});
     const path=`${portalMission.id}/${carId}/${eventType}_${photoKey}_${Date.now()}.jpg`;
-    const {error:uploadErr}=await sb.storage.from('carrier-photos').upload(path,file,{contentType:'image/jpeg'});
-    if(uploadErr)throw uploadErr;
-    const {data:{publicUrl}}=sb.storage.from('carrier-photos').getPublicUrl(path);
-    const {data:ev,error:evErr}=await sb.rpc('portal_add_event',{p_token:CARRIER_TOKEN,p_car_id:carId,p_event_type:eventType,p_photo_url:publicUrl,p_notes:photoKey});
-    if(evErr)throw evErr;
-    portalEvents.push(ev);
-    renderCarrierPortal();
+    // enregistrée sur le téléphone puis envoyée (reprise automatique si le réseau manque)
+    try{await pqEnqueue({type:'photo',carId,eventType,photoKey,blob,path});}
+    catch(qe){
+      // file d'attente indisponible (navigateur très restreint) : envoi direct comme avant
+      const file=new File([blob],rawFile.name,{type:'image/jpeg'});
+      const {error:uploadErr}=await sb.storage.from('carrier-photos').upload(path,file,{contentType:'image/jpeg'});
+      if(uploadErr)throw uploadErr;
+      const {data:{publicUrl}}=sb.storage.from('carrier-photos').getPublicUrl(path);
+      const {data:ev,error:evErr}=await sb.rpc('portal_add_event',{p_token:CARRIER_TOKEN,p_car_id:carId,p_event_type:eventType,p_photo_url:publicUrl,p_notes:photoKey});
+      if(evErr)throw evErr;
+      portalEvents.push(ev);
+      renderCarrierPortal();
+    }
   }catch(e){
-    portalToast('Erreur upload : '+e.message+' — Vérifie que le bucket carrier-photos est créé et public dans Supabase Storage.');
+    portalToast('Erreur : '+e.message);
   }
 }
 
 async function portalSkipPhoto(carId,eventType,photoKey){
-  try{
-    const {data:ev,error}=await sb.rpc('portal_add_event',{p_token:CARRIER_TOKEN,p_car_id:carId,p_event_type:eventType,p_photo_url:null,p_notes:photoKey});
-    if(error)throw error;
-    portalEvents.push(ev);
-    renderCarrierPortal();
-  }catch(e){portalToast('Erreur : '+e.message);}
+  try{await pqEnqueue({type:'skip',carId,eventType,photoKey});}
+  catch(qe){
+    try{
+      const {data:ev,error}=await sb.rpc('portal_add_event',{p_token:CARRIER_TOKEN,p_car_id:carId,p_event_type:eventType,p_photo_url:null,p_notes:photoKey});
+      if(error)throw error;
+      portalEvents.push(ev);
+      renderCarrierPortal();
+    }catch(e){portalToast('Erreur : '+e.message);}
+  }
 }
 
 // Stockage global de la confirmation en attente — évite tout problème de quoting dans onclick
@@ -7302,25 +7486,23 @@ function portalConfirmPhase(carId,eventType){
 }
 
 async function _doPortalConfirm(carId,eventType){
-  // Feedback visuel pendant la requête
-  const btnId='portal-confirm-doing';
-  const existing=document.getElementById(btnId);
-  if(existing)existing.textContent='⏳ Confirmation en cours…';
-
-  try{
-    const newStatus=eventType==='loading'?'chargé':'livré';
-    const {error}=await sb.rpc('portal_confirm',{p_token:CARRIER_TOKEN,p_car_id:carId,p_phase:eventType});
-    if(error)throw error;
-    const car=portalCars.find(c=>c.id===carId);
-    if(car)car.status=newStatus;
-    renderCarrierPortal();
-  }catch(e){
-    // Affiche l'erreur inline (alert() bloqué sur GitHub Pages/mobile)
-    const errDiv=document.createElement('div');
-    errDiv.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#c0392b;color:#fff;padding:14px 22px;border-radius:10px;font-size:14px;font-weight:600;z-index:99999;max-width:90%';
-    errDiv.textContent='❌ Erreur : '+e.message;
-    document.body.appendChild(errDiv);
-    setTimeout(()=>errDiv.remove(),5000);
+  try{await pqEnqueue({type:'confirm',carId,eventType});}
+  catch(e){
+    // file d'attente indisponible : envoi direct comme avant
+    try{
+      const {error}=await sb.rpc('portal_confirm',{p_token:CARRIER_TOKEN,p_car_id:carId,p_phase:eventType});
+      if(error)throw error;
+      const car=portalCars.find(c=>c.id===carId);
+      if(car)car.status=eventType==='loading'?'chargé':'livré';
+      portalEvents.push({id:'c_'+Date.now(),car_id:carId,event_type:'confirmed_'+eventType,photo_url:null});
+      renderCarrierPortal();
+    }catch(e2){
+      const errDiv=document.createElement('div');
+      errDiv.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#c0392b;color:#fff;padding:14px 22px;border-radius:10px;font-size:14px;font-weight:600;z-index:99999;max-width:90%';
+      errDiv.textContent='❌ Erreur : '+e2.message;
+      document.body.appendChild(errDiv);
+      setTimeout(()=>errDiv.remove(),5000);
+    }
   }
 }
 
