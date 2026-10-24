@@ -776,6 +776,7 @@ html[data-theme="dark"] [style*="border"][style*="#fff"]{border-color:#3b3b3b!im
   <div class="auth-card">
     <div class="auth-brand"><i class="ad-tile"><svg viewBox="90 180 730 640" fill="none" aria-hidden="true"><g stroke="#fff" stroke-width="40" stroke-linecap="round"><path d="M430 500H500C590 500 590 250 676 250"/><path d="M500 500H676"/><path d="M500 500C590 500 590 750 676 750"/></g><g stroke-width="36"><circle cx="745" cy="250" r="62" stroke="#fff"/><circle cx="745" cy="500" r="62" stroke="#ffa94d"/><circle cx="745" cy="750" r="62" stroke="#fff"/></g><circle cx="265" cy="500" r="175" fill="#fff"/><g transform="translate(150 438) scale(2.3)" fill="#2f8ad0"><path d="M18 34 30 12H68L82 34Z"/><rect x="2" y="30" width="96" height="30" rx="12"/><circle cx="26" cy="62" r="11"/><circle cx="74" cy="62" r="11"/><circle cx="26" cy="62" r="4" fill="#fff"/><circle cx="74" cy="62" r="4" fill="#fff"/></g></svg></i><div class="bt">auto<span>dispatch</span><small>TRANSPORT MANAGEMENT</small></div></div>
     <div class="auth-title">Connexion</div>
+    <div class="field" id="login-code-wrap" style="display:none;margin-bottom:9px"><label>CODE SOCIÉTÉ</label><input id="login-code" type="text" placeholder="Fourni par votre société de transport" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
     <div class="field"><label>E-MAIL</label><input id="login-email" type="email" placeholder="votre@email.com" autocomplete="email"></div>
     <div class="field" style="margin-top:9px"><label>MOT DE PASSE</label><input id="login-pwd" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()"></div>
     <div class="auth-err" id="login-err"></div>
@@ -842,8 +843,47 @@ html[data-theme="dark"] [style*="border"][style*="#fff"]{border-color:#3b3b3b!im
 //  CONFIG — remplace les deux valeurs ci-dessous par celles de
 //  ton projet Supabase : Settings → API → Project URL & anon key
 // ═══════════════════════════════════════════════════════════════
-const SUPABASE_URL  = 'https://srmesytesdspwdtumnfj.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNybWVzeXRlc2RzcHdkdHVtbmZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1ODMyMDEsImV4cCI6MjEwNjE1OTIwMX0.NpngBYSzBUNf7_OI516YhmtwzvPGPewlPRTPwbPwYoI';
+// ─── PLUSIEURS SOCIÉTÉS : un code société choisit la base de données de la société ───
+// Chaque société cliente a sa propre base. Le registre ci-dessous ne contient que l'empreinte (SHA-256) du code :
+// une ligne par société {empreinte : {url, anon}}. Sans code (ou code inconnu) : la société par défaut.
+function adSha256(msg){
+  const K=[],H=[];
+  for(let n=2,c=0;c<64;n++){let p=true;for(let d=2;d*d<=n;d++)if(n%d===0){p=false;break;}if(!p)continue;if(c<8)H[c]=Math.floor((Math.pow(n,1/2)%1)*4294967296)>>>0;K[c]=Math.floor((Math.pow(n,1/3)%1)*4294967296)>>>0;c++;}
+  const m=new TextEncoder().encode(msg),l=m.length,len=((l+9+63)>>6)<<6,b=new Uint8Array(len);b.set(m);b[l]=0x80;
+  const dv=new DataView(b.buffer);dv.setUint32(len-8,Math.floor(l*8/4294967296));dv.setUint32(len-4,(l*8)>>>0);
+  const rot=(x,n)=>(x>>>n)|(x<<(32-n)),h=H.slice(),w=new Array(64);
+  for(let o=0;o<len;o+=64){
+    for(let i=0;i<16;i++)w[i]=dv.getUint32(o+i*4);
+    for(let i=16;i<64;i++){const s0=rot(w[i-15],7)^rot(w[i-15],18)^(w[i-15]>>>3),s1=rot(w[i-2],17)^rot(w[i-2],19)^(w[i-2]>>>10);w[i]=(w[i-16]+s0+w[i-7]+s1)>>>0;}
+    let[a,bb,c,d,e,f,g,hh]=h;
+    for(let i=0;i<64;i++){
+      const S1=rot(e,6)^rot(e,11)^rot(e,25),ch=(e&f)^(~e&g),t1=(hh+S1+ch+K[i]+w[i])>>>0,S0=rot(a,2)^rot(a,13)^rot(a,22),mj=(a&bb)^(a&c)^(bb&c),t2=(S0+mj)>>>0;
+      hh=g;g=f;f=e;e=(d+t1)>>>0;d=c;c=bb;bb=a;a=(t1+t2)>>>0;
+    }
+    h[0]=(h[0]+a)>>>0;h[1]=(h[1]+bb)>>>0;h[2]=(h[2]+c)>>>0;h[3]=(h[3]+d)>>>0;h[4]=(h[4]+e)>>>0;h[5]=(h[5]+f)>>>0;h[6]=(h[6]+g)>>>0;h[7]=(h[7]+hh)>>>0;
+  }
+  return h.map(x=>x.toString(16).padStart(8,'0')).join('');
+}
+const AD_COMPANIES={
+  // 'empreinte-sha256-du-code-en-majuscules':{url:'https://xxxx.supabase.co',anon:'clé anon publique'},
+};
+const AD_DEFAULT={url:'https://srmesytesdspwdtumnfj.supabase.co',anon:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNybWVzeXRlc2RzcHdkdHVtbmZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1ODMyMDEsImV4cCI6MjEwNjE1OTIwMX0.NpngBYSzBUNf7_OI516YhmtwzvPGPewlPRTPwbPwYoI'};
+const adNormCode=c=>String(c||'').trim().toUpperCase().replace(/\s+/g,'');
+const adLookup=c=>{c=adNormCode(c);return c?AD_COMPANIES[adSha256(c)]||null:null;};
+let AD_BADCODE=false;
+const AD_CODE=(()=>{
+  const qs=new URLSearchParams(location.search),fromUrl=adNormCode(qs.get('c')),portal=qs.get('t')||qs.get('inspection');
+  if(fromUrl){
+    if(adLookup(fromUrl)){if(!portal){try{localStorage.setItem('adCompanyCode',fromUrl);}catch(_){}}return fromUrl;}   // un lien de portail ne change pas la société enregistrée
+    AD_BADCODE=true;return '';   // code inconnu : on n'utilise surtout pas la société mémorisée
+  }
+  let c='';try{c=adNormCode(localStorage.getItem('adCompanyCode'));}catch(_){}
+  return c&&adLookup(c)?c:'';
+})();
+const AD_CFG=(AD_CODE&&adLookup(AD_CODE))||AD_DEFAULT;
+const adC=()=>AD_CODE?'&c='+encodeURIComponent(AD_CODE):'';   // à ajouter aux liens envoyés aux chauffeurs et aux clients
+const SUPABASE_URL=AD_CFG.url;
+const SUPABASE_ANON=AD_CFG.anon;
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 // ─── JOURNAL D'AUDIT : trace automatique des écritures importantes (ne bloque jamais l'application) ───
 const AUDIT_TABLES={missions:'Mission',tours:'Tournée',freight_offers:'Offre de la bourse',invoices:'Facture',carrier_documents:'Document transporteur',carriers:'Transporteur',clients:'Client',sites:'Site',trucks:'Camion',app_settings:'Réglage'};
@@ -1577,14 +1617,33 @@ async function checkAuth(){
   const {data:{session}}=await sb.auth.getSession();
   setLoading(false);
   if(session){currentUser=session.user;await initApp();}
-  else{document.getElementById('auth-screen').style.display='flex';}
+  else{document.getElementById('auth-screen').style.display='flex';adInitCodeField();}
 }
 
+// champ « Code société » : visible dès que plusieurs sociétés existent (ou si un code a été demandé par le lien)
+function adInitCodeField(){
+  const wrap=document.getElementById('login-code-wrap');if(!wrap)return;
+  if(Object.keys(AD_COMPANIES).length||AD_CODE||AD_BADCODE){
+    wrap.style.display='block';document.getElementById('login-code').value=AD_CODE;
+    if(AD_BADCODE)document.getElementById('login-err').textContent='Code société inconnu. Vérifie le code reçu.';
+  }
+  try{const pre=JSON.parse(sessionStorage.getItem('adLoginPrefill')||'null');if(pre){document.getElementById('login-email').value=pre.email||'';sessionStorage.removeItem('adLoginPrefill');}}catch(_){}
+}
 async function login(){
   const email=document.getElementById('login-email').value.trim();
   const pwd=document.getElementById('login-pwd').value;
   const err=document.getElementById('login-err');
   err.textContent='';
+  // changement de société : on enregistre le code puis on recharge la page sur la bonne base
+  const wrap=document.getElementById('login-code-wrap');
+  if(wrap&&wrap.style.display!=='none'){
+    const code=adNormCode(document.getElementById('login-code').value);
+    if(code&&!adLookup(code)){err.textContent='Code société inconnu. Vérifie le code reçu.';return;}
+    if(code!==AD_CODE){
+      try{if(code)localStorage.setItem('adCompanyCode',code);else localStorage.removeItem('adCompanyCode');sessionStorage.setItem('adLoginPrefill',JSON.stringify({email}));}catch(_){}
+      location.href=location.pathname;return;
+    }
+  }
   if(!email||!pwd){err.textContent='Complète les deux champs.';return;}
   setLoading(true);
   try{
@@ -4098,7 +4157,7 @@ function csBourseHtml(T){
 function csTransportsHtml(T){
   return `<div class="panel"><div class="panel-title"><h2>${esc(T.transports)}</h2></div>
   ${csTransports.map(t=>{
-    const o=csOffers.find(x=>x.missionId===t.id),done=o&&o.status==='confirmed',link=window.location.origin+window.location.pathname+'?t='+t.carrier_token;
+    const o=csOffers.find(x=>x.missionId===t.id),done=o&&o.status==='confirmed',link=window.location.origin+window.location.pathname+'?t='+t.carrier_token+adC();
     return `<div style="border-top:1px solid var(--line);padding:14px 0"><div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><strong>${esc(t.ref)}</strong><span style="font-size:12px;color:var(--green);font-weight:700">${esc(done?T.confirmed:T.accepted)}${o?' · '+eur(o.price):''}</span></div>
       <div style="margin-top:4px">⬆ ${esc(place(t.pickup_country,t.pickup_city))} → ⬇ ${esc(place(t.delivery_country,t.delivery_city))}</div><div style="font-size:12.5px;color:#536a7d">${esc(T.vehicles)} : ${csVeh(t.cars)}</div>
       ${done?`<div style="font-size:13px;margin-top:6px">🚛 <b>${esc(t.carrier_plate||'')}</b> · ${esc(t.carrier_driver||'')} · ${csDate(t.carrier_load_date)} → ${csDate(t.carrier_delivery_date)}</div><p style="margin:8px 0 0"><a class="btn primary" href="${esc(link)}" target="_blank">${esc(T.portal)}</a></p>`
@@ -6299,7 +6358,7 @@ async function assignCarrierToMissions(carrierId,mids,emailInput='',force=false)
 
   if(tokens.length===1){
     const {m,token}=tokens[0];
-    const link=`${baseUrl}?t=${token}`;
+    const link=`${baseUrl}?t=${token}${adC()}`;
     if(carrierEmail){
       const subject=`AutoDispatch · Transport Confirmation · ${m.ref}`;
       const body=buildCarrierEmail(m,link,carrier?.name||'');
@@ -6309,11 +6368,11 @@ async function assignCarrierToMissions(carrierId,mids,emailInput='',force=false)
       alert(`✓ Transporteur affecté !\n\nLien portail copié dans le presse-papier :\n${link}\n\nTu peux l'envoyer par e-mail au transporteur.`);
     }
   } else {
-    const allLinks=tokens.map(({m,token})=>`${m.ref} : ${baseUrl}?t=${token}`).join('\n');
+    const allLinks=tokens.map(({m,token})=>`${m.ref} : ${baseUrl}?t=${token}${adC()}`).join('\n');
     if(carrierEmail){
       const subject=`AutoDispatch · Transport Confirmation · ${tokens.map(t=>t.m.ref).join(', ')}`;
       const missionBlocks=tokens.map(({m,token})=>{
-        const link=`${baseUrl}?t=${token}`;
+        const link=`${baseUrl}?t=${token}${adC()}`;
         const allDocs=m.cars.flatMap(c=>(c.docs||[]).filter(d=>d.url).map(d=>({car:c,doc:d})));
         const docsSection=allDocs.length
           ?`\n  📎 Documents:\n`+allDocs.map(({car,doc})=>`    • ${car.make} ${car.model}${car.plate?' ('+car.plate+')':''} – ${doc.name||doc.phase||'Document'}: ${doc.url}`).join('\n')
@@ -6388,7 +6447,7 @@ function buildCarrierEmail(m,link,carrierName){
 function copyPortalLink(missionId){
   const m=db.missions.find(x=>x.id===missionId);
   if(!m?.carrierToken){alert('Aucun lien portail disponible pour cette mission.');return;}
-  const link=`${window.location.origin}${window.location.pathname}?t=${m.carrierToken}`;
+  const link=`${window.location.origin}${window.location.pathname}?t=${m.carrierToken}${adC()}`;
   navigator.clipboard.writeText(link).then(()=>alert('Lien copié !\n'+link)).catch(()=>alert('Lien portail :\n'+link));
 }
 
@@ -6608,7 +6667,7 @@ function closeModal(){document.getElementById('modal').classList.remove('open');
 function openDetail(id){
   detailId=id;
   const m=db.missions.find(x=>x.id===id);if(!m)return;
-  const portalLink=m.carrierToken?`${window.location.origin}${window.location.pathname}?t=${m.carrierToken}`:'';
+  const portalLink=m.carrierToken?`${window.location.origin}${window.location.pathname}?t=${m.carrierToken}${adC()}`:'';
   const d=document.getElementById('detail');
   d.innerHTML=`<div class="detail-head"><div><div class="eyebrow">FICHE MISSION</div><h2>${esc(m.ref)}</h2><p>${esc(getClient(m).name||'—')} · ${badge(m.status)}</p></div><button class="x" onclick="closeDetail()">×</button></div>
   <div class="detail-block"><h3>Dates et adresses</h3><div class="route"><div class="routebox"><small>ENLÈVEMENT · ${pretty(m.pickupDate)}</small><strong>${esc(m.pickupSite)}</strong>${siteBadges(m.pickupSiteId)}<p>${esc([ccLabel(m.pickupCountry),[m.pickupPostal,m.pickupCity].filter(Boolean).join(' '),m.pickupStreet].filter(Boolean).join(' · '))}<br>Contact : ${esc(m.pickupContact||'—')}${m.keys?`<br><span style="font-weight:700;color:${m.keys==='1'?'#9a6b18':'#286d99'}">🔑 ${m.keys} clef${m.keys==='2'?'s':''} remise${m.keys==='2'?'s':''} au chargement</span>`:''}</p></div><div class="routebox"><small>LIVRAISON · ${pretty(m.deliveryDate)}</small><strong>${esc(m.deliverySite)}</strong>${siteBadges(m.deliverySiteId)}<p>${esc([ccLabel(m.deliveryCountry),[m.deliveryPostal,m.deliveryCity].filter(Boolean).join(' '),m.deliveryStreet].filter(Boolean).join(' · '))}<br>Contact : ${esc(m.deliveryContact||'—')}${m.deliveryEmail?`<br>E-mail : <a href="mailto:${esc(m.deliveryEmail)}" style="color:var(--blue)">${esc(m.deliveryEmail)}</a>`:''}</p>${m.deliveryEmail?`<button class="btn soft" style="margin-top:7px;font-size:11px" onclick="draftDeliverySite('${esc(m.id)}')">📧 Notifier site de livraison (${detectLang(m.deliveryCountry).toUpperCase()})</button>`:`<div style="font-size:10px;color:var(--muted);margin-top:6px">Pas d'e-mail livraison — modifier la mission pour en ajouter un.</div>`}</div></div><p><button class="btn" onclick="openMissionForm('${esc(m.id)}')">Modifier la mission / dates</button></p></div>
@@ -6916,7 +6975,7 @@ function buildClientEmail(m,n){
         ?(C.inspection_text_delivery||C.inspection_text||'Please use the link below to report any damage and sign the delivery receipt:')
         :(C.inspection_text||'Please use the link below when your vehicle(s) arrive to report any damage and sign the delivery receipt:'),
       ``,
-      `👉 ${window.location.origin}${window.location.pathname}?inspection=${m.deliveryToken}`,
+      `👉 ${window.location.origin}${window.location.pathname}?inspection=${m.deliveryToken}${adC()}`,
       ``,
       C.inspection_note||'(This link is valid for this delivery only — please complete the form on arrival of the vehicles)',
     ]:[]),
@@ -6993,7 +7052,7 @@ function draftDeliverySite(mid){
       T.insp_title||'📋 VEHICLE CONDITION REPORT',
       T.insp_text||'Please use the link below upon vehicle arrival to report any damage and sign the delivery receipt:',
       ``,
-      `👉 ${window.location.origin}${window.location.pathname}?inspection=${m.deliveryToken}`,
+      `👉 ${window.location.origin}${window.location.pathname}?inspection=${m.deliveryToken}${adC()}`,
       ``,
       T.insp_note||'(One-time link — to be completed upon arrival of the vehicles)',
     ]:[])
